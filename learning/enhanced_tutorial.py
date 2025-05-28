@@ -586,8 +586,8 @@ class EnhancedTutorial:
         if error_type == "array_out_of_bounds":
             # Examples of fixing common array out of bounds issues
             return [
-                "for(int i = 0; i < data.length; i++) { data[i] = i; }", // Corrected loop
-                "if (items.length > 0) { value = items[items.length - 1]; } else { /* handle empty array */ }" // Access last element safely
+                "for(int i = 0; i < data.length; i++) { data[i] = i; }", 
+                "if (items.length > 0) { value = items[items.length - 1]; } else { /* handle empty array */ }" 
             ]
         elif error_type == "missing_null_check":
             # Examples of adding null checks
@@ -598,8 +598,8 @@ class EnhancedTutorial:
         elif error_type == "string_comparison_by_ref":
             # Examples of using .equals() for string comparison
             return [
-                "if (str1 != null && str1.equals(str2)) { /*...*/ }", // Added null check for safety
-                "while (userInput != null && userInput.equals(\"EXIT\")) { /*...*/ }" // Added null check
+                "if (str1 != null && str1.equals(str2)) { /*...*/ }",
+                "while (userInput != null && userInput.equals(\"EXIT\")) { /*...*/ }" 
             ]
         else:
             # Generic fallback, should ideally not be reached if error_type is always one of the above
