@@ -521,6 +521,7 @@ translations = {
 
     "tab_tutorial": "教程",
     "tab_dashboard": "仪表板",
+    "tab_error_explorer": "错误浏览器",
     "user_not_authenticated_tutorial": "用户未通过身份验证。请登录以访问教程。",
     "user_not_authenticated_dashboard": "用户未通过身份验证。请登录以访问仪表板。"
 }

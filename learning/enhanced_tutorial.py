@@ -157,21 +157,23 @@ class EnhancedTutorial:
         
         # Error pattern examples for pattern recognition
         self.error_patterns = {
-            "off_by_one": [
-                "for(int i = 0; i <= array.length; i++)",
-                "for(int i = 1; i <= array.length; i++)",
-                "while(index <= list.size())"
+            "missing_null_check": [
+                "user.profile.updateBio(newBio);", # Potentially user or user.profile is null
+                "String data = fetchData(); data.toLowerCase();", # Potentially data is null
+                "configs[i].initialize();" # Potentially configs[i] is null
             ],
-            "null_check": [
-                "if(object.getValue() > 0 && object != null)",
-                "String result = getString(); result.toLowerCase();",
-                "user.getName().equals(searchName)"
+            "array_out_of_bounds": [
+                "for(int i = 0; i <= data.length; i++) { data[i] = i; }",
+                "value = items[items.length];",
+                "element = fixedArray[5]; /* Assume fixedArray.length <= 5 */",
+                "item = anArray[-1];"
             ],
-            "string_comparison": [
-                "if(str1 == str2)",
-                "return name == otherName;",
-                "while(input == \"quit\")"
+            "string_comparison_by_ref": [
+                "if (str1 == str2) { /*...*/ }",
+                "while (userInput == \"EXIT\") { /*...*/ }", # Escaped for Python string
+                "return actualValue == expectedValue;"
             ]
+            # Old keys 'off_by_one', 'null_check', 'string_comparison' are now removed/updated.
         }
     
     def get_tutorial_progress(self, user_id: str) -> Dict[str, Any]:
@@ -581,20 +583,24 @@ class EnhancedTutorial:
     
     def _generate_correct_alternatives(self, error_type: str, incorrect_pattern: str) -> List[str]:
         """Generate correct code alternatives for pattern recognition."""
-        if error_type == "off_by_one":
+        if error_type == "array_out_of_bounds":
+            # Examples of fixing common array out of bounds issues
             return [
-                "for(int i = 0; i < array.length; i++)",
-                "for(int i = 0; i < array.length - 1; i++)"
+                "for(int i = 0; i < data.length; i++) { data[i] = i; }", // Corrected loop
+                "if (items.length > 0) { value = items[items.length - 1]; } else { /* handle empty array */ }" // Access last element safely
             ]
-        elif error_type == "null_check":
+        elif error_type == "missing_null_check":
+            # Examples of adding null checks
             return [
-                "if(object != null && object.getValue() > 0)",
-                "String result = getString(); if(result != null) result.toLowerCase();"
+                "if (user != null && user.profile != null) { user.profile.updateBio(newBio); }",
+                "String data = fetchData(); if (data != null) { data.toLowerCase(); }"
             ]
-        elif error_type == "string_comparison":
+        elif error_type == "string_comparison_by_ref":
+            # Examples of using .equals() for string comparison
             return [
-                "if(str1.equals(str2))",
-                "return name.equals(otherName);"
+                "if (str1 != null && str1.equals(str2)) { /*...*/ }", // Added null check for safety
+                "while (userInput != null && userInput.equals(\"EXIT\")) { /*...*/ }" // Added null check
             ]
         else:
-            return ["// Correct code example 1", "// Correct code example 2"]
+            # Generic fallback, should ideally not be reached if error_type is always one of the above
+            return ["// Corrected: Example 1", "// Corrected: Example 2"]
