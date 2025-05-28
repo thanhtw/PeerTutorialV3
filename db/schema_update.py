@@ -64,7 +64,7 @@ def create_core_tables(db):
         consecutive_days INT DEFAULT 0,
         total_points INT DEFAULT 0,
         tutorial_completed BOOLEAN DEFAULT FALSE        
-    )
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     """
     
     # Create error_category_stats table
@@ -79,7 +79,7 @@ def create_core_tables(db):
         last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(uid),
         UNIQUE KEY (user_id, category)
-    )
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     """
     
     # Create activity_log table for detailed point history
@@ -93,7 +93,7 @@ def create_core_tables(db):
         details_zh TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(uid)
-    )
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     """
     
     db.execute_query(users_table)
@@ -118,7 +118,7 @@ def create_learning_tables(db):
         total_practice_time INT DEFAULT 0,
         FOREIGN KEY (user_id) REFERENCES users(uid),
         UNIQUE KEY (user_id, skill_category)
-    )
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     """
     
     # Tutorial Progress
@@ -134,7 +134,7 @@ def create_learning_tables(db):
         attempts_count INT DEFAULT 0,
         FOREIGN KEY (user_id) REFERENCES users(uid),
         UNIQUE KEY (user_id)
-    )
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     """
     
     # Learning Hints System
@@ -148,7 +148,7 @@ def create_learning_tables(db):
         used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         helpful BOOLEAN NULL,
         FOREIGN KEY (user_id) REFERENCES users(uid)
-    )
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     """
     
     # Pattern Recognition Progress
@@ -166,7 +166,7 @@ def create_learning_tables(db):
         last_practiced TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(uid),
         UNIQUE KEY (user_id, error_pattern)
-    )
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     """
     
     # Learning Sessions
@@ -183,7 +183,7 @@ def create_learning_tables(db):
         performance_score FLOAT DEFAULT 0.0,
         session_data JSON,
         FOREIGN KEY (user_id) REFERENCES users(uid)
-    )
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     """
     
     # AI Tutor Interactions
@@ -198,7 +198,7 @@ def create_learning_tables(db):
         helpful_rating INT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(uid)
-    )
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     """
     
     # Learning Paths
@@ -216,7 +216,7 @@ def create_learning_tables(db):
         is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    )
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     """
 
     learning_path_steps_table = """
@@ -235,7 +235,7 @@ def create_learning_tables(db):
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (path_id) REFERENCES learning_paths(id) ON DELETE CASCADE
-    )
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     """
     
     user_learning_paths_table = """
@@ -254,7 +254,7 @@ def create_learning_tables(db):
         FOREIGN KEY (path_id) REFERENCES learning_paths(id) ON DELETE CASCADE,
         FOREIGN KEY (current_step_id) REFERENCES learning_path_steps(id) ON DELETE SET NULL, /* If a step is deleted, nullify here */
         UNIQUE KEY (user_id, path_id)
-    )
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     """
     
     # User preferences for personalized learning
@@ -271,7 +271,7 @@ def create_learning_tables(db):
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(uid),
         UNIQUE KEY (user_id)
-    )
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     """
     
     db.execute_query(learning_progress_table)
@@ -298,7 +298,7 @@ def create_achievement_tables(db):
         description_zh TEXT,
         icon VARCHAR(20),
         sort_order INT DEFAULT 0
-    )
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     """
     
     # Create badges table with multilingual fields and enhanced features
@@ -317,7 +317,7 @@ def create_achievement_tables(db):
         unlock_criteria JSON,
         rarity VARCHAR(20) DEFAULT 'common',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     """
     
     # Create user_badges table
@@ -330,7 +330,7 @@ def create_achievement_tables(db):
         FOREIGN KEY (user_id) REFERENCES users(uid),
         FOREIGN KEY (badge_id) REFERENCES badges(badge_id),
         UNIQUE KEY (user_id, badge_id)
-    )
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     """
     
     db.execute_query(achievement_categories_table)
@@ -354,7 +354,7 @@ def create_peer_learning_tables(db):
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         expires_at TIMESTAMP,
         FOREIGN KEY (creator_id) REFERENCES users(uid)
-    )
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     """
     
     peer_review_participants_table = """
@@ -368,7 +368,7 @@ def create_peer_learning_tables(db):
         FOREIGN KEY (session_id) REFERENCES peer_review_sessions(id),
         FOREIGN KEY (user_id) REFERENCES users(uid),
         UNIQUE KEY (session_id, user_id)
-    )
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     """
     
     db.execute_query(peer_review_sessions_table)
@@ -391,7 +391,7 @@ def create_daily_challenge_tables(db):
         reward_points INT DEFAULT 50,
         bonus_badge VARCHAR(50) NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     """
     
     user_daily_challenges_table = """
@@ -406,7 +406,7 @@ def create_daily_challenge_tables(db):
         FOREIGN KEY (user_id) REFERENCES users(uid),
         FOREIGN KEY (challenge_id) REFERENCES daily_challenges(id),
         UNIQUE KEY (user_id, challenge_id)
-    )
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     """
     
     db.execute_query(daily_challenges_table)
@@ -433,7 +433,7 @@ def create_additional_tables(db):
         usage_count INT DEFAULT 0,
         rating FLOAT DEFAULT 0.0,
         FOREIGN KEY (created_by) REFERENCES users(uid)
-    )
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     """
     
     db.execute_query(code_examples_table)
@@ -445,9 +445,13 @@ def create_error_library_tables(db):
     CREATE TABLE IF NOT EXISTS error_details (
         id INT AUTO_INCREMENT PRIMARY KEY,
         error_code VARCHAR(50) NOT NULL UNIQUE,
-        language VARCHAR(20) NOT NULL DEFAULT 'Java',
+        language VARCHAR(20) NOT NULL DEFAULT 'Java', -- Represents programming_language
         title VARCHAR(255) NOT NULL,
         detailed_description_md TEXT,
+        category VARCHAR(255) NOT NULL,
+        content_language VARCHAR(10) NOT NULL,
+        implementation_guide_md TEXT NULL,
+        suggestion_fix_md TEXT NULL,
         example_good_code_md TEXT,
         example_bad_code_md TEXT,
         before_after_comparison_md TEXT,
@@ -455,7 +459,7 @@ def create_error_library_tables(db):
         importance_explanation_md TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    )
+    ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     """
     db.execute_query(error_details_table)
     logger.info("Error library tables created successfully")
