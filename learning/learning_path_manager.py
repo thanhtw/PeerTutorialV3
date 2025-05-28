@@ -45,7 +45,7 @@ class LearningPathManager:
             ORDER BY path_order ASC
         """
         try:
-            results = self.db.execute_query(query, fetch_all=True)
+            results = self.db.execute_query(query)
             if results:
                 # Assuming results from db.execute_query is already List[Dict[str, Any]]
                 # If not, conversion will be needed.
@@ -82,7 +82,7 @@ class LearningPathManager:
             ORDER BY step_order ASC
         """
         try:
-            results = self.db.execute_query(query, (path_id,), fetch_all=True)
+            results = self.db.execute_query(query, (path_id,))
             if results:
                 # Assuming results from db.execute_query is already List[Dict[str, Any]]
                 logger.info(f"Successfully fetched {len(results)} steps for path_id {path_id}.")
@@ -339,7 +339,7 @@ class LearningPathManager:
         """
         # Added lp.path_order to the SELECT and ORDER BY for consistent path ordering
         try:
-            results = self.db.execute_query(query, (user_id,), fetch_all=True)
+            results = self.db.execute_query(query, (user_id,))
             if results:
                 # Assuming results from db.execute_query is already List[Dict[str, Any]]
                 logger.info(f"Successfully fetched {len(results)} enrolled paths for user {user_id}.")

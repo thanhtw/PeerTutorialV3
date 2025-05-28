@@ -75,7 +75,7 @@ class ErrorLibraryManager:
 
         query = "SELECT error_code, title FROM error_details ORDER BY title ASC"
         try:
-            results = self.db.execute_query(query, fetch_all=True)
+            results = self.db.execute_query(query)
             if results:
                 # Assuming results is a list of dict-like objects (e.g., from a DictCursor)
                 # This comprehension ensures we only process dicts and they have the required keys.
