@@ -44,6 +44,7 @@ from ui.components.feedback_system import render_feedback_tab
 from ui.components.auth_ui import AuthUI
 from ui.components.enhanced_tutorial import EnhancedTutorialUI
 from ui.components.learning_dashboard import LearningDashboardUI
+from ui.components.error_explorer_ui import ErrorExplorerUI
 
 
 # Set page config
@@ -151,6 +152,7 @@ def main():
     code_generator_ui = CodeGeneratorUI(workflow, code_display_ui)
     enhanced_tutorial_ui = EnhancedTutorialUI(llm_manager)
     learning_dashboard_ui = LearningDashboardUI()
+    error_explorer_ui = ErrorExplorerUI()
     
     # Header with improved styling
     st.markdown(f"""
@@ -173,7 +175,8 @@ def main():
         t("tab_review"),
         t("tab_feedback"),
         t("tab_tutorial"),  # New
-        t("tab_dashboard")  # New
+        t("tab_dashboard"), # New
+        t("tab_error_explorer") # New
         #t("tab_logs")
     ]
     
@@ -209,7 +212,10 @@ def main():
         else:
             st.warning(t("user_not_authenticated_dashboard")) # Message for user not found
         
-    # with tabs[3]:  # This should be tabs[5] if logs are re-enabled
+    with tabs[5]: # Error Explorer Tab
+        error_explorer_ui.render()
+        
+    # with tabs[3]:  # This should be tabs[6] if logs are re-enabled
     #     render_llm_logs_tab()
 
 if __name__ == "__main__":

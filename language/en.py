@@ -512,6 +512,7 @@ translations = {
 
     "tab_tutorial": "Tutorial",
     "tab_dashboard": "Dashboard",
+    "tab_error_explorer": "Error Explorer",
     "user_not_authenticated_tutorial": "User not authenticated. Please log in to access the tutorial.",
     "user_not_authenticated_dashboard": "User not authenticated. Please log in to access the dashboard."
 }

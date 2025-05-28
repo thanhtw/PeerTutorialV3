@@ -16,6 +16,9 @@ def update_database_schema():
         # Create learning feature tables
         create_learning_tables(db)
         
+        # Create error library tables
+        create_error_library_tables(db)
+        
         # Create achievement and badge tables
         create_achievement_tables(db)
         
@@ -205,12 +208,33 @@ def create_learning_tables(db):
         path_name VARCHAR(100) NOT NULL,
         description_en TEXT,
         description_zh TEXT,
-        difficulty_level VARCHAR(20) NOT NULL,
+        difficulty_level VARCHAR(20) NOT NULL, /* e.g., 'Beginner', 'Intermediate', 'Advanced' */
         estimated_hours INT DEFAULT 0,
-        prerequisites JSON,
-        skills_learned JSON,
+        prerequisites JSON, /* e.g., {"completed_paths": [1, 2], "min_level": "intermediate"} */
+        skills_learned JSON, /* e.g., ["NULL_POINTER", "ARRAY_INDEX_OUT_OF_BOUNDS"] */
         path_order INT DEFAULT 0,
-        is_active BOOLEAN DEFAULT TRUE
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+    """
+
+    learning_path_steps_table = """
+    CREATE TABLE IF NOT EXISTS learning_path_steps (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        path_id INT NOT NULL,
+        step_order INT NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        description_md TEXT, /* General instructions or introductory text for the step */
+        step_type VARCHAR(50) NOT NULL, 
+            /* Examples: 'ERROR_DETAIL_STUDY', 'PATTERN_GAME', 'GUIDED_PRACTICE', 'QUIZ', 'VIDEO', 'EXTERNAL_LINK' */
+        content_reference VARCHAR(255) NULL, 
+            /* Links to specific content: error_code for ERROR_DETAIL_STUDY, 
+               error_type for PATTERN_GAME, exercise_id for GUIDED_PRACTICE, etc. */
+        estimated_time_minutes INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (path_id) REFERENCES learning_paths(id) ON DELETE CASCADE
     )
     """
     
@@ -219,13 +243,16 @@ def create_learning_tables(db):
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id VARCHAR(36) NOT NULL,
         path_id INT NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'not_started', /* e.g., 'not_started', 'in_progress', 'completed' */
+        current_step_id INT NULL, /* FK to learning_path_steps.id */
+        total_steps INT DEFAULT 0, /* Should be set upon enrollment based on path definition */
+        progress_percentage FLOAT DEFAULT 0.0,
         started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         completed_at TIMESTAMP NULL,
-        current_step INT DEFAULT 0,
-        total_steps INT DEFAULT 0,
-        progress_percentage FLOAT DEFAULT 0.0,
-        FOREIGN KEY (user_id) REFERENCES users(uid),
-        FOREIGN KEY (path_id) REFERENCES learning_paths(id),
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE,
+        FOREIGN KEY (path_id) REFERENCES learning_paths(id) ON DELETE CASCADE,
+        FOREIGN KEY (current_step_id) REFERENCES learning_path_steps(id) ON DELETE SET NULL, /* If a step is deleted, nullify here */
         UNIQUE KEY (user_id, path_id)
     )
     """
@@ -254,6 +281,7 @@ def create_learning_tables(db):
     db.execute_query(learning_sessions_table)
     db.execute_query(ai_tutor_interactions_table)
     db.execute_query(learning_paths_table)
+    db.execute_query(learning_path_steps_table) # New call
     db.execute_query(user_learning_paths_table)
     db.execute_query(user_learning_preferences_table)
     logger.info("Learning tables created successfully")
@@ -410,6 +438,27 @@ def create_additional_tables(db):
     
     db.execute_query(code_examples_table)
     logger.info("Additional tables created successfully")
+
+def create_error_library_tables(db):
+    """Create tables for the error library, including detailed error information."""
+    error_details_table = """
+    CREATE TABLE IF NOT EXISTS error_details (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        error_code VARCHAR(50) NOT NULL UNIQUE,
+        language VARCHAR(20) NOT NULL DEFAULT 'Java',
+        title VARCHAR(255) NOT NULL,
+        detailed_description_md TEXT,
+        example_good_code_md TEXT,
+        example_bad_code_md TEXT,
+        before_after_comparison_md TEXT,
+        common_misconceptions_md TEXT,
+        importance_explanation_md TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+    """
+    db.execute_query(error_details_table)
+    logger.info("Error library tables created successfully")
 
 def create_indexes(db):
     """Create indexes for performance optimization."""
