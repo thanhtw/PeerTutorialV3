@@ -586,8 +586,6 @@ class EnhancedTutorial:
         if error_type == "array_out_of_bounds":
             # Examples of fixing common array out of bounds issues
             return [
-                "for(int i = 0; i < data.length; i++) { data[i] = i; }", # Corrected loop
-                "if (items.length > 0) { value = items[items.length - 1]; } else { /* handle empty array */ }" // Access last element safely
             ]
         elif error_type == "missing_null_check":
             # Examples of adding null checks
@@ -598,9 +596,43 @@ class EnhancedTutorial:
         elif error_type == "string_comparison_by_ref":
             # Examples of using .equals() for string comparison
             return [
-                "if (str1 != null && str1.equals(str2)) { /*...*/ }", // Added null check for safety
-                "while (userInput != null && userInput.equals(\"EXIT\")) { /*...*/ }" // Added null check
+                "if (str1 != null && str1.equals(str2)) { /*...*/ }",
+                "while (userInput != null && userInput.equals(\"EXIT\")) { /*...*/ }" 
             ]
         else:
             # Generic fallback, should ideally not be reached if error_type is always one of the above
             return ["// Corrected: Example 1", "// Corrected: Example 2"]
+
+    def _get_navigation_info(self, step_id: int, progress: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Calculate navigation information for the tutorial.
+
+        Args:
+            step_id: Current step ID
+            progress: User's tutorial progress
+
+        Returns:
+            Dictionary with navigation details.
+        """
+        max_step_id = max(config["step_id"] for config in self.tutorial_structure.values())
+        
+        is_first_step = step_id == 0
+        is_last_step = step_id == max_step_id
+        
+        next_step_id = None
+        if not is_last_step:
+            next_step_id = step_id + 1
+            
+        previous_step_id = None
+        if not is_first_step:
+            previous_step_id = step_id - 1
+            
+        total_steps = len(self.tutorial_structure)
+        
+        return {
+            "is_first_step": is_first_step,
+            "is_last_step": is_last_step,
+            "next_step_id": next_step_id,
+            "previous_step_id": previous_step_id,
+            "total_steps": total_steps
+        }
