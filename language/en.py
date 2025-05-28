@@ -508,11 +508,10 @@ translations = {
     "view_full_leaderboard": "View Full Leaderboard",
     "users": "users",
     "of": "of",
-    "no_badges_yet":"No Badges Yet"
+    "no_badges_yet":"No Badges Yet",
 
-
-
-
-
-
+    "tab_tutorial": "Tutorial",
+    "tab_dashboard": "Dashboard",
+    "user_not_authenticated_tutorial": "User not authenticated. Please log in to access the tutorial.",
+    "user_not_authenticated_dashboard": "User not authenticated. Please log in to access the dashboard."
 }
