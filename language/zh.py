@@ -517,7 +517,10 @@ translations = {
     "view_full_leaderboard": "查看完整排行榜",
     "users": "用戶",
     "of": "共",
-    "no_badges_yet":"尚未獲得徽章"
+    "no_badges_yet":"尚未獲得徽章",
 
-
+    "tab_tutorial": "教程",
+    "tab_dashboard": "仪表板",
+    "user_not_authenticated_tutorial": "用户未通过身份验证。请登录以访问教程。",
+    "user_not_authenticated_dashboard": "用户未通过身份验证。请登录以访问仪表板。"
 }

@@ -42,6 +42,8 @@ from ui.components.code_generator import CodeGeneratorUI
 from ui.components.code_display import CodeDisplayUI, render_review_tab  
 from ui.components.feedback_system import render_feedback_tab
 from ui.components.auth_ui import AuthUI
+from ui.components.enhanced_tutorial import EnhancedTutorialUI
+from ui.components.learning_dashboard import LearningDashboardUI
 
 
 # Set page config
@@ -147,6 +149,8 @@ def main():
     # Initialize UI components
     code_display_ui = CodeDisplayUI()
     code_generator_ui = CodeGeneratorUI(workflow, code_display_ui)
+    enhanced_tutorial_ui = EnhancedTutorialUI(llm_manager)
+    learning_dashboard_ui = LearningDashboardUI()
     
     # Header with improved styling
     st.markdown(f"""
@@ -165,9 +169,11 @@ def main():
     
     # Create enhanced tabs for different steps of the workflow
     tab_labels = [
-        t("tab_generate"), 
-        t("tab_review"), 
-        t("tab_feedback")
+        t("tab_generate"),
+        t("tab_review"),
+        t("tab_feedback"),
+        t("tab_tutorial"),  # New
+        t("tab_dashboard")  # New
         #t("tab_logs")
     ]
     
@@ -187,7 +193,23 @@ def main():
     with tabs[2]:
         render_feedback_tab(workflow, auth_ui)
         
-    # with tabs[3]:  
+    with tabs[3]: # Tutorial Tab
+        # Retrieve user_id. A common way is from the auth_ui object or session_state.
+        # Assuming auth_ui.get_user_id() is the correct method:
+        user_id = st.session_state.auth.get("user_id") # Corrected line
+        if user_id:
+            enhanced_tutorial_ui.render(user_id=user_id, on_complete=lambda: st.session_state.update({"tutorial_completed": True, "active_tab": 0})) # Added on_complete to switch tab
+        else:
+            st.warning(t("user_not_authenticated_tutorial")) # Message for user not found
+
+    with tabs[4]: # Dashboard Tab
+        user_id = st.session_state.auth.get("user_id") # Corrected line
+        if user_id:
+            learning_dashboard_ui.render(user_id=user_id)
+        else:
+            st.warning(t("user_not_authenticated_dashboard")) # Message for user not found
+        
+    # with tabs[3]:  # This should be tabs[5] if logs are re-enabled
     #     render_llm_logs_tab()
 
 if __name__ == "__main__":
