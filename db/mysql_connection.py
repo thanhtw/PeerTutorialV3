@@ -65,7 +65,9 @@ class MySQLConnection:
                     database=self.db_name,
                     port=self.db_port,
                     auth_plugin='mysql_native_password',  # Try alternative auth method
-                    use_pure=True  # Use pure Python implementation for better compatibility
+                    use_pure=True,  # Use pure Python implementation for better compatibility
+                    charset='utf8mb4',
+                    collation='utf8mb4_unicode_ci'
                 )
                 logger.debug("Connected to MySQL successfully")
             return self.connection
