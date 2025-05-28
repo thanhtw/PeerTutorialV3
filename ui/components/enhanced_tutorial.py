@@ -430,50 +430,67 @@ class EnhancedTutorialUI:
         current_hint = st.session_state.get(f"current_hint_{context}")
         if current_hint:
             self._display_hint(current_hint, context)
+
+    def _render_interactive_hint_level_ui(self, hint_level_content: Dict[str, Any], level_number: int, error_type_context: str):
+        """
+        Renders a single hint level using an expander, styled similarly to the mockup.
+        """
+        level_icons = {1: "🟢", 2: "🟡", 3: "🔴"}
+        level_titles = {
+            1: "General Guidance",
+            2: "More Specific",
+            3: "Almost the Answer"
+        }
+        icon = level_icons.get(level_number, "💡")
+        title_suffix = level_titles.get(level_number, f"Level {level_number}")
+        
+        # Key for session state to remember if expander was opened
+        # Use a unique key based on context (e.g. error type) and level number
+        # expander_key = f"hint_expander_{error_type_context}_level_{level_number}"
+
+        # For now, always default to collapsed unless we manage state across reruns
+        # expanded_by_default = st.session_state.get(expander_key, False) 
+
+        expander_label = f"{icon} **Level {level_number} Hint - {title_suffix}**"
+        
+        with st.expander(expander_label, expanded=False): # expanded=expanded_by_default
+            # st.markdown(f"<hr style='border-top: 3px solid {level_colors.get(level_number, '#ccc')};'>", unsafe_allow_html=True) # Optional styling
+
+            for key, value in hint_level_content.items():
+                display_key = key.replace("_", " ").title()
+                if key == "code_highlight" and value: # Assuming value might be a code string
+                    st.markdown(f"**{display_key}:**")
+                    st.code(value, language="java") # Or appropriate language
+                elif value: # Only display if value is not empty
+                    st.markdown(f"**{display_key}:** {value}")
+            
+            # Placeholder for feedback buttons from mockup (will be handled later)
+            # st.markdown("---")
+            # st.write("Was this helpful? 👍 👎") 
+
+        # This part is just for a discussion point, not for implementation in this subtask:
+        # if st.session_state.get(f"expander_state_changed_for_{expander_key}", False):
+        #    st.session_state[expander_key] = True # Update actual state if it was clicked
+        #    del st.session_state[f"expander_state_changed_for_{expander_key}"]
+        #    # Here we would call a function to update the overall progress bar
+        #    # self._update_hint_progress_bar()
+        #    # st.rerun() # May not be needed if progress bar updates visually without it
     
     def _display_hint(self, hint: Dict[str, Any], context: str):
-        """Display a hint with feedback options."""
-        
-        level = hint["level"]
-        content = hint["content"]
-        
-        # Color scheme based on hint level
-        colors = {1: "#e8f5e8", 2: "#fff3cd", 3: "#f8d7da"}
-        border_colors = {1: "#4caf50", 2: "#ffc107", 3: "#dc3545"}
-        
-        hint_html = f"""
-        <div style="background: {colors[level]}; border-left: 4px solid {border_colors[level]}; 
-                    padding: 15px; margin: 10px 0; border-radius: 5px;">
-            <h4>💡 {t('hint_level')} {level}</h4>
         """
-        
-        for key, value in content.items():
-            label = key.replace("_", " ").title()
-            hint_html += f"<p><strong>{label}:</strong> {value}</p>"
-        
-        hint_html += "</div>"
-        
-        st.markdown(hint_html, unsafe_allow_html=True)
-        
-        # Feedback buttons
-        col1, col2, col3 = st.columns([2, 1, 1])
-        with col2:
-            if st.button("👍", key=f"helpful_{context}_{level}"):
-                self.hint_system.record_hint_feedback(
-                    st.session_state.get("user_id"), 
-                    st.session_state.tutorial_session["session_id"],
-                    context, level, True
-                )
-                st.success(t("thanks_for_feedback"))
-        
-        with col3:
-            if st.button("👎", key=f"not_helpful_{context}_{level}"):
-                self.hint_system.record_hint_feedback(
-                    st.session_state.get("user_id"),
-                    st.session_state.tutorial_session["session_id"],
-                    context, level, False
-                )
-                st.info(t("feedback_recorded"))
+        Display a hint using the interactive hint level UI.
+        This method now calls _render_interactive_hint_level_ui for the current hint level.
+        """
+        if not hint or 'level' not in hint or 'content' not in hint:
+            logger.warning("Attempted to display an invalid or incomplete hint.")
+            return
+
+        self._render_interactive_hint_level_ui(
+            hint_level_content=hint['content'],
+            level_number=hint['level'],
+            error_type_context=context
+        )
+        # Feedback buttons are removed as per subtask focus; will be re-added later.
     
     def _show_error_type_details(self, error_type: str):
         """Show detailed information about an error type."""

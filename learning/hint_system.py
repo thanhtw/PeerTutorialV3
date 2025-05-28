@@ -111,7 +111,8 @@ class SmartHintSystem:
                  session_start_time: float, attempt_count: int,
                  user_skill_level: str = "beginner") -> Optional[Dict[str, Any]]:
         """
-        Get an appropriate hint based on user progress and timing.
+        Get appropriate hints based on user progress and timing.
+        Returns content for all levels up to the determined eligible level.
         
         Args:
             user_id: User's ID
@@ -122,53 +123,52 @@ class SmartHintSystem:
             user_skill_level: User's skill level ('beginner', 'intermediate', 'advanced')
             
         Returns:
-            Hint dictionary or None if no hint should be shown yet
+            A dictionary containing a list of hint details and other metadata, 
+            or None if no hint should be shown yet.
         """
         try:
             # Calculate time elapsed
             current_time = time.time()
             time_elapsed = current_time - session_start_time
             
-            # Determine appropriate hint level
-            hint_level = self._determine_hint_level(time_elapsed, attempt_count, user_skill_level)
+            # Determine appropriate maximum hint level user is eligible for
+            max_eligible_level = self._determine_hint_level(time_elapsed, attempt_count, user_skill_level)
             
-            if hint_level is None:
+            if max_eligible_level is None:
+                logger.debug(f"No hint level determined for user {user_id}, error {error_type}, time {time_elapsed}, attempts {attempt_count}.")
                 return None
             
-            # Check if user has already seen this hint level for this error type
-            if self._has_seen_hint(user_id, session_id, error_type, hint_level):
-                # Maybe offer next level hint if available
-                next_level = hint_level + 1
-                if next_level <= 3:
-                    next_hint_level = self._determine_hint_level(time_elapsed, attempt_count, user_skill_level, min_level=next_level)
-                    if next_hint_level:
-                        hint_level = next_hint_level
-                    else:
-                        return None
-                else:
-                    return None
+            hints_to_display = []
+            for level_num in range(1, max_eligible_level + 1):
+                # The logic for _has_seen_hint might be re-evaluated if we want to individually
+                # track seen status for each level in a multi-level display context.
+                # For now, if eligible for level N, show all 1..N.
+                level_content = self._get_hint_content(error_type, level_num)
+                if level_content:
+                    hints_to_display.append({
+                        "level_number": level_num,
+                        "content": level_content
+                    })
             
-            # Get hint content
-            hint_content = self._get_hint_content(error_type, hint_level)
-            
-            if hint_content:
-                # Log hint usage
-                self._log_hint_usage(user_id, session_id, error_type, hint_level)
+            if not hints_to_display:
+                logger.debug(f"No hint content found for user {user_id}, error {error_type} up to level {max_eligible_level}.")
+                return None
+
+            # Log usage for the highest level being provided
+            self._log_hint_usage(user_id, session_id, error_type, max_eligible_level)
                 
-                return {
-                    "level": hint_level,
-                    "content": hint_content,
-                    "should_show": True,
-                    "timing_info": {
-                        "time_elapsed": int(time_elapsed),
-                        "attempt_count": attempt_count
-                    }
+            return {
+                "max_eligible_level": max_eligible_level, # Highest level user is eligible for
+                "hints_content_list": hints_to_display, # List of hint dicts {level_number, content}
+                "should_show": True, # Overall flag
+                "timing_info": {
+                    "time_elapsed": int(time_elapsed),
+                    "attempt_count": attempt_count
                 }
-            
-            return None
+            }
             
         except Exception as e:
-            logger.error(f"Error getting hint: {str(e)}")
+            logger.error(f"Error getting hint for user {user_id}, error {error_type}: {e}", exc_info=True)
             return None
     
     def record_hint_feedback(self, user_id: str, session_id: str, 

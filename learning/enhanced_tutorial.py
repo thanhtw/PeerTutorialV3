@@ -586,8 +586,6 @@ class EnhancedTutorial:
         if error_type == "array_out_of_bounds":
             # Examples of fixing common array out of bounds issues
             return [
-                "for(int i = 0; i < data.length; i++) { data[i] = i; }", 
-                "if (items.length > 0) { value = items[items.length - 1]; } else { /* handle empty array */ }" 
             ]
         elif error_type == "missing_null_check":
             # Examples of adding null checks
