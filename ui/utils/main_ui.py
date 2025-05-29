@@ -168,6 +168,10 @@ def render_llm_logs_tab():
     try:
         from utils.llm_logger import LLMInteractionLogger
         from utils.language_utils import t
+        import logging
+        
+        # Add logger for this function
+        logger = logging.getLogger(__name__)
         
         if 'llm_logger' not in st.session_state:
             st.warning(t("llm_logger_not_initialized"))
@@ -248,6 +252,8 @@ def render_llm_logs_tab():
     
     except Exception as e:
         from utils.language_utils import t
+        import logging
+        logger = logging.getLogger(__name__)
         logger.error(f"Error rendering LLM logs tab: {str(e)}")
         st.error(f"Error loading logs: {str(e)}")
 

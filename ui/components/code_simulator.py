@@ -520,6 +520,13 @@ class CodeSimulator:
             white-space: pre;
         }
         </style>
+        
+        <script>
+        function toggleBreakpoint(lineNumber) {
+            // This would be handled by Streamlit callbacks in practice
+            console.log('Toggle breakpoint at line:', lineNumber);
+        }
+        </script>
         '''
         
         return css + ''.join(html_parts)
