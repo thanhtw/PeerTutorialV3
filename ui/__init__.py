@@ -35,14 +35,14 @@ __all__ = [
     'LearningDashboardUI',
     'render_learning_dashboard',
     
-    # UI utilities
+    # UI utilities - compact and professional
     'init_session_state',
     'render_llm_logs_tab',
     'create_enhanced_tabs',
     'render_sidebar',
     'render_professional_sidebar',
     
-    # Interactive components
+    # Interactive components - optimized sizing
     'level_up_animation',
     'ProfileLeaderboardSidebar'
 ]

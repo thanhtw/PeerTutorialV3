@@ -58,7 +58,7 @@
 }
 
 .level-up-unlocked-message {
-    margin-top: 20px; /* More space */
+    margin-top: 10px; /* Reduced from 20px for more compact design */
 }
 
 .level-up-unlocked-text {
