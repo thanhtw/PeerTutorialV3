@@ -702,3 +702,24 @@ h3{
     padding: 20px;
   }
 }
+
+/* Info container styling */
+.info-container {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 15px;
+  margin: 10px 0;
+  border-left: 4px solid #4c68d7;
+}
+
+.info-about {
+  font-weight: bold;
+  color: #4c68d7;
+  margin-bottom: 8px;
+}
+
+.info-about-app {
+  color: #6c757d;
+  font-size: 0.9em;
+  line-height: 1.4;
+}

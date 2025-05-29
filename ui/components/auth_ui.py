@@ -14,7 +14,7 @@ from pathlib import Path
 import base64
 
 from auth.mysql_auth import MySQLAuthManager
-from utils.language_utils import t, get_current_language, set_language
+from utils.language_utils import t, get_current_language, set_language, get_available_languages
 
 # Configure logging
 logging.basicConfig(
@@ -104,23 +104,27 @@ class AuthUI:
         
         col1, col2, col3 = st.columns([1, 1, 1])
         with col2:
-            language_options = {
-                "English": "en",
-                "中文": "zh"
-            }
+            language_options = get_available_languages()
             
             current_lang = get_current_language()
-            current_display = [k for k, v in language_options.items() if v == current_lang][0]
+            current_display = language_options.get(current_lang, "English")
             
             selected_lang = st.selectbox(
                 "",
-                options=list(language_options.keys()),
-                index=list(language_options.keys()).index(current_display),
+                options=list(language_options.values()),
+                index=list(language_options.values()).index(current_display),
                 key="language_selector"
             )
             
-            if language_options[selected_lang] != current_lang:
-                set_language(language_options[selected_lang])
+            # Find the language code for the selected display name
+            selected_lang_code = None
+            for code, display in language_options.items():
+                if display == selected_lang:
+                    selected_lang_code = code
+                    break
+            
+            if selected_lang_code and selected_lang_code != current_lang:
+                set_language(selected_lang_code)
                 st.rerun()
 
     def _render_professional_login_form(self):
@@ -264,7 +268,7 @@ class AuthUI:
                 "senior": t('senior_level_description')
             }
             
-            selected_level_index = st.selectbox(
+            selected_level_display = st.selectbox(
                 "",
                 options=level_options,
                 index=0,
@@ -272,8 +276,11 @@ class AuthUI:
                 help=t('level_selection_help')
             )
             
+            # Get the internal level value
+            selected_level_index = level_options.index(selected_level_display)
+            selected_level = level_internal_values[selected_level_index]
+            
             # Show level description
-            selected_level = level_internal_values[level_options.index(selected_level_index)]
             st.info(f"ℹ️ {level_descriptions[selected_level]}")
             
             # Get level names for both languages
@@ -664,11 +671,11 @@ class AuthUI:
         st.markdown("---")
         
         st.markdown(f"""
-        <div class="infor-infor">
-            <div class="infor-about">
+        <div class="info-container">
+            <div class="info-about">
                 ℹ️ {t('about')}
             </div>
-            <div class="infor-aboutapp">
+            <div class="info-about-app">
                 {t("about_app")}
             </div>
         </div>
@@ -676,7 +683,7 @@ class AuthUI:
         
         
         # Use Streamlit button for actual functionality
-        if st.button(f"{t('logout')}", key="enhanced_logout", use_container_width=True):
+        if st.button(f"🚪 {t('logout')}", key="enhanced_logout", use_container_width=True):
             self.logout()
 
 

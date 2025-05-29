@@ -112,6 +112,9 @@ class MySQLAuthManager:
             
         # If level names are not provided, get them from translation
         if not level_name_en or not level_name_zh:
+            # Import here to avoid circular imports
+            from utils.language_utils import get_current_language, set_language, t
+            
             # Save current language
             current_lang = get_current_language()
             

@@ -167,6 +167,7 @@ def render_llm_logs_tab():
     """
     try:
         from utils.llm_logger import LLMInteractionLogger
+        from utils.language_utils import t
         
         if 'llm_logger' not in st.session_state:
             st.warning(t("llm_logger_not_initialized"))
@@ -246,6 +247,7 @@ def render_llm_logs_tab():
                     st.rerun()
     
     except Exception as e:
+        from utils.language_utils import t
         logger.error(f"Error rendering LLM logs tab: {str(e)}")
         st.error(f"Error loading logs: {str(e)}")
 
@@ -257,6 +259,8 @@ def render_professional_sidebar(llm_manager):
     Args:
         llm_manager: LLMManager instance
     """
+    from utils.language_utils import t
+    
     with st.sidebar:
         # Enhanced LLM Provider info with better styling
         st.markdown(f"""

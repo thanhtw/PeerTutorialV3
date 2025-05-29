@@ -173,6 +173,18 @@ def render_language_selector():
                 st.session_state.full_reset = True
                 st.rerun()
 
+def get_available_languages() -> Dict[str, str]:
+    """
+    Get available languages with their display names.
+    
+    Returns:
+        Dictionary mapping language codes to display names
+    """
+    return {
+        "en": "English",
+        "zh": "繁體中文"
+    }
+
 # Backward compatibility exports
 __all__ = [
     'init_language',
@@ -182,6 +194,7 @@ __all__ = [
     'get_translations',
     'get_llm_prompt_instructions',
     'render_language_selector',
+    'get_available_languages',
     'DEFAULT_LANGUAGE',
     'SUPPORTED_LANGUAGES'
 ]
