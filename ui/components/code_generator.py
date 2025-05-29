@@ -68,10 +68,24 @@ class ErrorSelectorUI:
         Returns:
             Dictionary with selected categories
         """
-        st.subheader(t("select_error_categories"))
+        # Enhanced header with professional styling
+        st.markdown("""
+        <div class="section-header">
+            <span class="section-icon">🎯</span>
+            <div>
+                <h3 class="section-title">""" + t("select_error_categories") + """</h3>
+                <p class="section-subtitle">""" + t("choose_categories_for_practice") + """</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         
-        # Add help text explaining how this mode works
-        st.info(t("advanced_mode_help"))
+        # Enhanced help section
+        st.markdown(f"""
+        <div class="selection-help">
+            <span class="selection-help-icon">💡</span>
+            <strong>{t("advanced_mode_help")}</strong>
+        </div>
+        """, unsafe_allow_html=True)
         
         java_error_categories = all_categories.get("java_errors", [])
         
@@ -84,8 +98,8 @@ class ErrorSelectorUI:
         # Get the current selection state from session
         current_selections = st.session_state.selected_error_categories.get("java_errors", [])
         
-        # Use a card-based grid layout for categories
-        st.markdown('<div class="problem-area-grid">', unsafe_allow_html=True)
+        # Enhanced grid layout for categories
+        st.markdown('<div class="problem-area-grid-enhanced">', unsafe_allow_html=True)
         
         # Get current language for database field selection
         current_lang = get_current_language()
@@ -99,7 +113,7 @@ class ErrorSelectorUI:
             "Java Specific": "☕", "Java-Specific": "☕", "Java特定錯誤": "☕"
         }
         
-        # Generate cards for each category from database
+        # Generate enhanced cards for each category from database
         for i, category_data in enumerate(java_error_categories):
             # Create a unique and safe key for this category
             category_key = f"java_category_{i}"
@@ -126,17 +140,20 @@ class ErrorSelectorUI:
             # Check if category is already selected from session state
             is_selected = category_code in current_selections
             
-            # Create a card with toggle effect for each category
+            # Create enhanced card with professional styling
             selected_class = "selected" if is_selected else ""
             st.markdown(f"""
-            <div class="problem-area-card {selected_class}" id="{category_key}_card" 
+            <div class="problem-area-card-enhanced {selected_class}" id="{category_key}_card" 
                 onclick="this.classList.toggle('selected'); 
                         document.getElementById('{category_key}_checkbox').click();">
-                <div class="problem-area-title">
-                    {icon} {category_name}
-                    <span class="icon">{'✓' if is_selected else ''}</span>
+                <div class="problem-area-header">
+                    <div class="problem-area-title-enhanced">
+                        <span class="problem-area-icon">{icon}</span>
+                        <span>{category_name}</span>
+                    </div>
+                    <div class="selection-indicator">{'✓' if is_selected else ''}</div>
                 </div>
-                <p class="problem-area-description">{category_desc}</p>
+                <p class="problem-area-description-enhanced">{category_desc}</p>
             </div>
             """, unsafe_allow_html=True)
             
@@ -159,13 +176,25 @@ class ErrorSelectorUI:
         # Close the grid container
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Selection summary
-        st.write("### " + t("selected_categories"))
+        # Enhanced selection summary
+        st.markdown(f"""
+        <div class="selected-categories-enhanced">
+            <div class="selected-categories-header">
+                <h4>{t("selected_categories")}</h4>
+                <span class="selected-categories-count">{len(current_selections)}</span>
+            </div>
+        """, unsafe_allow_html=True)
+        
         if not current_selections:
-            st.warning(t("no_categories"))
+            st.markdown(f"""
+            <div class="no-selection-message">
+                <strong>⚠️ {t("no_categories")}</strong><br>
+                <small>{t("please_select_at_least_one_category")}</small>
+            </div>
+            """, unsafe_allow_html=True)
         else:
-            # Display selected categories
-            st.markdown('<div class="selected-categories">', unsafe_allow_html=True)
+            # Display selected categories with enhanced styling
+            st.markdown('<div class="selected-categories-list">', unsafe_allow_html=True)
             for i, category_code in enumerate(current_selections):
                 # Find the category data for display
                 category_display_name = category_code
@@ -186,12 +215,14 @@ class ErrorSelectorUI:
                         break
                 
                 st.markdown(f"""
-                <div class="selected-category-item" id="selected_category_{i}">
-                    <span class="category-icon">{icon}</span>
-                    <span class="category-name">{category_display_name}</span>
+                <div class="selected-category-tag">
+                    <span class="category-tag-icon">{icon}</span>
+                    <span>{category_display_name}</span>
                 </div>
                 """, unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
         
         # Update selections in session state
         st.session_state.selected_error_categories["java_errors"] = current_selections
@@ -293,58 +324,56 @@ class ErrorSelectorUI:
         
     def render_mode_selector(self) -> str:
         """
-        Render the mode selector UI with improved mode switching behavior.
+        Render the enhanced mode selector UI with professional styling.
         
         Returns:
             Selected mode ("advanced" or "specific")
         """
-        st.markdown("#### " + t("error_selection_mode"))
+        st.markdown(f"""
+        <div class="mode-selector-container">
+            <div class="mode-selector-header">
+                <h4>🎯 {t("error_selection_mode")}</h4>
+                <p>{t("choose_how_to_select_errors")}</p>
+            </div>
+        """, unsafe_allow_html=True)
         
-        # Create a more descriptive selection with radio buttons
-        mode_options = [
-            t("advanced_mode"),
-            t("specific_mode")
-        ]
-        
-        # Convert session state to index
+        # Get current mode
         current_mode = st.session_state.error_selection_mode
-        current_index = 0
-        if current_mode == "specific":
-            current_index = 1
         
-        # Error selection mode radio buttons with CSS class for styling
-        st.markdown('<div class="error-mode-radio">', unsafe_allow_html=True)
-        selected_option = st.radio(
-            t("error_selection_prompt"),
-            options=mode_options,
-            index=current_index,
-            key="error_mode_radio",
-            label_visibility="collapsed",
-            horizontal=True
-        )
-        st.markdown('</div>', unsafe_allow_html=True)
+        # Create enhanced mode selection
+        col1, col2 = st.columns(2)
         
-        # Update error selection mode based on selection
-        new_mode = st.session_state.error_selection_mode
-        if t("advanced_mode") in selected_option and st.session_state.error_selection_mode != "advanced":
-            new_mode = "advanced"
-        elif t("specific_mode") in selected_option and st.session_state.error_selection_mode != "specific":
-            new_mode = "specific"
-        
-        # Only update if the mode has changed
-        if new_mode != st.session_state.error_selection_mode:
-            # Store previous mode for reference
-            previous_mode = st.session_state.error_selection_mode
+        with col1:
+            advanced_selected = "selected" if current_mode == "advanced" else ""
+            if st.button("", key="advanced_mode_btn", help=t("advanced_mode_description")):
+                st.session_state.error_selection_mode = "advanced"
+                st.rerun()
             
-            # Update the mode
-            st.session_state.error_selection_mode = new_mode
-                
-            # Initialize or reset appropriate selections when mode changes
-            if new_mode == "specific":
-                # Make sure selected_specific_errors exists
-                if "selected_specific_errors" not in st.session_state:
-                    st.session_state.selected_specific_errors = []
+            # Display mode option with enhanced styling
+            st.markdown(f"""
+            <div class="mode-option {advanced_selected}" onclick="document.getElementById('advanced_mode_btn').click();">
+                <span class="mode-option-icon">🎯</span>
+                <h5 class="mode-option-title">{t("advanced_mode")}</h5>
+                <p class="mode-option-description">{t("select_error_categories")}</p>
+            </div>
+            """, unsafe_allow_html=True)
         
+        with col2:
+            specific_selected = "selected" if current_mode == "specific" else ""
+            if st.button("", key="specific_mode_btn", help=t("specific_mode_description")):
+                st.session_state.error_selection_mode = "specific"
+                st.rerun()
+            
+            # Display mode option with enhanced styling
+            st.markdown(f"""
+            <div class="mode-option {specific_selected}" onclick="document.getElementById('specific_mode_btn').click();">
+                <span class="mode-option-icon">🔍</span>
+                <h5 class="mode-option-title">{t("specific_mode")}</h5>
+                <p class="mode-option-description">{t("select_specific_errors")}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
         
         return st.session_state.error_selection_mode
     
@@ -688,7 +717,7 @@ def show_workflow_process():
 
 def render_generate_tab(workflow, error_selector_ui, code_display_ui, user_level=None):
     """
-    Render the problem generation tab with enhanced workflow visualization.
+    Render the problem generation tab with enhanced professional styling.
     
     Args:
         workflow: JavaCodeReviewGraph workflow
@@ -696,7 +725,16 @@ def render_generate_tab(workflow, error_selector_ui, code_display_ui, user_level
         code_display_ui: CodeDisplayUI instance
         user_level: Optional user level from authentication (basic, medium, senior)
     """
-    st.subheader(t("generate_problem"))
+    # Enhanced tab container
+    st.markdown('<div class="generate-tab-container">', unsafe_allow_html=True)
+    
+    # Enhanced header
+    st.markdown(f"""
+    <div class="generate-header">
+        <h2>🚀 {t("generate_problem")}</h2>
+        <p>{t("create_java_code_with_errors_for_review_practice")}</p>
+    </div>
+    """, unsafe_allow_html=True)
 
     force_regenerate = st.session_state.get("force_regeneration", False)
 
@@ -710,11 +748,23 @@ def render_generate_tab(workflow, error_selector_ui, code_display_ui, user_level
     
     # If we already have a code snippet, show the workflow process
     if hasattr(st.session_state, 'workflow_state') and hasattr(st.session_state.workflow_state, 'code_snippet') and st.session_state.workflow_state.code_snippet:
-        # First display the workflow progress
+        # Enhanced workflow display
+        st.markdown('<div class="workflow-display-enhanced">', unsafe_allow_html=True)
         show_workflow_process()
+        st.markdown('</div>', unsafe_allow_html=True)
         
-        # Then display the generated code
-        st.subheader(t("generated_java_code"))
+        # Enhanced code display section
+        st.markdown(f"""
+        <div class="generate-section">
+            <div class="section-header">
+                <span class="section-icon">💻</span>
+                <div>
+                    <h3 class="section-title">{t("generated_java_code")}</h3>
+                    <p class="section-subtitle">{t("review_the_generated_code_below")}</p>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         
         # Get known problems from multiple sources to ensure we have data for instructor view
         known_problems = []
@@ -755,9 +805,14 @@ def render_generate_tab(workflow, error_selector_ui, code_display_ui, user_level
             known_problems=known_problems
         )
         
-       
-        # Add button to regenerate code
-        if st.button(t("generate_new"), type="primary"):
+        # Enhanced regenerate button
+        st.markdown(f"""
+        <div class="generate-button-section">
+            <h4>🔄 {t("generate_new_problem")}</h4>
+            <p>{t("create_different_code_problem")}</p>
+        """, unsafe_allow_html=True)
+        
+        if st.button("", key="regenerate_btn"):
             # Store items we want to preserve
             preserved_keys = ["auth", "provider_selection", "user_level", "language"]
             
@@ -798,37 +853,76 @@ def render_generate_tab(workflow, error_selector_ui, code_display_ui, user_level
             st.session_state.active_tab = 0
             # Rerun to update UI
             st.rerun()
+            
+        st.markdown(f"""
+        <div class="generate-button-enhanced" onclick="document.getElementById('regenerate_btn').click();">
+            <div class="generate-button-text">
+                <span class="generate-button-icon">🔄</span>
+                <span>{t("generate_new")}</span>
+            </div>
+        </div>
+        </div>
+        """, unsafe_allow_html=True)
     else:
-       
+        # Enhanced mode selection section
+        st.markdown(f'<div class="generate-section">', unsafe_allow_html=True)
         selection_mode = error_selector_ui.render_mode_selector()
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Enhanced parameters display section
+        st.markdown(f"""
+        <div class="generate-section">
+            <div class="section-header">
+                <span class="section-icon">⚙️</span>
+                <div>
+                    <h3 class="section-title">{t("generation_parameters")}</h3>
+                    <p class="section-subtitle">{t("auto_configured_based_on_level")}</p>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
         
         # Set parameters automatically based on user level (no UI controls)
         params = error_selector_ui.get_code_params_for_level(user_level)
         
-        # Show the auto-set parameters as read-only information
+        # Show the auto-set parameters with enhanced styling
         difficulty_level = params["difficulty_level"].capitalize()
         code_length = params["code_length"].capitalize()
         
-        # Create a nicer container for parameter display
         st.markdown(f"""
-        <div style="background-color: rgba(76, 104, 215, 0.1); border-left: 4px solid #4c68d7; padding: 15px; margin: 15px 0; border-radius: 5px;">
-          <strong>{t("code_params")}</strong>
-          <div style="display: flex; margin-top: 10px;">
-            <div style="flex: 1; padding: 10px; background-color: white; border-radius: 5px; margin-right: 10px; text-align: center;">
-              <div style="font-weight: 500; color: #4c68d7;">{t("difficulty")}</div>
-              <div style="font-size: 1.2rem; margin-top: 5px;">{difficulty_level}</div>
+        <div class="parameters-display">
+            <div class="parameters-header">
+                <h4>📊 {t("code_parameters")}</h4>
             </div>
-            <div style="flex: 1; padding: 10px; background-color: white; border-radius: 5px; text-align: center;">
-              <div style="font-weight: 500; color: #4c68d7;">{t("code_length")}</div>
-              <div style="font-size: 1.2rem, margin-top: 5px;">{code_length}</div>
+            <div class="parameters-grid">
+                <div class="parameter-card">
+                    <span class="parameter-icon">🎯</span>
+                    <p class="parameter-label">{t("difficulty")}</p>
+                    <h4 class="parameter-value">{difficulty_level}</h4>
+                </div>
+                <div class="parameter-card">
+                    <span class="parameter-icon">📏</span>
+                    <p class="parameter-label">{t("code_length")}</p>
+                    <h4 class="parameter-value">{code_length}</h4>
+                </div>
             </div>
-          </div>
-          <em style="font-size: 0.9rem; margin-top: 10px; display: block;">{t("params_based_on_level")} ({user_level or 'medium'}).</em>
+            <div class="parameters-note">
+                💡 {t("params_based_on_level")} ({user_level or 'medium'})
+            </div>
+        </div>
         </div>
         """, unsafe_allow_html=True)
         
-        # Display error selection interface based on mode within a container
-        st.markdown('<div class="category-selection-container">', unsafe_allow_html=True)
+        # Enhanced error selection section
+        st.markdown(f"""
+        <div class="category-selection-enhanced">
+            <div class="section-header">
+                <span class="section-icon">🎯</span>
+                <div>
+                    <h3 class="section-title">{t("error_selection")}</h3>
+                    <p class="section-subtitle">{t("choose_errors_to_include")}</p>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
         
         all_categories = workflow.get_all_error_categories()
         
@@ -844,9 +938,14 @@ def render_generate_tab(workflow, error_selector_ui, code_display_ui, user_level
             
         st.markdown('</div>', unsafe_allow_html=True)
         
+        # Enhanced generate button section
+        st.markdown(f"""
+        <div class="generate-button-section">
+            <h4>🚀 {t("ready_to_generate")}</h4>
+            <p>{t("click_below_to_create_java_code")}</p>
+        """, unsafe_allow_html=True)
         
-        st.markdown('<div class="generate-button-container">', unsafe_allow_html=True)
-        if st.button(t("generate_code_button"), type="primary", use_container_width=True):
+        if st.button("", key="generate_code_btn"):
             # Reset workflow steps for a fresh generation
             st.session_state.workflow_steps = [f"{t('start_process')}"]
             
@@ -940,8 +1039,20 @@ def render_generate_tab(workflow, error_selector_ui, code_display_ui, user_level
             else:
                 # If workflow state doesn't exist yet
                 st.error(t("workflow_not_initialized"))
-        st.markdown('</div>', unsafe_allow_html=True)
-
+        
+        # Enhanced generate button display
+        st.markdown(f"""
+        <div class="generate-button-enhanced" onclick="document.getElementById('generate_code_btn').click();">
+            <div class="generate-button-text">
+                <span class="generate-button-icon">🚀</span>
+                <span>{t("generate_code_button")}</span>
+            </div>
+        </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Close tab container
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # Usage example:
 class CodeGeneratorUI:

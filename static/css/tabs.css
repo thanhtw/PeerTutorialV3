@@ -1,47 +1,52 @@
 /* Professional tab styling with modern appearance */
 .stTabs [data-baseweb="tab-list"] {
   gap: 10px;
-  background-color: var(--card-bg);
-  padding: 16px 16px 0 16px;
-  border-radius: 10px 10px 0 0;
-  border: 1px solid var(--border);
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  padding: 20px 20px 0 20px;
+  border-radius: 15px 15px 0 0;
+  border: 1px solid #dee2e6;
   border-bottom: none;
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.08);
   color: #212529;
 }
 
 .stTabs [data-baseweb="tab"] {
-  height: 54px;
+  height: 60px;
   white-space: pre-wrap;
-  background-color: rgba(76, 104, 215, 0.08);
-  border-radius: 8px 8px 0px 0px;
-  padding: 8px 24px;
-  font-weight: 500;
-  transition: all 0.25s ease;
+  background: linear-gradient(135deg, rgba(76, 104, 215, 0.08) 0%, rgba(118, 74, 188, 0.05) 100%);
+  border-radius: 12px 12px 0px 0px;
+  padding: 12px 30px;
+  font-weight: 600;
+  transition: all 0.3s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid transparent;
+  border: 2px solid transparent;
   border-bottom: none;
-  font-size: 15px;
+  font-size: 16px;
   position: relative;
-  padding-left: 48px !important; /* Make room for the number */
-  color: #212529;
+  padding-left: 55px !important;
+  color: #495057;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .stTabs [data-baseweb="tab"]::before {
   position: absolute;
-  left: 14px;
+  left: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  background-color: rgba(76, 104, 215, 0.15);
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, rgba(76, 104, 215, 0.2) 0%, rgba(118, 74, 188, 0.15) 100%);
   border-radius: 50%;
   font-weight: bold;
   content: attr(data-step-number);
-  color: #212529;
+  color: #4c68d7;
+  font-size: 0.9em;
+  border: 2px solid rgba(76, 104, 215, 0.3);
 }
 
 .stTabs [data-baseweb="tab"]:nth-child(1)::before {
@@ -63,30 +68,34 @@
 }
 
 .stTabs [aria-selected="true"] {
-  background-color: var(--primary);
+  background: linear-gradient(135deg, #4c68d7 0%, #764ba2 100%);
   color: white;
-  box-shadow: 0 2px 8px var(--shadow);
-  transform: translateY(-3px);
-  border: 1px solid var(--primary-dark);
+  box-shadow: 0 8px 25px rgba(76, 104, 215, 0.4);
+  transform: translateY(-5px);
+  border: 2px solid #4c68d7;
   border-bottom: none;
 }
 
 .stTabs [aria-selected="true"]::before {
-  background-color: rgba(255, 255, 255, 0.25);
-  color: #212529;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.2) 100%);
+  color: white;
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
 .stTabs [data-baseweb="tab"]:hover {
-  background-color: rgba(76, 104, 215, 0.2) !important;
-  transform: translateY(-2px);
+  background: linear-gradient(135deg, rgba(76, 104, 215, 0.15) 0%, rgba(118, 74, 188, 0.1) 100%) !important;
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(76, 104, 215, 0.25);
+  border-color: rgba(76, 104, 215, 0.3);
 }
 
 .stTabs [data-baseweb="tab-panel"] {
   background-color: var(--card-bg);
-  padding: 24px;
-  border: 1px solid var(--border);
-  border-radius: 0px 0px 10px 10px;
-  box-shadow: 0 2px 10px var(--shadow);
+  padding: 30px;
+  border: 1px solid #dee2e6;
+  border-radius: 0px 0px 15px 15px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+  min-height: 500px;
 }
 
 /* Dark mode refinements */
