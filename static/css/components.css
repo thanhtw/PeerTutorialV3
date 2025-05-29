@@ -660,9 +660,7 @@ border-left: 3px solid #4c68d7;
   gap: 0.5rem;
 }
 
-.review-container .stButton > button {
-  /* Add specific styles if theme defaults are not enough */
-}
+
 
 .review-container .stTextArea textarea {
   border-color: var(--border-strong, #ccc);
@@ -729,9 +727,6 @@ border-left: 3px solid #4c68d7;
   font-size: 1.1em; /* Icon slightly larger */
 }
 
-.category-name {
-  /* Styles for category name if needed */
-}
 
 .error-mode-radio div[role="radiogroup"] { /* Targeting Streamlit's radio button group */
   display: flex;

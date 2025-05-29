@@ -121,7 +121,6 @@
     "click_error_types_to_learn": "點擊下方的錯誤類型以了解更多",
     "logical": "邏輯錯誤",
     "syntax": "語法錯誤",
-    "code_quality": "程式碼品質問題", 
     "standard_violation": "標準違規",
     "java_specific": "Java特定錯誤",
     "example_review": "範例審查",
