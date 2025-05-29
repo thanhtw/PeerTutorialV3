@@ -2,7 +2,7 @@
 Language utilities for Java Peer Review Training System.
 
 This module provides utilities for handling language selection and translation.
-Updated to work with multilingual database fields.
+Updated to use the new i18n package for proper internationalization.
 """
 
 import streamlit as st
@@ -17,16 +17,36 @@ parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 
-# Import language package
-from language import get_translations, get_llm_prompt_instructions, SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE
+# Import i18n package
+from i18n import init_i18n, get_i18n, t as i18n_t, set_locale as i18n_set_locale, get_locale as i18n_get_locale, get_llm_instructions as i18n_get_llm_instructions
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
+# Initialize i18n with locales directory
+_i18n_initialized = False
+
+def _ensure_i18n_initialized():
+    """Ensure i18n is initialized."""
+    global _i18n_initialized
+    if not _i18n_initialized:
+        locales_dir = os.path.join(parent_dir, "i18n", "locales")
+        init_i18n(default_locale="en", locales_dir=locales_dir)
+        _i18n_initialized = True
+
+# Constants for backward compatibility
+DEFAULT_LANGUAGE = "en"
+SUPPORTED_LANGUAGES = ["en", "zh"]
+
 def init_language():
     """Initialize language selection in session state."""
+    _ensure_i18n_initialized()
+    
     if "language" not in st.session_state:
         st.session_state.language = DEFAULT_LANGUAGE
+    
+    # Set i18n locale to match session state
+    i18n_set_locale(st.session_state.language)
 
 def set_language(lang: str):
     """
@@ -35,11 +55,15 @@ def set_language(lang: str):
     Args:
         lang: Language code (e.g., 'en', 'zh')
     """
+    _ensure_i18n_initialized()
+    
     if lang in SUPPORTED_LANGUAGES:
         st.session_state.language = lang
+        i18n_set_locale(lang)
     else:
         logger.warning(f"Unsupported language: {lang}, using default: {DEFAULT_LANGUAGE}")
         st.session_state.language = DEFAULT_LANGUAGE
+        i18n_set_locale(DEFAULT_LANGUAGE)
 
 def get_current_language() -> str:
     """
@@ -48,26 +72,89 @@ def get_current_language() -> str:
     Returns:
         Current language code
     """
-    return st.session_state.get("language", DEFAULT_LANGUAGE)
+    _ensure_i18n_initialized()
+    
+    # Sync session state with i18n if needed
+    if hasattr(st, 'session_state') and 'language' in st.session_state:
+        session_lang = st.session_state.language
+        i18n_lang = i18n_get_locale()
+        if session_lang != i18n_lang:
+            i18n_set_locale(session_lang)
+        return session_lang
+    
+    return i18n_get_locale()
 
-def t(key: str) -> str:
+def t(key: str, **kwargs) -> str:
     """
     Translate a text key to the current language.
     
     Args:
         key: Text key to translate
+        **kwargs: Variables for string formatting
         
     Returns:
         Translated text
     """
-    current_lang = get_current_language()
-    translations = get_translations(current_lang)
+    _ensure_i18n_initialized()
     
-    # Return the translation if found, otherwise return the key itself
-    return translations.get(key, key)
+    # Ensure locale is synced
+    current_lang = get_current_language()
+    if i18n_get_locale() != current_lang:
+        i18n_set_locale(current_lang)
+    
+    return i18n_t(key, **kwargs)
+
+def get_translations(language: str = None) -> Dict[str, str]:
+    """
+    Get translations for the specified language.
+    
+    Args:
+        language: Language code ('en' or 'zh'), uses current if None
+        
+    Returns:
+        Dictionary of translations (for backward compatibility)
+    """
+    _ensure_i18n_initialized()
+    
+    target_lang = language or get_current_language()
+    
+    # Get the i18n instance
+    i18n_instance = get_i18n()
+    
+    # Return the translations dictionary for the target language
+    return i18n_instance._translations.get(target_lang, {})
+
+def get_llm_prompt_instructions(language: str = None) -> Dict[str, Any]:
+    """
+    Get LLM prompt instructions for the specified language.
+    
+    Args:
+        language: Language code ('en' or 'zh'), uses current if None
+        
+    Returns:
+        Dictionary of LLM instructions
+    """
+    _ensure_i18n_initialized()
+    
+    target_lang = language or get_current_language()
+    
+    # Temporarily set locale if different
+    original_locale = i18n_get_locale()
+    if target_lang != original_locale:
+        i18n_set_locale(target_lang)
+    
+    instructions = i18n_get_llm_instructions()
+    
+    # Restore original locale
+    if target_lang != original_locale:
+        i18n_set_locale(original_locale)
+    
+    return instructions
 
 def render_language_selector():
     """Render a simplified language selector in the sidebar."""
+    _ensure_i18n_initialized()
+    
     with st.sidebar:
         st.subheader(t("language"))
         cols = st.columns([1, 1])
@@ -85,3 +172,16 @@ def render_language_selector():
                 set_language("zh")
                 st.session_state.full_reset = True
                 st.rerun()
+
+# Backward compatibility exports
+__all__ = [
+    'init_language',
+    'set_language', 
+    'get_current_language',
+    't',
+    'get_translations',
+    'get_llm_prompt_instructions',
+    'render_language_selector',
+    'DEFAULT_LANGUAGE',
+    'SUPPORTED_LANGUAGES'
+]

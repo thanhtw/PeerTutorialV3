@@ -27,7 +27,7 @@ class ReviewAttempt(BaseModel):
 class WorkflowState(BaseModel):
     """The state for the Java Code Review workflow"""
     # Current workflow step
-    current_step: Literal["generate", "review", "analyze", "summarize", "complete"] = Field(
+    current_step: Literal["generate", "evaluate", "regenerate", "review", "analyze", "summarize", "complete"] = Field(
         "generate", description="Current step in the workflow"
     )
     

@@ -89,8 +89,8 @@ class AuthUI:
                             "level_name_en": result.get("level_name_en"),
                             "level_name_zh": result.get("level_name_zh"),
                             "reviews_completed": result.get("reviews_completed"),
-                            "score": result.get("score"),
-                            "tutorial_completed": result.get("tutorial_completed", False)
+                            "score": result.get("score")
+                            # Removed tutorial_completed field
                         }                     
                         st.success(t("login_success"))
                         
@@ -426,6 +426,5 @@ class AuthUI:
         if st.button(f"{t('logout')}", key="enhanced_logout", use_container_width=True):
             self.logout()
 
-    
 
-        
+

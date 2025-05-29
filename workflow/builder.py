@@ -11,6 +11,7 @@ from langgraph.graph import StateGraph, END
 from state_schema import WorkflowState
 from workflow.node import WorkflowNodes
 from workflow.conditions import WorkflowConditions
+from utils.language_utils import t
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -40,7 +41,7 @@ class GraphBuilder:
         Returns:
             StateGraph: The constructed workflow graph
         """
-        logger.debug("Building Java Code Review workflow graph")
+        logger.debug(t("building_workflow_graph"))
         
         # Create a new graph with our state schema
         workflow = StateGraph(WorkflowState)
@@ -57,7 +58,7 @@ class GraphBuilder:
         # Set the entry point
         workflow.set_entry_point("generate_code")
         
-        logger.debug("Workflow graph construction completed")
+        logger.debug(t("workflow_graph_construction_completed"))
         return workflow
     
     def _add_nodes(self, workflow: StateGraph) -> None:
@@ -73,6 +74,7 @@ class GraphBuilder:
         workflow.add_node("regenerate_code", self.workflow_nodes.regenerate_code_node)
         workflow.add_node("review_code", self.workflow_nodes.review_code_node)
         workflow.add_node("analyze_review", self.workflow_nodes.analyze_review_node)
+        workflow.add_node("generate_summary", self.workflow_nodes.generate_summary_node)
         
         logger.debug("Added all nodes to workflow graph")
     
@@ -120,4 +122,3 @@ class GraphBuilder:
         
         logger.debug("Added conditional edges to workflow graph")
 
-    

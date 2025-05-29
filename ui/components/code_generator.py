@@ -10,7 +10,7 @@ import logging
 import random
 import time
 from typing import List, Dict, Any, Optional, Tuple, Callable
-from utils.language_utils import t
+from utils.language_utils import t, get_current_language
 from state_schema import WorkflowState
 
 # Configure logging
@@ -59,11 +59,11 @@ class ErrorSelectorUI:
     def render_category_selection(self, all_categories: Dict[str, List[str]]) -> Dict[str, List[str]]:
         """
         Render the error category selection UI for advanced mode with enhanced styling and layout.
-        Each error category from Java_code_review_errors.json is displayed as a visually distinct card.
-        Works with both English and Traditional Chinese.
+        Each error category from database is displayed as a visually distinct card.
+        Uses database fields based on current language.
         
         Args:
-            all_categories: Dictionary with 'java_errors' categories
+            all_categories: Dictionary with 'java_errors' categories from database
             
         Returns:
             Dictionary with selected categories
@@ -87,65 +87,44 @@ class ErrorSelectorUI:
         # Use a card-based grid layout for categories
         st.markdown('<div class="problem-area-grid">', unsafe_allow_html=True)
         
-        # Define category icons and descriptions for better visual appeal
-        category_info = {
-            "Logical": {
-                "icon": "🧠",
-                "description": t("logical_desc")
-            },
-            "Syntax": {
-                "icon": "🔍",
-                "description": t("syntax_desc")
-            },
-            "Code Quality": {
-                "icon": "✨",
-                "description": t("code_quality_desc")
-            },
-            "Standard Violation": {
-                "icon": "📏",
-                "description": t("standard_violation_desc")
-            },
-            "Java Specific": {
-                "icon": "☕",
-                "description": t("java_specific_desc")
-            },
-            # Chinese category mappings
-            "邏輯錯誤": {
-                "icon": "🧠",
-                "description": t("logical_desc")
-            },
-            "語法錯誤": {
-                "icon": "🔍",
-                "description": t("syntax_desc")
-            },
-            "程式碼品質": {
-                "icon": "✨",
-                "description": t("code_quality_desc")
-            },
-            "標準違規": {
-                "icon": "📏",
-                "description": t("standard_violation_desc")
-            },
-            "Java 特定錯誤": {
-                "icon": "☕",
-                "description": t("java_specific_desc")
-            }
+        # Get current language for database field selection
+        current_lang = get_current_language()
+        
+        # Define category icons for visual appeal (fallback for missing database icons)
+        default_category_icons = {
+            "Logical": "🧠", "Logical Errors": "🧠", "邏輯錯誤": "🧠",
+            "Syntax": "🔍", "Syntax Errors": "🔍", "語法錯誤": "🔍",
+            "Code Quality": "✨", "Code Quality Issues": "✨", "程式碼品質": "✨",
+            "Standard Violation": "📏", "Standard Violations": "📏", "標準違規": "📏",
+            "Java Specific": "☕", "Java-Specific": "☕", "Java特定錯誤": "☕"
         }
         
-        # Generate cards for each category
-        for i, category in enumerate(java_error_categories):
+        # Generate cards for each category from database
+        for i, category_data in enumerate(java_error_categories):
             # Create a unique and safe key for this category
             category_key = f"java_category_{i}"
             
+            # Extract category information from database based on language
+            if isinstance(category_data, dict):
+                # If category_data is a dict with language-specific fields
+                if current_lang == 'zh':
+                    category_name = category_data.get('name_zh', category_data.get('name_en', 'Unknown'))
+                    category_desc = category_data.get('description_zh', category_data.get('description_en', ''))
+                else:
+                    category_name = category_data.get('name_en', category_data.get('name_zh', 'Unknown'))
+                    category_desc = category_data.get('description_en', category_data.get('description_zh', ''))
+                
+                category_code = category_data.get('category_code', category_name)
+                icon = category_data.get('icon', default_category_icons.get(category_name, "📁"))
+            else:
+                # Fallback for string category names
+                category_name = str(category_data)
+                category_code = category_name
+                category_desc = t("error_category")
+                icon = default_category_icons.get(category_name, "📁")
+            
             # Check if category is already selected from session state
-            is_selected = category in current_selections
-            
-            # Get icon and description - fallback to defaults if not found
-            icon = category_info.get(category, {}).get("icon", "📁")
-            description = category_info.get(category, {}).get("description", t("error_category"))
-            
-            # Get translated category name - if it's already in the correct language, this will just return the original
-            category_name = t(category.lower()) if category.lower() in ["logical", "syntax", "code_quality", "standard_violation", "java_specific"] else category
+            is_selected = category_code in current_selections
             
             # Create a card with toggle effect for each category
             selected_class = "selected" if is_selected else ""
@@ -157,26 +136,25 @@ class ErrorSelectorUI:
                     {icon} {category_name}
                     <span class="icon">{'✓' if is_selected else ''}</span>
                 </div>
-                <p class="problem-area-description">{description}</p>
+                <p class="problem-area-description">{category_desc}</p>
             </div>
             """, unsafe_allow_html=True)
             
-            # Hidden checkbox to track state (will be clicked by the card's onclick handler)
-            # Use index-based unique keys instead of category text
+            # Hidden checkbox to track state
             selected = st.checkbox(
-                f"Category {i}",  # Just a label, won't be displayed
+                f"Category {i}",
                 key=category_key,
                 value=is_selected,
-                label_visibility="collapsed"  # Hide the actual checkbox
+                label_visibility="collapsed"
             )
             
             # Update selection state based on checkbox
             if selected:
-                if category not in current_selections:
-                    current_selections.append(category)
+                if category_code not in current_selections:
+                    current_selections.append(category_code)
             else:
-                if category in current_selections:
-                    current_selections.remove(category)
+                if category_code in current_selections:
+                    current_selections.remove(category_code)
         
         # Close the grid container
         st.markdown('</div>', unsafe_allow_html=True)
@@ -186,17 +164,31 @@ class ErrorSelectorUI:
         if not current_selections:
             st.warning(t("no_categories"))
         else:
-            # Display selected categories with visual enhancements
+            # Display selected categories
             st.markdown('<div class="selected-categories">', unsafe_allow_html=True)
-            for i, category in enumerate(current_selections):
-                icon = category_info.get(category, {}).get("icon", "📁")
-                category_name = t(category.lower()) if category.lower() in ["logical", "syntax", "code_quality", "standard_violation", "java_specific"] else category
+            for i, category_code in enumerate(current_selections):
+                # Find the category data for display
+                category_display_name = category_code
+                icon = "📁"
                 
-                # Use index-based unique identifier for each category display
+                for category_data in java_error_categories:
+                    if isinstance(category_data, dict):
+                        if category_data.get('category_code') == category_code:
+                            if current_lang == 'zh':
+                                category_display_name = category_data.get('name_zh', category_data.get('name_en', category_code))
+                            else:
+                                category_display_name = category_data.get('name_en', category_data.get('name_zh', category_code))
+                            icon = category_data.get('icon', default_category_icons.get(category_display_name, "📁"))
+                            break
+                    elif str(category_data) == category_code:
+                        category_display_name = category_code
+                        icon = default_category_icons.get(category_code, "📁")
+                        break
+                
                 st.markdown(f"""
                 <div class="selected-category-item" id="selected_category_{i}">
                     <span class="category-icon">{icon}</span>
-                    <span class="category-name">{category_name}</span>
+                    <span class="category-name">{category_display_name}</span>
                 </div>
                 """, unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
@@ -828,7 +820,7 @@ def render_generate_tab(workflow, error_selector_ui, code_display_ui, user_level
             </div>
             <div style="flex: 1; padding: 10px; background-color: white; border-radius: 5px; text-align: center;">
               <div style="font-weight: 500; color: #4c68d7;">{t("code_length")}</div>
-              <div style="font-size: 1.2rem; margin-top: 5px;">{code_length}</div>
+              <div style="font-size: 1.2rem, margin-top: 5px;">{code_length}</div>
             </div>
           </div>
           <em style="font-size: 0.9rem; margin-top: 10px; display: block;">{t("params_based_on_level")} ({user_level or 'medium'}).</em>
@@ -977,14 +969,8 @@ class CodeGeneratorUI:
         Args:
             user_level: Optional user level from authentication (basic, medium, senior)
         """
-        # Check if tutorial needs to be shown
-        if not st.session_state.get("tutorial_completed", False):
-            from ui.components.tutorial import CodeReviewTutorial
-            tutorial = CodeReviewTutorial()
-            tutorial.render(on_complete=lambda: render_generate_tab(self.workflow, self.error_selector, self.code_display_ui, user_level))
-        else:
-            # Render the standard generation tab
-            render_generate_tab(self.workflow, self.error_selector, self.code_display_ui, user_level)
+        # Remove the tutorial check - allow direct access to code generation
+        render_generate_tab(self.workflow, self.error_selector, self.code_display_ui, user_level)
     
     def generate_code(self, params, error_selection_mode, selected_categories, selected_specific_errors=None):
         """

@@ -9,6 +9,7 @@ student learning pace and provides multiple examples and practice opportunities.
 import logging
 import json
 import random
+import time
 from typing import Dict, List, Any, Optional, Tuple
 from db.mysql_connection import MySQLConnection
 from core.student_response_evaluator import StudentResponseEvaluator
@@ -33,149 +34,309 @@ class EnhancedTutorial:
         else:
             self.evaluator = None
         
-        # Tutorial structure with multiple steps and variations
+        # Enhanced tutorial structure with interactive elements
         self.tutorial_structure = {
-            "introduction": {
+            "welcome": {
                 "step_id": 0,
                 "title": t("tutorial_welcome"),
-                "type": "information",
+                "type": "interactive_intro",
                 "required": True,
-                "estimated_time": 2
+                "estimated_time": 3,
+                "elements": ["welcome_animation", "user_profile_setup", "goal_setting"]
             },
-            "code_overview": {
+            "error_gallery": {
                 "step_id": 1,
-                "title": t("understanding_code"),
-                "type": "code_display",
-                "required": True,
-                "estimated_time": 3
-            },
-            "error_types_intro": {
-                "step_id": 2,
-                "title": t("types_of_errors"),
+                "title": t("error_type_gallery"),
                 "type": "interactive_gallery",
                 "required": True,
-                "estimated_time": 5
+                "estimated_time": 6,
+                "elements": ["error_showcase", "click_to_explore", "visual_examples"]
             },
-            "poor_review_example": {
+            "pattern_intro": {
+                "step_id": 2,
+                "title": t("pattern_recognition_intro"),
+                "type": "pattern_game",
+                "required": True,
+                "estimated_time": 8,
+                "elements": ["drag_drop_patterns", "instant_feedback", "score_tracking"]
+            },
+            "guided_review": {
                 "step_id": 3,
-                "title": t("poor_review_example"),
-                "type": "example_analysis",
-                "required": True,
-                "estimated_time": 4
-            },
-            "good_review_example": {
-                "step_id": 4,
-                "title": t("good_review_example"),
-                "type": "example_analysis",
-                "required": True,
-                "estimated_time": 4
-            },
-            "guided_practice": {
-                "step_id": 5,
-                "title": t("your_turn_practice"),
+                "title": t("guided_code_review"),
                 "type": "guided_practice",
                 "required": True,
-                "estimated_time": 8
+                "estimated_time": 12,
+                "elements": ["step_by_step_guide", "real_time_hints", "progress_tracker"]
             },
-            "pattern_recognition": {
-                "step_id": 6,
-                "title": t("recognizing_patterns"),
-                "type": "pattern_game",
+            "speed_challenge": {
+                "step_id": 4,
+                "title": t("speed_recognition_challenge"),
+                "type": "timed_challenge",
                 "required": False,
-                "estimated_time": 6
+                "estimated_time": 10,
+                "elements": ["timer", "rapid_fire_questions", "leaderboard"]
             },
-            "final_challenge": {
-                "step_id": 7,
-                "title": t("final_challenge"),
-                "type": "mini_review",
+            "mastery_test": {
+                "step_id": 5,
+                "title": t("mastery_demonstration"),
+                "type": "comprehensive_review",
                 "required": True,
-                "estimated_time": 10
+                "estimated_time": 15,
+                "elements": ["full_review_simulation", "detailed_feedback", "skill_assessment"]
             },
-            "completion": {
-                "step_id": 8,
-                "title": t("tutorial_complete"),
-                "type": "completion",
+            "celebration": {
+                "step_id": 6,
+                "title": t("tutorial_completion"),
+                "type": "completion_ceremony",
                 "required": True,
-                "estimated_time": 1
+                "estimated_time": 2,
+                "elements": ["achievement_animation", "badge_award", "next_steps"]
             }
         }
         
-        # Sample code examples with different complexity levels
-        self.code_examples = {
-            "beginner": [
-                {
-                    "code": """public class Calculator {
-    public int divide(int a, int b) {
-        return a / b;  // ERROR: No zero check
-    }
-    
-    public boolean isEqual(String str1, String str2) {
-        return str1 == str2;  // ERROR: String comparison with ==
+        # Interactive code examples with visual elements
+        self.interactive_examples = {
+            "off_by_one_showcase": {
+                "title": "🔍 Off-by-One Error Demo",
+                "description": "Watch how this error causes problems",
+                "code": """public class ArrayDemo {
+    public void printArray(int[] data) {
+        for(int i = 0; i <= data.length; i++) {  // 🚨 Error here!
+            System.out.println(data[i]);
+        }
     }
 }""",
-                    "errors": ["division_by_zero", "string_comparison"],
-                    "difficulty": "easy"
+                "animation_steps": [
+                    {"highlight": "i <= data.length", "explanation": "Loop condition allows i to equal array length"},
+                    {"highlight": "data[i]", "explanation": "When i equals length, this throws ArrayIndexOutOfBoundsException"},
+                    {"highlight": "i < data.length", "explanation": "Fixed: Use < instead of <=", "is_fix": True}
+                ],
+                "visual_demo": "array_bounds_animation"
+            },
+            "null_check_showcase": {
+                "title": "⚠️ Null Pointer Error Demo",
+                "description": "See why null checks are crucial",
+                "code": """public class UserProcessor {
+    public void updateProfile(User user) {
+        user.getProfile().updateBio("New bio");  // 🚨 Error here!
+    }
+}""",
+                "animation_steps": [
+                    {"highlight": "user.getProfile()", "explanation": "What if user is null?"},
+                    {"highlight": "getProfile().updateBio", "explanation": "What if getProfile() returns null?"},
+                    {"highlight": "if (user != null && user.getProfile() != null)", "explanation": "Fixed: Add null checks", "is_fix": True}
+                ],
+                "visual_demo": "null_pointer_animation"
+            }
+        }
+        
+        # Gamification elements
+        self.achievement_system = {
+            "pattern_spotter": {"points": 50, "icon": "🎯", "description": "Spotted first error pattern"},
+            "speed_demon": {"points": 100, "icon": "⚡", "description": "Completed speed challenge"},
+            "code_detective": {"points": 150, "icon": "🕵️", "description": "Found all hidden errors"},
+            "tutorial_master": {"points": 200, "icon": "🎓", "description": "Completed entire tutorial"}
+        }
+        
+        # Visual feedback templates
+        self.feedback_templates = {
+            "excellent": {
+                "icon": "🌟",
+                "color": "#28a745",
+                "animation": "celebration",
+                "message": "Outstanding work! You're mastering this!"
+            },
+            "good": {
+                "icon": "👍",
+                "color": "#007bff",
+                "animation": "success",
+                "message": "Great job! You're on the right track!"
+            },
+            "needs_work": {
+                "icon": "💪",
+                "color": "#ffc107",
+                "animation": "encourage",
+                "message": "Keep practicing! You're getting there!"
+            }
+        }
+
+    def get_interactive_step_content(self, user_id: str, step_id: int) -> Dict[str, Any]:
+        """Get enhanced interactive content for tutorial steps."""
+        try:
+            step_config = self._get_step_config(step_id)
+            if not step_config:
+                return {"error": t("invalid_step")}
+            
+            progress = self.get_tutorial_progress(user_id)
+            content = self._generate_interactive_content(step_config, progress, user_id)
+            
+            return {
+                "step_config": step_config,
+                "content": content,
+                "navigation": self._get_enhanced_navigation(step_id, progress),
+                "gamification": self._get_gamification_data(user_id, step_id),
+                "visual_elements": self._get_visual_elements(step_config)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting interactive step content: {str(e)}")
+            return {"error": str(e)}
+
+    def start_pattern_recognition_game(self, user_id: str, difficulty: str = "beginner") -> Dict[str, Any]:
+        """Start an interactive pattern recognition game."""
+        try:
+            patterns = self._generate_pattern_game(difficulty)
+            session_id = self._create_game_session(user_id, "pattern_recognition")
+            
+            return {
+                "session_id": session_id,
+                "game_type": "pattern_recognition",
+                "difficulty": difficulty,
+                "patterns": patterns,
+                "scoring": {
+                    "correct_points": 10,
+                    "streak_bonus": 5,
+                    "time_bonus_threshold": 30
+                },
+                "ui_config": {
+                    "show_timer": True,
+                    "show_score": True,
+                    "show_streak": True,
+                    "enable_hints": True
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error starting pattern game: {str(e)}")
+            return {"error": str(e)}
+
+    def evaluate_interactive_response(self, user_id: str, session_id: str, 
+                                    response_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Evaluate user response with enhanced feedback."""
+        try:
+            response_type = response_data.get("type")
+            
+            if response_type == "pattern_selection":
+                result = self._evaluate_pattern_selection(response_data)
+            elif response_type == "code_review":
+                result = self._evaluate_code_review(response_data)
+            elif response_type == "drag_drop":
+                result = self._evaluate_drag_drop(response_data)
+            else:
+                return {"error": "Unknown response type"}
+            
+            # Add visual feedback
+            result["visual_feedback"] = self._generate_visual_feedback(result)
+            
+            # Update progress and achievements
+            self._update_tutorial_progress(user_id, session_id, result)
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error evaluating interactive response: {str(e)}")
+            return {"error": str(e)}
+
+    def get_tutorial_dashboard(self, user_id: str) -> Dict[str, Any]:
+        """Get comprehensive tutorial dashboard data."""
+        try:
+            progress = self.get_tutorial_progress(user_id)
+            
+            return {
+                "progress_overview": {
+                    "current_step": progress.get("current_step", 0),
+                    "total_steps": len(self.tutorial_structure),
+                    "completion_percentage": self._calculate_completion_percentage(progress),
+                    "time_spent": progress.get("total_time_spent", 0),
+                    "estimated_remaining": self._estimate_remaining_time(progress)
+                },
+                "achievements": self._get_user_achievements(user_id),
+                "skill_progress": self._get_skill_development(user_id),
+                "next_recommended": self._get_next_recommendation(progress),
+                "visual_elements": {
+                    "progress_ring": True,
+                    "skill_badges": True,
+                    "achievement_showcase": True,
+                    "motivational_message": self._get_motivational_message(progress)
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting tutorial dashboard: {str(e)}")
+            return {}
+
+    def _generate_pattern_game(self, difficulty: str) -> List[Dict[str, Any]]:
+        """Generate interactive pattern recognition game."""
+        patterns = []
+        
+        if difficulty == "beginner":
+            patterns.extend([
+                {
+                    "id": 1,
+                    "type": "visual_comparison",
+                    "question": "Which code has an off-by-one error?",
+                    "options": [
+                        {"code": "for(i=0; i<len; i++)", "correct": False, "explanation": "Correct boundary"},
+                        {"code": "for(i=0; i<=len; i++)", "correct": True, "explanation": "Off-by-one: <= allows i to equal len"},
+                        {"code": "for(i=1; i<len; i++)", "correct": False, "explanation": "Starts at 1, but ends correctly"}
+                    ],
+                    "visual_hint": "array_bounds_visualization",
+                    "points": 10
                 },
                 {
-                    "code": """public class ArrayProcessor {
-    private int[] numbers;
-    
-    public void printAll() {
-        for (int i = 0; i <= numbers.length; i++) {  // ERROR: Off-by-one
-            System.out.println(numbers[i]);
-        }
-    }
-}""",
-                    "errors": ["off_by_one"],
-                    "difficulty": "easy"
+                    "id": 2,
+                    "type": "drag_drop",
+                    "question": "Drag the correct null check to fix this code:",
+                    "code_template": "user.getProfile().updateName(name);",
+                    "drag_options": [
+                        {"text": "if(user != null)", "position": "before", "correct": True},
+                        {"text": "if(name != null)", "position": "before", "correct": False},
+                        {"text": "if(profile != null)", "position": "after", "correct": False}
+                    ],
+                    "visual_hint": "null_check_flow",
+                    "points": 15
                 }
-            ],
-            "intermediate": [
-                {
-                    "code": """public class UserManager {
-    private List<User> users = new ArrayList<>();
-    
-    public User findUser(String name) {
-        for (User user : users) {
-            if (user.getName() == name) {  // ERROR: String comparison
-                return user;
-            }
-        }
-        return null;
-    }
-    
-    public void removeUser(String name) {
-        User user = findUser(name);
-        users.remove(user);  // ERROR: No null check
-    }
-}""",
-                    "errors": ["string_comparison", "null_check"],
-                    "difficulty": "medium"
-                }
-            ]
-        }
+            ])
         
-        # Error pattern examples for pattern recognition
-        self.error_patterns = {
-            "missing_null_check": [
-                "user.profile.updateBio(newBio);", # Potentially user or user.profile is null
-                "String data = fetchData(); data.toLowerCase();", # Potentially data is null
-                "configs[i].initialize();" # Potentially configs[i] is null
-            ],
-            "array_out_of_bounds": [
-                "for(int i = 0; i <= data.length; i++) { data[i] = i; }",
-                "value = items[items.length];",
-                "element = fixedArray[5]; /* Assume fixedArray.length <= 5 */",
-                "item = anArray[-1];"
-            ],
-            "string_comparison_by_ref": [
-                "if (str1 == str2) { /*...*/ }",
-                "while (userInput == \"EXIT\") { /*...*/ }", # Escaped for Python string
-                "return actualValue == expectedValue;"
-            ]
-            # Old keys 'off_by_one', 'null_check', 'string_comparison' are now removed/updated.
+        return patterns
+
+    def _generate_visual_feedback(self, result: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate visual feedback based on performance."""
+        accuracy = result.get("accuracy", 0)
+        
+        if accuracy >= 90:
+            feedback_type = "excellent"
+        elif accuracy >= 70:
+            feedback_type = "good"
+        else:
+            feedback_type = "needs_work"
+        
+        template = self.feedback_templates[feedback_type]
+        
+        return {
+            "type": feedback_type,
+            "icon": template["icon"],
+            "color": template["color"],
+            "animation": template["animation"],
+            "message": template["message"],
+            "show_confetti": accuracy >= 90,
+            "progress_animation": True,
+            "sound_effect": f"{feedback_type}_sound"
         }
-    
+
+    def _get_motivational_message(self, progress: Dict[str, Any]) -> str:
+        """Get personalized motivational message."""
+        completion = self._calculate_completion_percentage(progress)
+        
+        if completion < 25:
+            return "🚀 Great start! You're building a strong foundation!"
+        elif completion < 50:
+            return "💪 You're making excellent progress! Keep going!"
+        elif completion < 75:
+            return "🎯 Almost there! You're becoming a code review expert!"
+        else:
+            return "🌟 Outstanding! You're mastering the art of code review!"
+
     def get_tutorial_progress(self, user_id: str) -> Dict[str, Any]:
         """
         Get current tutorial progress for a user.
@@ -635,4 +796,107 @@ class EnhancedTutorial:
             "next_step_id": next_step_id,
             "previous_step_id": previous_step_id,
             "total_steps": total_steps
+        }
+    
+    def _get_step_config(self, step_id: int) -> Optional[Dict[str, Any]]:
+        """Get configuration for a specific step."""
+        for step_name, config in self.tutorial_structure.items():
+            if config["step_id"] == step_id:
+                config["name"] = step_name
+                return config
+        return None
+
+    def _generate_interactive_content(self, step_config: Dict, progress: Dict, user_id: str) -> Dict[str, Any]:
+        """Generate interactive content based on step type."""
+        step_type = step_config["type"]
+        
+        if step_type == "interactive_intro":
+            return self._create_welcome_experience(user_id)
+        elif step_type == "interactive_gallery":
+            return self._create_error_gallery()
+        elif step_type == "pattern_game":
+            return self._create_pattern_game_content()
+        elif step_type == "guided_practice":
+            return self._create_guided_practice()
+        elif step_type == "timed_challenge":
+            return self._create_speed_challenge()
+        else:
+            return self._generate_step_content(step_config, progress, user_id)
+
+    def _create_welcome_experience(self, user_id: str) -> Dict[str, Any]:
+        """Create an engaging welcome experience."""
+        return {
+            "type": "interactive_intro",
+            "title": "🎓 Welcome to Code Review Mastery!",
+            "subtitle": "Your journey to becoming a code review expert starts here",
+            "interactive_elements": [
+                {
+                    "type": "animation",
+                    "content": "welcome_hero_animation",
+                    "duration": 3000
+                },
+                {
+                    "type": "goal_selector",
+                    "title": "What's your goal?",
+                    "options": [
+                        {"id": "improve_skills", "text": "Improve my review skills", "icon": "🎯"},
+                        {"id": "learn_patterns", "text": "Learn error patterns", "icon": "🔍"},
+                        {"id": "speed_up", "text": "Review code faster", "icon": "⚡"}
+                    ]
+                },
+                {
+                    "type": "commitment",
+                    "title": "How much time can you dedicate?",
+                    "options": ["15 min/day", "30 min/day", "1 hour/day"]
+                }
+            ],
+            "motivation": {
+                "facts": [
+                    "Code reviews catch 60% more bugs than testing alone",
+                    "Expert reviewers spot issues 3x faster",
+                    "Good reviews improve team productivity by 25%"
+                ],
+                "personal_message": f"Let's make you a code review champion!"
+            }
+        }
+
+    def _create_error_gallery(self) -> Dict[str, Any]:
+        """Create an interactive error gallery."""
+        return {
+            "type": "interactive_gallery",
+            "title": "🎨 The Error Gallery",
+            "subtitle": "Click on each error type to explore",
+            "gallery_items": [
+                {
+                    "id": "off_by_one",
+                    "title": "Off-by-One Errors",
+                    "icon": "🎯",
+                    "preview_code": "for(i=0; i<=len; i++)",
+                    "description": "When loops go one step too far",
+                    "interactive": True,
+                    "demo_type": "bounds_visualization"
+                },
+                {
+                    "id": "null_pointer",
+                    "title": "Null Pointer Errors",
+                    "icon": "⚠️",
+                    "preview_code": "user.getName().length()",
+                    "description": "When objects don't exist",
+                    "interactive": True,
+                    "demo_type": "null_flow_diagram"
+                },
+                {
+                    "id": "string_comparison",
+                    "title": "String Comparison",
+                    "icon": "🔤",
+                    "preview_code": "if(str1 == str2)",
+                    "description": "Reference vs content comparison",
+                    "interactive": True,
+                    "demo_type": "reference_visualization"
+                }
+            ],
+            "exploration_tracker": {
+                "required_views": 3,
+                "unlock_bonus": "pattern_spotter_badge"
+            }
         }

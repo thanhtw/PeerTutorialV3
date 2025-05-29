@@ -195,15 +195,14 @@ class DatabaseSetup:
                 score INT DEFAULT 0,
                 last_activity DATE DEFAULT NULL,
                 consecutive_days INT DEFAULT 0,
-                total_points INT DEFAULT 0,
-                tutorial_completed BOOLEAN DEFAULT FALSE        
+                total_points INT DEFAULT 0
             ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
             """
             
             cursor.execute(users_table)
             logger.info("Users table created")
             
-            # Create error_categories table
+            # Create error_categories table with enhanced structure
             error_categories_table = """
             CREATE TABLE IF NOT EXISTS error_categories (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -215,14 +214,17 @@ class DatabaseSetup:
                 sort_order INT DEFAULT 0,
                 is_active BOOLEAN DEFAULT TRUE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_category_code (category_code),
+                INDEX idx_active (is_active),
+                INDEX idx_sort_order (sort_order)
             ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
             """
             
             cursor.execute(error_categories_table)
             logger.info("Error categories table created")
             
-            # Create java_errors table
+            # Create java_errors table with enhanced structure
             java_errors_table = """
             CREATE TABLE IF NOT EXISTS java_errors (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -254,7 +256,9 @@ class DatabaseSetup:
                 INDEX idx_category_id (category_id),
                 INDEX idx_error_code (error_code),
                 INDEX idx_difficulty (difficulty_level),
-                INDEX idx_active (is_active)
+                INDEX idx_active (is_active),
+                INDEX idx_error_name_en (error_name_en),
+                INDEX idx_error_name_zh (error_name_zh)
             ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
             """
             
@@ -361,41 +365,56 @@ class DatabaseSetup:
         except Exception as e:
             logger.error(f"Unexpected error creating tables: {str(e)}")
             return False
-    
-    def test_application_connection(self):
-        """Test connection with application user credentials."""
+
+    def migrate_json_data(self):
+        """Simple data validation - data is now inserted via SQL file."""
         try:
-            logger.info("Testing application user connection...")
+            logger.info("Validating inserted data...")
             
-            connection = mysql.connector.connect(
-                host=self.db_host,
-                user=self.app_user,
-                password=self.app_password,
-                database=self.db_name,
-                port=self.db_port,
-                charset='utf8mb4',
-                collation='utf8mb4_unicode_ci'
-            )
+            connection = self.get_connection()
+            cursor = connection.cursor()
             
-            if connection.is_connected():
-                cursor = connection.cursor()
-                cursor.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = %s", (self.db_name,))
-                table_count = cursor.fetchone()[0]
-                logger.info(f"Application user can access {table_count} tables")
-                cursor.close()
-                connection.close()
+            # Check if data was inserted
+            cursor.execute("SELECT COUNT(*) FROM error_categories")
+            categories_count = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM java_errors") 
+            errors_count = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM badges")
+            badges_count = cursor.fetchone()[0]
+            
+            cursor.close()
+            connection.close()
+            
+            logger.info(f"Data validation results:")
+            logger.info(f"  Error categories: {categories_count}")
+            logger.info(f"  Java errors: {errors_count}")
+            logger.info(f"  Badges: {badges_count}")
+            
+            if categories_count > 0 and errors_count > 0:
+                logger.info("✅ Data insertion validation successful")
                 return True
             else:
-                logger.error("Application user connection failed")
+                logger.error("❌ Data validation failed - no data found")
                 return False
                 
-        except mysql.connector.Error as e:
-            logger.error(f"Application user connection error: {str(e)}")
-            return False
         except Exception as e:
-            logger.error(f"Unexpected error testing app connection: {str(e)}")
+            logger.error(f"Error during data validation: {str(e)}")
             return False
-    
+
+    def get_connection(self):
+        """Get database connection for validation."""
+        return mysql.connector.connect(
+            host=self.db_host,
+            user=self.app_user,
+            password=self.app_password,
+            port=self.db_port,
+            database=self.db_name,
+            charset='utf8mb4',
+            collation='utf8mb4_unicode_ci'
+        )
+
     def run_complete_setup(self):
         """Run the complete database setup process."""
         logger.info("Starting complete database setup...")
@@ -421,12 +440,17 @@ class DatabaseSetup:
                 logger.error("❌ Table creation failed")
                 return False
             
-            # Step 5: Test application connection
+            # Step 5: Migrate JSON data
+            if not self.migrate_json_data():
+                logger.error("❌ Data migration failed")
+                return False
+            
+            # Step 6: Test application connection
             if not self.test_application_connection():
                 logger.error("❌ Application user connection test failed")
                 return False
             
-            logger.info("✅ Complete database setup successful!")
+            logger.info("✅ Complete database setup with data migration successful!")
             return True
             
         except Exception as e:
@@ -463,10 +487,44 @@ APP_DB_PASSWORD={self.app_password}
             logger.error(f"Error creating .env file: {str(e)}")
             return False
 
+    def test_application_connection(self):
+        """Test connection using application user credentials."""
+        try:
+            logger.info("Testing application user connection...")
+            
+            connection = mysql.connector.connect(
+                host=self.db_host,
+                user=self.app_user,
+                password=self.app_password,
+                port=self.db_port,
+                database=self.db_name,
+                charset='utf8mb4',
+                collation='utf8mb4_unicode_ci'
+            )
+            
+            if connection.is_connected():
+                cursor = connection.cursor()
+                cursor.execute("SELECT DATABASE(), USER(), VERSION()")
+                result = cursor.fetchone()
+                logger.info(f"Application connection successful: Database={result[0]}, User={result[1]}")
+                cursor.close()
+                connection.close()
+                return True
+            else:
+                logger.error("Failed to connect with application user")
+                return False
+                
+        except mysql.connector.Error as e:
+            logger.error(f"Application user connection error: {str(e)}")
+            return False
+        except Exception as e:
+            logger.error(f"Unexpected error testing application connection: {str(e)}")
+            return False
+
 def main():
     """Main setup function."""
     print("🔧 Java Peer Review Training System - Database Setup")
-    print("=" * 60)
+    print("=" * 70)
     
     # Check if MySQL is accessible
     setup = DatabaseSetup()
@@ -482,6 +540,7 @@ def main():
     print(f"   • Database: {setup.db_name}")
     print(f"   • User: {setup.app_user}")
     print("   • Core tables for the application")
+    print("   • Note: Run the SQL file separately to insert data")
     
     confirm = input("\nContinue? (y/n): ")
     if confirm.lower() != 'y':
@@ -492,11 +551,10 @@ def main():
     success = setup.run_complete_setup()
     
     if success:
-        print("\n🎉 Setup completed successfully!")
+        print("\n🎉 Database setup completed successfully!")
         print("\nNext steps:")
-        print("1. Run: python db/enhanced_schema_update.py")
-        print("2. Run: python migration/repository_migration.py")
-        print("3. Test: python examples/database_repository_usage.py")
+        print("1. Run the SQL file to insert all data")
+        print("2. Test: python examples/database_repository_usage.py")
         
         # Create/update .env file
         setup.create_env_file()
@@ -504,12 +562,83 @@ def main():
     else:
         print("\n❌ Setup failed!")
         print("Please check the logs above for error details.")
-        print("\nTroubleshooting:")
-        print("1. Verify MySQL is running")
-        print("2. Check database credentials")
-        print("3. Ensure MySQL user has admin privileges")
     
     return success
+
+def verify_tables_exist():
+    """Verify that all required tables exist."""
+    try:
+        # Use MySQLConnection instead of direct mysql.connector
+        from db.mysql_connection import MySQLConnection
+        db = MySQLConnection()
+        
+        # Test connection first
+        if not db.test_connection_only():
+            logger.error("Cannot connect to database for verification")
+            return False
+        
+        required_tables = [
+            'users', 'error_categories', 'java_errors', 'activity_log',
+            'error_usage_stats', 'badges', 'user_badges'
+        ]
+        
+        existing_tables = []
+        missing_tables = []
+        
+        for table in required_tables:
+            check_query = """
+            SELECT COUNT(*) as count 
+            FROM information_schema.tables 
+            WHERE table_schema = DATABASE() 
+            AND table_name = %s
+            """
+            result = db.execute_query(check_query, (table,), fetch_one=True)
+            if result and result.get('count', 0) > 0:
+                existing_tables.append(table)
+            else:
+                missing_tables.append(table)
+        
+        print(f"\n📊 Tables Status: {len(existing_tables)}/{len(required_tables)} created")
+        
+        if existing_tables:
+            print("✅ Existing tables:")
+            for table in existing_tables:
+                print(f"   - {table}")
+        
+        if missing_tables:
+            print("❌ Missing tables:")
+            for table in missing_tables:
+                print(f"   - {table}")
+            logger.error(f"Missing tables: {', '.join(missing_tables)}")
+            return False
+        
+        # Verify core tables have proper structure
+        if 'error_categories' in existing_tables and 'java_errors' in existing_tables:
+            # Check if tables have the expected columns
+            cat_columns_query = """
+            SELECT COLUMN_NAME 
+            FROM information_schema.COLUMNS 
+            WHERE table_schema = DATABASE() 
+            AND table_name = 'error_categories'
+            """
+            cat_columns = db.execute_query(cat_columns_query)
+            expected_cat_columns = ['id', 'category_code', 'name_en', 'name_zh', 'is_active']
+            
+            if cat_columns:
+                existing_cat_cols = [col['COLUMN_NAME'] for col in cat_columns]
+                missing_cols = [col for col in expected_cat_columns if col not in existing_cat_cols]
+                if missing_cols:
+                    logger.error(f"error_categories table missing columns: {missing_cols}")
+                    return False
+            
+            print("✅ Table structure verification passed")
+        
+        logger.info("All required tables exist and have proper structure")
+        return True
+            
+    except Exception as e:
+        logger.error(f"Error verifying tables: {str(e)}")
+        return False
 
 if __name__ == "__main__":
     success = main()

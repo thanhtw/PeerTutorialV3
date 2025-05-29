@@ -8,6 +8,7 @@ which paths to take in the LangGraph workflow.
 import logging
 from typing import Dict, Any, List, Optional
 from state_schema import WorkflowState
+from utils.language_utils import t
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -45,12 +46,12 @@ class WorkflowConditions:
         
         # Check if current step is explicitly set to regenerate
         if current_step == "regenerate":
-            logger.debug("Path decision: regenerate_code (explicit current_step)")
+            logger.debug(f"{t('path_decision')}: regenerate_code ({t('explicit_current_step')})")
             return "regenerate_code"
         
         # IMPORTANT: Explicitly check validity flag first
         if evaluation_result and evaluation_result.get("valid", False):
-            logger.debug("Path decision: review_code (evaluation passed)")
+            logger.debug(f"{t('path_decision')}: review_code ({t('evaluation_passed')})")
             return "review_code"
 
         # Check if we have missing or extra errors and haven't reached max attempts
@@ -59,12 +60,12 @@ class WorkflowConditions:
         
         # If we need regeneration and haven't reached max attempts, regenerate
         if needs_regeneration and evaluation_attempts < max_evaluation_attempts:
-            reason = "missing errors" if has_missing_errors else "extra errors"
-            logger.debug(f"Path decision: regenerate_code (found {reason})")
+            reason = t("missing_errors") if has_missing_errors else t("extra_errors")
+            logger.debug(f"{t('path_decision')}: regenerate_code ({t('found')} {reason})")
             return "regenerate_code"
         
         # If we've reached max attempts or don't need regeneration, move to review
-        logger.debug(f"Path decision: review_code (attempts: {evaluation_attempts}/{max_evaluation_attempts})")
+        logger.debug(f"{t('path_decision')}: review_code ({t('attempts')}: {evaluation_attempts}/{max_evaluation_attempts})")
         return "review_code"
     
     @staticmethod

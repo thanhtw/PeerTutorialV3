@@ -11,8 +11,9 @@ from typing import Dict, Any, List, Tuple, Optional
 
 from state_schema import WorkflowState, CodeSnippet
 from utils.code_utils import extract_both_code_versions, create_regeneration_prompt, get_error_count_from_state
-import random
 from utils.language_utils import t
+import random
+import logging
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -153,7 +154,7 @@ class WorkflowNodes:
                     
         except Exception as e:           
             logger.error(f"{t('error')} generating code: {str(e)}", exc_info=True)
-            state.error = f"{t('error')} generating code: {str(e)}"
+            state.error = f"{t('error')} {t('generating_java_code')}: {str(e)}"
             return state
 
     def regenerate_code_node(self, state: WorkflowState) -> WorkflowState:
@@ -219,8 +220,8 @@ class WorkflowNodes:
                 return self.generate_code_node(state)
             
         except Exception as e:                 
-            logger.error(f"Error regenerating code: {str(e)}", exc_info=True)
-            state.error = f"Error regenerating code: {str(e)}"
+            logger.error(f"{t('error')} regenerating code: {str(e)}", exc_info=True)
+            state.error = f"{t('error')} {t('regenerating_code')}: {str(e)}"
             return state
         
     def evaluate_code_node(self, state: WorkflowState) -> WorkflowState:
@@ -267,8 +268,8 @@ class WorkflowNodes:
                     "missing_errors": [f"{error.get('type', '').upper()} - {error.get('name', '')}" 
                                     for error in requested_errors],
                     "valid": False,
-                    "feedback": f"Error in evaluation. Please ensure the code contains all {original_error_count} requested errors.",
-                    "original_error_count": original_error_count  # Add original count for consistency
+                    "feedback": f"{t('error_in_evaluation')}. {t('please_ensure_code_contains_all')} {original_error_count} {t('requested_errors')}.",
+                    "original_error_count": original_error_count
                 }
             else:
                 evaluation_result = raw_evaluation_result
@@ -353,8 +354,8 @@ class WorkflowNodes:
             return state
             
         except Exception as e:
-            logger.error(f"Error evaluating code: {str(e)}", exc_info=True)
-            state.error = f"Error evaluating code: {str(e)}"
+            logger.error(f"{t('error')} in evaluation: {str(e)}", exc_info=True)
+            state.error = f"{t('error')} {t('evaluating_code')}: {str(e)}"
             return state
 
     def review_code_node(self, state: WorkflowState) -> WorkflowState:
@@ -470,6 +471,48 @@ class WorkflowNodes:
             state.error = f"Error analyzing review: {str(e)}"
             return state
        
+    def generate_summary_node(self, state: WorkflowState) -> WorkflowState:
+        """
+        Generate final summary node - marks the completion of the workflow.
+        
+        Args:
+            state: Current workflow state
+            
+        Returns:
+            Updated workflow state with summary completion
+        """
+        try:
+            logger.debug("Generating final summary for workflow completion")
+            
+            # Mark the workflow as completed
+            state.current_step = "completed"
+            
+            # Generate final summary if needed
+            if not hasattr(state, 'final_summary') or not state.final_summary:
+                # Basic summary based on review results
+                if state.review_history:
+                    latest_review = state.review_history[-1]
+                    analysis = latest_review.analysis
+                    
+                    identified_count = analysis.get(t('identified_count'), 0)
+                    original_error_count = getattr(state, 'original_error_count', 0)
+                    
+                    if original_error_count > 0:
+                        percentage = (identified_count / original_error_count) * 100
+                        state.final_summary = f"Review completed: {identified_count}/{original_error_count} errors identified ({percentage:.1f}%)"
+                    else:
+                        state.final_summary = f"Review completed: {identified_count} errors identified"
+                else:
+                    state.final_summary = "Review workflow completed"
+            
+            logger.debug("Summary generation completed successfully")
+            return state
+            
+        except Exception as e:
+            logger.error(f"Error generating summary: {str(e)}", exc_info=True)
+            state.error = f"Error generating summary: {str(e)}"
+            return state
+       
     def _extract_requested_errors(self, state: WorkflowState) -> List[Dict[str, Any]]:
         """
         Extract requested errors from the state with improved error handling and type safety.
@@ -538,4 +581,3 @@ class WorkflowNodes:
         logger.debug(f"Extracted {len(requested_errors)} requested errors")
         
         return requested_errors
-        

@@ -540,12 +540,7 @@ class LearningDashboardUI:
     def _render_getting_started(self):
         """Render getting started view for new users."""
         
-        st.markdown(f"""
-        <div class="getting-started" style="text-align: center; padding: 40px;">
-            <h2>🚀 {t('welcome_to_dashboard')}</h2>
-            <p>{t('dashboard_getting_started_message')}</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.info(t("welcome_to_dashboard"))
         
         # Show what they can expect to see
         st.markdown(f"### {t('what_youll_see_here')}")
@@ -561,6 +556,19 @@ class LearningDashboardUI:
             st.markdown(f"**{feature}:** {description}")
         
         st.info(t("start_tutorial_to_begin_journey"))
+        
+        # Add tutorial start button
+        if st.button(t("start_tutorial"), key="start_tutorial_button", type="primary"):
+            self._start_tutorial()
+    
+    def _start_tutorial(self):
+        """Handle starting the tutorial."""
+        # Mark that tutorial should be shown
+        st.session_state.tutorial_completed = False
+        st.session_state.show_tutorial = True
+        
+        # Switch to the main app view
+        st.rerun()
     
     def _handle_recommendation_action(self, recommendation: Dict[str, Any]):
         """Handle recommendation action button click."""

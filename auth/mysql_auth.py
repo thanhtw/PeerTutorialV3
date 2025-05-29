@@ -38,8 +38,14 @@ class MySQLAuthManager:
         if self._initialized:
             return
             
-        self.db = MySQLConnection()
-        self._initialized = True
+        try:
+            self.db = MySQLConnection()
+            self._initialized = True
+            logger.debug("MySQLAuthManager initialized successfully")
+        except Exception as e:
+            logger.warning(f"MySQLAuthManager initialization failed: {str(e)}")
+            self.db = None
+            self._initialized = True
     
     def _hash_password(self, password: str) -> str:
         """Hash a password using SHA-256."""
@@ -158,7 +164,6 @@ class MySQLAuthManager:
     def authenticate_user(self, email: str, password: str) -> Dict[str, Any]:
         """
         Authenticate user with email and password.
-        Updated to include tutorial completion status.
         
         Args:
             email: User email
@@ -168,11 +173,11 @@ class MySQLAuthManager:
             Dictionary with authentication result
         """
         try:
-            # Get user by email with tutorial completion status
+            # Get user by email without tutorial completion status
             query = """
             SELECT uid, email, password, display_name_en, display_name_zh, 
                 level_name_en, level_name_zh,
-                reviews_completed, score, tutorial_completed
+                reviews_completed, score
             FROM users 
             WHERE email = %s
             """
@@ -186,7 +191,6 @@ class MySQLAuthManager:
                     "error": "Invalid email or password"
                 }
             
-           
             return {
                     "success": True,
                     "user_id": user_data["uid"],
@@ -196,11 +200,9 @@ class MySQLAuthManager:
                     "level_name_en": user_data["level_name_en"],
                     "level_name_zh": user_data["level_name_zh"],                    
                     "reviews_completed": user_data["reviews_completed"],
-                    "score": user_data["score"],
-                    "tutorial_completed": user_data["tutorial_completed"]
+                    "score": user_data["score"]
                 }
             
-                
         except Exception as e:
             logger.error(f"Error during authentication for email {email}: {str(e)}")
             return {

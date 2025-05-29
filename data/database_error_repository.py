@@ -40,9 +40,14 @@ class DatabaseErrorRepository:
         self._verify_database_setup()
     
     def _verify_database_setup(self):
-        """Verify that the required database tables exist."""
+        """Verify that the required database tables exist and have data."""
         try:
-            # Check if error_categories table exists
+            # Test basic connection first
+            if not self.db.test_connection_only():
+                logger.info("Database connection not available. Please run setup first.")
+                return
+            
+            # Check if error_categories table exists and has data
             check_query = """
             SELECT COUNT(*) as count 
             FROM information_schema.tables 
@@ -52,10 +57,18 @@ class DatabaseErrorRepository:
             result = self.db.execute_query(check_query, fetch_one=True)
             
             if not result or result.get('count', 0) == 0:
-                logger.error("Error categories table not found. Please run migration first.")
-                raise Exception("Database tables not initialized. Run enhanced_schema_update.py first.")
+                logger.info("Error categories table not found. Please run database setup first.")
+                return
             
-            # Check if java_errors table exists
+            # Check if categories have data
+            data_query = "SELECT COUNT(*) as count FROM error_categories WHERE is_active = TRUE"
+            data_result = self.db.execute_query(data_query, fetch_one=True)
+            
+            if not data_result or data_result.get('count', 0) == 0:
+                logger.info("No categories found. Please import data using the SQL file.")
+                return
+            
+            # Check if java_errors table exists and has data  
             check_query = """
             SELECT COUNT(*) as count 
             FROM information_schema.tables 
@@ -65,14 +78,21 @@ class DatabaseErrorRepository:
             result = self.db.execute_query(check_query, fetch_one=True)
             
             if not result or result.get('count', 0) == 0:
-                logger.error("Java errors table not found. Please run migration first.")
-                raise Exception("Database tables not initialized. Run enhanced_schema_update.py first.")
+                logger.info("Java errors table not found. Please run database setup first.")
+                return
+            
+            # Check if errors have data
+            data_query = "SELECT COUNT(*) as count FROM java_errors WHERE is_active = TRUE"
+            data_result = self.db.execute_query(data_query, fetch_one=True)
+            
+            if not data_result or data_result.get('count', 0) == 0:
+                logger.info("No error data found. Please import data using the SQL file.")
+                return
                 
-            logger.debug("Database tables verified successfully")
+            logger.debug(f"Database verified: {data_result['count']} errors available")
             
         except Exception as e:
-            logger.error(f"Database verification failed: {str(e)}")
-            raise
+            logger.info(f"Database not ready: {str(e)}. Please run setup and import data first.")
     
     def _get_language_fields(self, base_field: str) -> str:
         """Get the appropriate language field name."""
@@ -335,14 +355,26 @@ class DatabaseErrorRepository:
         Returns:
             Tuple of (list of error objects, list of problem descriptions)
         """
-        # Adjust count based on difficulty
-        error_counts = {
-            t("easy"): max(2, count - 2),
-            t("medium"): count,
-            t("hard"): count + 2
+        # Map difficulty levels properly
+        difficulty_map = {
+            "easy": "easy",
+            "medium": "medium", 
+            "hard": "hard",
+            "簡單": "easy",
+            "中等": "medium",
+            "困難": "hard"
         }
         
-        adjusted_count = error_counts.get(difficulty.lower(), count)
+        mapped_difficulty = difficulty_map.get(difficulty.lower(), "medium")
+        
+        # Adjust count based on difficulty
+        error_counts = {
+            "easy": max(2, count - 2),
+            "medium": count,
+            "hard": count + 2
+        }
+        
+        adjusted_count = error_counts.get(mapped_difficulty, count)
         
         # If specific errors are provided, use those
         if specific_errors and len(specific_errors) > 0:
@@ -366,7 +398,7 @@ class DatabaseErrorRepository:
             
             return selected_errors, problem_descriptions
         
-        # Otherwise use category-based selection
+        # Otherwise use category-based selection with improved logic
         elif selected_categories:
             try:
                 self.current_language = get_current_language()
@@ -374,8 +406,9 @@ class DatabaseErrorRepository:
                 java_error_categories = selected_categories.get("java_errors", [])
                 if not java_error_categories:
                     logger.warning("No categories specified, using defaults")
-                    selected_categories = {"java_errors": ["Logical", "Syntax", "Code Quality"]}
-                    java_error_categories = selected_categories["java_errors"]
+                    # Get some default categories
+                    default_cats = self.get_all_categories()
+                    java_error_categories = default_cats.get("java_errors", [])[:3]
                 
                 # Get field names
                 name_field = self._get_language_fields('error_name')
@@ -383,58 +416,74 @@ class DatabaseErrorRepository:
                 guide_field = self._get_language_fields('implementation_guide')
                 cat_name_field = self._get_language_fields('name')
                 
-                # Determine selection range based on difficulty
-                error_selection_ranges = {
-                    t("easy"): (1, 2),
-                    t("medium"): (1, 3),
-                    t("hard"): (1, 4)
-                }
+                # Build query for selected categories
+                placeholders = ','.join(['%s'] * len(java_error_categories))
                 
-                min_errors, max_errors = error_selection_ranges.get(difficulty.lower(), (1, 2))
+                query = f"""
+                SELECT 
+                    je.{name_field} as error_name,
+                    je.{desc_field} as description,
+                    je.{guide_field} as implementation_guide,
+                    je.difficulty_level,
+                    je.error_code,
+                    ec.{cat_name_field} as category_name
+                FROM java_errors je
+                JOIN error_categories ec ON je.category_id = ec.id
+                WHERE ec.{cat_name_field} IN ({placeholders}) 
+                AND je.is_active = TRUE AND ec.is_active = TRUE
+                AND je.difficulty_level = %s
+                ORDER BY RAND()
+                LIMIT %s
+                """
                 
-                all_errors = []
+                params = tuple(java_error_categories) + (mapped_difficulty, adjusted_count)
+                errors = self.db.execute_query(query, params)
                 
-                # Get errors from each category
-                for category in java_error_categories:
-                    category_query = f"""
+                # If not enough errors found with exact difficulty, try without difficulty filter
+                if not errors or len(errors) < adjusted_count // 2:
+                    logger.info(f"Not enough {mapped_difficulty} errors found, trying without difficulty filter")
+                    
+                    query_no_diff = f"""
                     SELECT 
                         je.{name_field} as error_name,
                         je.{desc_field} as description,
                         je.{guide_field} as implementation_guide,
+                        je.difficulty_level,
+                        je.error_code,
                         ec.{cat_name_field} as category_name
                     FROM java_errors je
                     JOIN error_categories ec ON je.category_id = ec.id
-                    WHERE ec.{cat_name_field} = %s 
+                    WHERE ec.{cat_name_field} IN ({placeholders}) 
                     AND je.is_active = TRUE AND ec.is_active = TRUE
                     ORDER BY RAND()
                     LIMIT %s
                     """
                     
-                    num_to_select = random.randint(min_errors, max_errors)
-                    category_errors = self.db.execute_query(category_query, (category, num_to_select))
-                    
-                    for error in category_errors or []:
-                        all_errors.append({
-                            t("category"): error['category_name'],
-                            t("error_name_variable"): error['error_name'],
-                            t("description"): error['description'],
-                            t("implementation_guide"): error.get('implementation_guide', '')
-                        })
+                    params_no_diff = tuple(java_error_categories) + (adjusted_count,)
+                    errors = self.db.execute_query(query_no_diff, params_no_diff)
                 
-                # Select final errors
-                if len(all_errors) > adjusted_count:
-                    selected_errors = random.sample(all_errors, adjusted_count)
-                else:
-                    selected_errors = all_errors
-                
-                # Format problem descriptions
+                # Format results
+                selected_errors = []
                 problem_descriptions = []
-                for error in selected_errors:
-                    category = error.get(t("category"), "")
-                    name = error.get(t("error_name_variable"), "Unknown")
-                    description = error.get(t("description"), "")
-                    problem_descriptions.append(f"{category} - {name}: {description}")
                 
+                for error in errors or []:
+                    error_data = {
+                        t("category"): error['category_name'],
+                        t("error_name_variable"): error['error_name'],
+                        t("description"): error['description'],
+                        t("implementation_guide"): error.get('implementation_guide', ''),
+                        "difficulty_level": error.get('difficulty_level', 'medium'),
+                        "error_code": error.get('error_code', '')
+                    }
+                    
+                    selected_errors.append(error_data)
+                    
+                    # Create problem description
+                    problem_descriptions.append(
+                        f"{error['category_name']}: {error['error_name']} - {error['description']}"
+                    )
+                
+                logger.info(f"Selected {len(selected_errors)} errors for LLM")
                 return selected_errors, problem_descriptions
                 
             except Exception as e:

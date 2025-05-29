@@ -3,7 +3,7 @@
 Learning Progress Manager for Java Peer Review Training System.
 
 This module handles tracking and updating student learning progress,
-skill development, and personalized learning paths.
+skill development, and personalized learning paths with enhanced gamification.
 """
 
 import logging
@@ -16,7 +16,7 @@ from utils.language_utils import get_current_language, t
 logger = logging.getLogger(__name__)
 
 class LearningProgressManager:
-    """Manager for tracking and updating student learning progress."""
+    """Manager for tracking and updating student learning progress with gamification."""
     
     _instance = None
     
@@ -32,18 +32,70 @@ class LearningProgressManager:
         self.db = MySQLConnection()
         self._initialized = True
         
-        # Skill categories and their experience point multipliers
+        # Enhanced skill categories with visual elements
         self.skill_categories = {
-            "logical": {"base_xp": 15, "mastery_threshold": 85},
-            "syntax": {"base_xp": 10, "mastery_threshold": 90},
-            "code_quality": {"base_xp": 20, "mastery_threshold": 75},
-            "standard_violation": {"base_xp": 12, "mastery_threshold": 80},
-            "java_specific": {"base_xp": 25, "mastery_threshold": 70}
+            "logical": {
+                "base_xp": 15, 
+                "mastery_threshold": 85,
+                "icon": "🧠",
+                "color": "#667eea",
+                "description": "Logical thinking and problem-solving skills"
+            },
+            "syntax": {
+                "base_xp": 10, 
+                "mastery_threshold": 90,
+                "icon": "🔍",
+                "color": "#4caf50",
+                "description": "Code syntax and structure awareness"
+            },
+            "code_quality": {
+                "base_xp": 20, 
+                "mastery_threshold": 75,
+                "icon": "✨",
+                "color": "#ff6b6b",
+                "description": "Clean code and best practices"
+            },
+            "standard_violation": {
+                "base_xp": 12, 
+                "mastery_threshold": 80,
+                "icon": "📏",
+                "color": "#feca57",
+                "description": "Coding standards and conventions"
+            },
+            "java_specific": {
+                "base_xp": 25, 
+                "mastery_threshold": 70,
+                "icon": "☕",
+                "color": "#764ba2",
+                "description": "Java language specific features"
+            }
         }
         
-        # Level thresholds (experience points needed for each level)
-        self.level_thresholds = [0, 100, 250, 500, 1000, 1750, 2750, 4000, 5500, 7500, 10000]
-    
+        # Enhanced level system with titles and rewards
+        self.level_system = {
+            1: {"title": "Code Rookie", "xp": 0, "icon": "🌱", "color": "#95a5a6"},
+            2: {"title": "Bug Spotter", "xp": 100, "icon": "👀", "color": "#3498db"},
+            3: {"title": "Error Hunter", "xp": 250, "icon": "🎯", "color": "#2ecc71"},
+            4: {"title": "Code Detective", "xp": 500, "icon": "🕵️", "color": "#f39c12"},
+            5: {"title": "Review Specialist", "xp": 1000, "icon": "🛡️", "color": "#e74c3c"},
+            6: {"title": "Quality Guardian", "xp": 1750, "icon": "⚔️", "color": "#9b59b6"},
+            7: {"title": "Code Sage", "xp": 2750, "icon": "🧙", "color": "#1abc9c"},
+            8: {"title": "Master Reviewer", "xp": 4000, "icon": "👑", "color": "#e67e22"},
+            9: {"title": "Code Wizard", "xp": 5500, "icon": "🎭", "color": "#34495e"},
+            10: {"title": "Grand Master", "xp": 7500, "icon": "💎", "color": "#8e44ad"},
+            11: {"title": "Code Legend", "xp": 10000, "icon": "🌟", "color": "#d4af37"}
+        }
+        
+        # Achievement system
+        self.achievements = {
+            "first_review": {"icon": "🎉", "points": 50, "title": "First Steps"},
+            "perfect_score": {"icon": "💯", "points": 100, "title": "Perfectionist"},
+            "speed_demon": {"icon": "⚡", "points": 75, "title": "Lightning Fast"},
+            "streak_master": {"icon": "🔥", "points": 150, "title": "On Fire"},
+            "skill_master": {"icon": "🏆", "points": 200, "title": "Skill Master"},
+            "tutorial_complete": {"icon": "🎓", "points": 100, "title": "Graduate"}
+        }
+
     def update_skill_progress(self, user_id: str, skill_category: str, 
                             errors_encountered: int, errors_identified: int,
                             time_spent_minutes: int = 0) -> Dict[str, Any]:
@@ -471,3 +523,308 @@ class LearningProgressManager:
         except Exception as e:
             logger.error(f"Error getting next milestone: {str(e)}")
             return {}
+    
+    def get_enhanced_dashboard_data(self, user_id: str) -> Dict[str, Any]:
+        """Get comprehensive learning dashboard with enhanced visualizations."""
+        try:
+            # Get base progress data
+            base_data = self.get_learning_dashboard_data(user_id)
+            
+            # Enhance with visual elements
+            enhanced_data = {
+                **base_data,
+                "visual_progress": self._get_visual_progress_data(user_id),
+                "gamification": self._get_gamification_data(user_id),
+                "motivational_elements": self._get_motivational_elements(user_id),
+                "interactive_elements": self._get_interactive_elements(user_id)
+            }
+            
+            return enhanced_data
+            
+        except Exception as e:
+            logger.error(f"Error getting enhanced dashboard data: {str(e)}")
+            return {}
+
+    def _get_visual_progress_data(self, user_id: str) -> Dict[str, Any]:
+        """Get data for visual progress representations."""
+        try:
+            skill_progress = self.get_skill_progress(user_id)
+            
+            # Create skill radar chart data
+            radar_data = {}
+            for skill in skill_progress:
+                skill_category = skill.get("skill_category")
+                mastery = skill.get("mastery_percentage", 0)
+                radar_data[skill_category] = {
+                    "value": mastery,
+                    "color": self.skill_categories.get(skill_category, {}).get("color", "#95a5a6"),
+                    "icon": self.skill_categories.get(skill_category, {}).get("icon", "📊")
+                }
+            
+            # Calculate overall level and progress
+            total_xp = sum(skill.get("experience_points", 0) for skill in skill_progress)
+            current_level_info = self._get_level_info(total_xp)
+            
+            return {
+                "skill_radar": radar_data,
+                "level_progress": {
+                    "current_level": current_level_info["level"],
+                    "title": current_level_info["title"],
+                    "icon": current_level_info["icon"],
+                    "color": current_level_info["color"],
+                    "current_xp": total_xp,
+                    "next_level_xp": current_level_info["next_level_xp"],
+                    "progress_percentage": current_level_info["progress_percentage"]
+                },
+                "skill_cards": [
+                    {
+                        "category": skill.get("skill_category"),
+                        "mastery": skill.get("mastery_percentage", 0),
+                        "level": self._calculate_level(skill.get("experience_points", 0)),
+                        "icon": self.skill_categories.get(skill.get("skill_category"), {}).get("icon", "📊"),
+                        "color": self.skill_categories.get(skill.get("skill_category"), {}).get("color", "#95a5a6"),
+                        "description": self.skill_categories.get(skill.get("skill_category"), {}).get("description", ""),
+                        "progress_ring": True
+                    }
+                    for skill in skill_progress
+                ]
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting visual progress data: {str(e)}")
+            return {}
+
+    def _get_gamification_data(self, user_id: str) -> Dict[str, Any]:
+        """Get gamification elements for the dashboard."""
+        try:
+            # Get achievements
+            achievements_query = """
+                SELECT badge_type, earned_at, points_awarded 
+                FROM user_badges 
+                WHERE user_id = %s 
+                ORDER BY earned_at DESC
+            """
+            user_achievements = self.db.execute_query(achievements_query, (user_id,)) or []
+            
+            # Get current streak
+            streak_data = self._get_current_streak(user_id)
+            
+            # Get leaderboard position
+            leaderboard_position = self._get_leaderboard_position(user_id)
+            
+            return {
+                "achievements": [
+                    {
+                        "type": achievement.get("badge_type"),
+                        "icon": self.achievements.get(achievement.get("badge_type"), {}).get("icon", "🏆"),
+                        "title": self.achievements.get(achievement.get("badge_type"), {}).get("title", "Achievement"),
+                        "points": achievement.get("points_awarded", 0),
+                        "earned_at": achievement.get("earned_at"),
+                        "is_recent": self._is_recent_achievement(achievement.get("earned_at"))
+                    }
+                    for achievement in user_achievements
+                ],
+                "streak": {
+                    "current": streak_data["current"],
+                    "best": streak_data["best"],
+                    "icon": "🔥" if streak_data["current"] > 0 else "💤",
+                    "message": self._get_streak_message(streak_data["current"])
+                },
+                "leaderboard": {
+                    "position": leaderboard_position,
+                    "total_users": self._get_total_users(),
+                    "percentile": self._calculate_percentile(leaderboard_position)
+                },
+                "daily_goal": self._get_daily_goal_progress(user_id),
+                "unlock_next": self._get_next_unlock(user_id)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting gamification data: {str(e)}")
+            return {}
+
+    def _get_motivational_elements(self, user_id: str) -> Dict[str, Any]:
+        """Get motivational messages and challenges."""
+        try:
+            progress = self.get_skill_progress(user_id)
+            
+            # Determine user's current state
+            if not progress:
+                motivation_type = "beginner"
+            else:
+                avg_mastery = sum(skill.get("mastery_percentage", 0) for skill in progress) / len(progress)
+                if avg_mastery < 40:
+                    motivation_type = "struggling"
+                elif avg_mastery < 70:
+                    motivation_type = "progressing"
+                else:
+                    motivation_type = "advanced"
+            
+            motivational_messages = {
+                "beginner": {
+                    "message": "🚀 Welcome to your coding journey! Every expert was once a beginner.",
+                    "tip": "Start with the tutorial to build a strong foundation.",
+                    "goal": "Complete your first code review"
+                },
+                "struggling": {
+                    "message": "💪 Keep going! Every mistake is a step towards mastery.",
+                    "tip": "Focus on one error type at a time for better results.",
+                    "goal": "Improve your weakest skill by 10%"
+                },
+                "progressing": {
+                    "message": "🎯 Great progress! You're building solid review skills.",
+                    "tip": "Try tackling more complex code examples.",
+                    "goal": "Achieve 70% mastery in all skills"
+                },
+                "advanced": {
+                    "message": "🌟 Excellent work! You're becoming a review expert.",
+                    "tip": "Challenge yourself with time-limited reviews.",
+                    "goal": "Help others and share your knowledge"
+                }
+            }
+            
+            return {
+                "daily_message": motivational_messages[motivation_type],
+                "challenges": self._get_active_challenges(user_id),
+                "celebrations": self._get_recent_celebrations(user_id),
+                "encouragement": self._get_encouragement_based_on_activity(user_id)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting motivational elements: {str(e)}")
+            return {}
+
+    def _get_interactive_elements(self, user_id: str) -> Dict[str, Any]:
+        """Get interactive dashboard elements."""
+        return {
+            "quick_actions": [
+                {"id": "start_review", "icon": "🎯", "text": "Start Quick Review", "color": "#3498db"},
+                {"id": "practice_patterns", "icon": "🧩", "text": "Practice Patterns", "color": "#2ecc71"},
+                {"id": "speed_challenge", "icon": "⚡", "text": "Speed Challenge", "color": "#f39c12"},
+                {"id": "view_progress", "icon": "📊", "text": "Detailed Progress", "color": "#9b59b6"}
+            ],
+            "progress_animations": {
+                "skill_progress": True,
+                "level_up": True,
+                "achievement_unlock": True,
+                "streak_celebration": True
+            },
+            "personalization": {
+                "theme_suggestions": self._get_theme_suggestions(user_id),
+                "goal_adjustments": self._get_goal_adjustments(user_id),
+                "difficulty_recommendations": self._get_difficulty_recommendations(user_id)
+            }
+        }
+
+    def award_achievement(self, user_id: str, achievement_type: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Award achievement with visual feedback."""
+        try:
+            achievement_info = self.achievements.get(achievement_type)
+            if not achievement_info:
+                return {"success": False, "error": "Unknown achievement type"}
+            
+            # Check if already earned
+            check_query = """
+                SELECT id FROM user_badges 
+                WHERE user_id = %s AND badge_type = %s
+            """
+            existing = self.db.execute_query(check_query, (user_id, achievement_type), fetch_one=True)
+            
+            if existing:
+                return {"success": False, "error": "Achievement already earned"}
+            
+            # Award the achievement
+            insert_query = """
+                INSERT INTO user_badges (user_id, badge_type, earned_at, points_awarded)
+                VALUES (%s, %s, NOW(), %s)
+            """
+            
+            self.db.execute_query(insert_query, (
+                user_id, achievement_type, achievement_info["points"]
+            ))
+            
+            return {
+                "success": True,
+                "achievement": {
+                    "type": achievement_type,
+                    "icon": achievement_info["icon"],
+                    "title": achievement_info["title"],
+                    "points": achievement_info["points"],
+                    "description": self._get_achievement_description(achievement_type, context)
+                },
+                "celebration": {
+                    "show_animation": True,
+                    "confetti": True,
+                    "sound": "achievement_unlock",
+                    "message": f"🎉 Achievement Unlocked: {achievement_info['title']}!"
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error awarding achievement: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    def _get_level_info(self, xp: int) -> Dict[str, Any]:
+        """Get detailed level information for given XP."""
+        current_level = 1
+        for level, info in self.level_system.items():
+            if xp >= info["xp"]:
+                current_level = level
+            else:
+                break
+        
+        current_info = self.level_system[current_level]
+        next_level = current_level + 1
+        next_info = self.level_system.get(next_level, self.level_system[current_level])
+        
+        if next_level <= max(self.level_system.keys()):
+            progress_percentage = ((xp - current_info["xp"]) / (next_info["xp"] - current_info["xp"])) * 100
+        else:
+            progress_percentage = 100
+        
+        return {
+            "level": current_level,
+            "title": current_info["title"],
+            "icon": current_info["icon"],
+            "color": current_info["color"],
+            "current_xp": xp,
+            "level_xp": current_info["xp"],
+            "next_level_xp": next_info["xp"] if next_level <= max(self.level_system.keys()) else xp,
+            "progress_percentage": min(100, max(0, progress_percentage))
+        }
+
+    def _get_current_streak(self, user_id: str) -> Dict[str, int]:
+        """Calculate current and best learning streak."""
+        try:
+            # This is a simplified version - in reality, you'd track daily activity
+            query = """
+                SELECT DATE(started_at) as practice_date, COUNT(*) as sessions
+                FROM learning_sessions 
+                WHERE user_id = %s AND started_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+                GROUP BY DATE(started_at)
+                ORDER BY practice_date DESC
+            """
+            
+            results = self.db.execute_query(query, (user_id,)) or []
+            
+            current_streak = 0
+            best_streak = 0
+            temp_streak = 0
+            
+            # Calculate streaks (simplified logic)
+            for i, session in enumerate(results):
+                if i == 0 or session["sessions"] > 0:
+                    temp_streak += 1
+                    if i == 0:
+                        current_streak = temp_streak
+                else:
+                    best_streak = max(best_streak, temp_streak)
+                    temp_streak = 0
+            
+            best_streak = max(best_streak, temp_streak)
+            
+            return {"current": current_streak, "best": best_streak}
+            
+        except Exception as e:
+            logger.error(f"Error calculating streak: {str(e)}")
+            return {"current": 0, "best": 0}

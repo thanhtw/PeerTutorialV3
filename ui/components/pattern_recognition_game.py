@@ -673,42 +673,7 @@ class PatternRecognitionGameUI:
             """
             
             current_stats = self.db.execute_query(query, (user_id, pattern_type), fetch_one=True)
-            
-            if current_stats:
-                # Update existing stats
-                new_correct = current_stats["correct_identifications"] + (1 if is_correct else 0)
-                new_total = current_stats["total_attempts"] + 1
-                new_avg_time = (current_stats["average_time_seconds"] * current_stats["total_attempts"] + response_time) / new_total
-                new_streak = current_stats["current_streak"] + 1 if is_correct else 0
-                new_best_streak = max(current_stats["best_streak"], new_streak)
-                
-                update_query = """
-                    UPDATE pattern_recognition_stats 
-                    SET correct_identifications = %s, total_attempts = %s,
-                        average_time_seconds = %s, current_streak = %s,
-                        best_streak = %s, last_practiced = NOW()
-                    WHERE user_id = %s AND error_pattern = %s
-                """
-                
-                self.db.execute_query(update_query, (
-                    new_correct, new_total, new_avg_time, new_streak, 
-                    new_best_streak, user_id, pattern_type
-                ))
-            else:
-                # Create new stats
-                insert_query = """
-                    INSERT INTO pattern_recognition_stats 
-                    (user_id, error_pattern, correct_identifications, total_attempts,
-                     average_time_seconds, current_streak, best_streak)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """
-                
-                streak = 1 if is_correct else 0
-                
-                self.db.execute_query(insert_query, (
-                    user_id, pattern_type, 1 if is_correct else 0, 1,
-                    response_time, streak, streak
-                ))
+
                 
         except Exception as e:
             logger.error(f"Error updating pattern stats: {str(e)}")

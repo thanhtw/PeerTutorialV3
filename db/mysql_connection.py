@@ -47,8 +47,8 @@ class MySQLConnection:
         self.connection = None
         self._initialized = True
         
-        # Create database and tables if they don't exist
-        self._initialize_database()
+        # Try to initialize database safely
+        self._safe_initialize_database()
     
     def _get_connection(self):
         """Get a database connection with improved error handling."""
@@ -76,37 +76,40 @@ class MySQLConnection:
             logger.error(traceback.format_exc())
             return None
     
-    def _initialize_database(self):
-        """Create the database and tables if they don't exist."""
+    def _safe_initialize_database(self):
+        """Safely initialize database without failing if tables don't exist."""
         try:
-            # First, connect without specifying a database to create it if needed
-            logger.debug(f"Initializing database: {self.db_name}")
-            init_conn = mysql.connector.connect(
-                host=self.db_host,
-                user=self.db_user,
-                password=self.db_password,
-                port=self.db_port
-            )
+            # Check if we can connect to the database
+            connection = self._get_connection()
+            if connection and connection.is_connected():
+                logger.debug("Database connection verified successfully")
+            else:
+                logger.warning("Database connection could not be established")
+        except Exception as e:
+            logger.warning(f"Database initialization skipped: {str(e)}")
 
-            print("init_conn: ", init_conn)
+    def test_admin_connection(self):
+        """Test connection with admin credentials for setup."""
+        try:
+            admin_user = os.getenv("ADMIN_DB_USER", "root")
+            admin_password = os.getenv("ADMIN_DB_PASSWORD", self.db_password)
             
-            cursor = init_conn.cursor()
+            connection = mysql.connector.connect(
+                host=self.db_host,
+                user=admin_user,
+                password=admin_password,
+                port=self.db_port,
+                charset='utf8mb4',
+                collation='utf8mb4_unicode_ci'
+            )
             
-            # Create database if it doesn't exist
-            logger.debug(f"Creating database if not exists: {self.db_name}")
-            cursor.execute(f"CREATE DATABASE IF NOT EXISTS {self.db_name}")
-            cursor.execute(f"USE {self.db_name}")
+            if connection.is_connected():
+                connection.close()
+                return True
+            return False
             
-            # Commit changes and close connection
-            init_conn.commit()
-            cursor.close()
-            init_conn.close()
-            
-            logger.debug("Database and tables initialized successfully")
-            
-        except mysql.connector.Error as e:
-            logger.error(f"Error initializing database: {str(e)}")
-            logger.error(traceback.format_exc())
+        except mysql.connector.Error:
+            return False
     
     def execute_query(self, query: str, params: tuple = None, fetch_one: bool = False):
         """
@@ -171,3 +174,46 @@ class MySQLConnection:
                 logger.error(f"Unexpected error executing query: {str(e)}")
                 #logger.error(traceback.format_exc())
                 return None
+    
+    def test_connection_only(self):
+        """Test database connection without creating tables."""
+        try:
+            connection = mysql.connector.connect(
+                host=self.db_host,
+                user=self.db_user,
+                password=self.db_password,
+                database=self.db_name,
+                port=self.db_port,
+                charset='utf8mb4',
+                collation='utf8mb4_unicode_ci'
+            )
+            
+            if connection.is_connected():
+                connection.close()
+                return True
+            return False
+            
+        except mysql.connector.Error:
+            return False
+    
+    def get_admin_connection(self):
+        """Get connection using admin credentials for setup purposes."""
+        try:
+            admin_user = os.getenv("ADMIN_DB_USER", "root")
+            admin_password = os.getenv("ADMIN_DB_PASSWORD", self.db_password)
+            
+            connection = mysql.connector.connect(
+                host=self.db_host,
+                user=admin_user,
+                password=admin_password,
+                database=self.db_name,
+                port=self.db_port,
+                charset='utf8mb4',
+                collation='utf8mb4_unicode_ci'
+            )
+            
+            return connection
+            
+        except mysql.connector.Error as e:
+            logger.error(f"Admin connection failed: {str(e)}")
+            return None

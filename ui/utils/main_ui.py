@@ -91,7 +91,7 @@ def create_enhanced_tabs(labels: List[str]):
     # Handle forced tab reset
     if st.session_state.get("force_tab_zero", False):
         st.session_state.active_tab = 0
-        del st.session_state["force_tab_zero"]
+        st.session_state["force_tab_zero"] = False
     
     # Get current active tab
     current_tab = st.session_state.active_tab
@@ -99,7 +99,7 @@ def create_enhanced_tabs(labels: List[str]):
     # Check review completion for feedback tab access
     if current_tab == 2:  # Feedback tab
         if not _is_review_completed():
-            st.warning("Please complete all review attempts before accessing feedback.")
+            st.warning(t("complete_review_first"))
             st.session_state.active_tab = 1
             current_tab = 1
     

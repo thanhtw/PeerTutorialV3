@@ -22,7 +22,6 @@ from ui.utils.main_ui import (
 
 # Animation components
 from ui.components.animation import level_up_animation
-from ui.components.tutorial import CodeReviewTutorial
 from ui.components.profile_leaderboard import ProfileLeaderboardSidebar
 
 
@@ -41,6 +40,5 @@ __all__ = [
     
     # Animation components
     'level_up_animation',
-    'CodeReviewTutorial',
     'ProfileLeaderboardSidebar'
 ]

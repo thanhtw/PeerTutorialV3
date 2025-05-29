@@ -14,6 +14,7 @@ from typing import List, Any, Dict, Optional
 from pathlib import Path
 
 from utils.code_utils import process_llm_response
+from utils.language_utils import t
 
 # Configure logging
 logging.basicConfig(
@@ -179,14 +180,14 @@ class LLMInteractionLogger:
                 f.write(f"TIMESTAMP: {timestamp}\n")
                 f.write(f"TYPE: {interaction_type}\n")
                 f.write(f"METADATA: {json.dumps(metadata or {},ensure_ascii=False, indent=2)}\n\n")
-                f.write("=== PROMPT ===\n\n")
+                f.write(f"=== {t('prompt_tab').upper()} ===\n\n")
                 f.write(formatted_prompt)
-                f.write("\n\n=== RESPONSE ===\n\n")
+                f.write(f"\n\n=== {t('response_tab').upper()} ===\n\n")
                 f.write(formatted_response)
                 
-            logger.debug(f"Logged {interaction_type} interaction to {log_file} and {text_file}")
+            logger.debug(f"{t('logged')} {interaction_type} {t('interaction_to')} {log_file} and {text_file}")
         except Exception as e:
-            logger.error(f"Error writing log to file: {str(e)}")
+            logger.error(f"{t('error')} {t('writing_log_to_file')}: {str(e)}")
     
     def log_code_generation(self, prompt: str, response: Any, metadata: Optional[Dict[str, Any]] = None) -> None:
         """

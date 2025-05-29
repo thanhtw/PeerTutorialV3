@@ -1,4 +1,3 @@
-# ui/components/enhanced_tutorial.py
 """
 Enhanced Tutorial UI Component for Java Peer Review Training System.
 

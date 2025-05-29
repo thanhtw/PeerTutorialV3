@@ -63,7 +63,7 @@ class WorkflowManager:
         Connection testing is now done lazily on first LLM use.
         Handles cases where models might not initialize successfully.
         """
-        logger.debug("Initializing domain objects for workflow")
+        logger.debug(t("initializing_domain_objects"))
         
         # Initialize models for different functions without testing connection
         # Connection will be tested when models are actually used
@@ -81,7 +81,7 @@ class WorkflowManager:
         
         # Initialize domain objects with models (they can handle None models gracefully)
         self.code_generator = CodeGenerator(generative_model, self.llm_logger)
-        self.code_evaluation = CodeEvaluationAgent(generative_model, self.llm_logger)
+        self.code_evaluation = CodeEvaluationAgent(review_model, self.llm_logger)
         self.evaluator = StudentResponseEvaluator(review_model, llm_logger=self.llm_logger)
         
         # Store feedback models for generating final feedback
@@ -96,9 +96,9 @@ class WorkflowManager:
         elif successful_models > 0:
             logger.warning(f"Initialized {successful_models}/{total_models} models successfully. Some features may be limited.")
         else:
-            logger.error("Failed to initialize any models. LLM features will not be available.")
+            logger.error(t("failed_initialize_models"))
         
-        logger.debug("Domain objects initialization completed")
+        logger.debug(t("domain_objects_initialization_completed"))
 
     def _initialize_model_for_role(self, role: str):
         """

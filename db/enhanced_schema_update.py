@@ -339,41 +339,65 @@ def insert_new_error(db, error_code, category_id, error_name, description, imple
     
     db.execute_query(insert_query, params)
 
-def populate_missing_translations():
-    """Populate missing translations by copying from available language."""
+def create_sample_data_if_missing():
+    """Create sample data if no JSON files are found."""
     db = MySQLConnection()
     
     try:
-        # Find errors missing Chinese translations
-        missing_zh_query = """
-        SELECT id, error_name_en, description_en, implementation_guide_en
-        FROM java_errors 
-        WHERE error_name_zh = error_name_en OR error_name_zh IS NULL OR error_name_zh = ''
-        """
+        # Check if we already have data
+        cat_check = db.execute_query("SELECT COUNT(*) as count FROM error_categories", fetch_one=True)
+        if cat_check and cat_check['count'] > 0:
+            logger.info("Categories already exist, skipping sample data creation")
+            return True
         
-        missing_zh_errors = db.execute_query(missing_zh_query)
+        logger.info("Creating sample data...")
         
-        if missing_zh_errors:
-            logger.info(f"Found {len(missing_zh_errors)} errors missing Chinese translations")
-            
-            for error in missing_zh_errors:
-                # For now, copy English to Chinese (in production, you'd want proper translation)
-                update_query = """
-                UPDATE java_errors 
-                SET error_name_zh = %s, description_zh = %s, implementation_guide_zh = %s
-                WHERE id = %s
-                """
-                db.execute_query(update_query, (
-                    error['error_name_en'],
-                    error['description_en'], 
-                    error['implementation_guide_en'],
-                    error['id']
-                ))
+        # Insert sample categories
+        sample_categories = [
+            ('logical', 'Logical Errors', '邏輯錯誤', 1),
+            ('syntax', 'Syntax Errors', '語法錯誤', 2),
+            ('code_quality', 'Code Quality', '程式碼品質', 3),
+            ('java_specific', 'Java Specific', 'Java特定錯誤', 4)
+        ]
         
-        logger.info("Translation population completed")
+        for code, name_en, name_zh, order in sample_categories:
+            insert_cat = """
+            INSERT IGNORE INTO error_categories (category_code, name_en, name_zh, sort_order)
+            VALUES (%s, %s, %s, %s)
+            """
+            db.execute_query(insert_cat, (code, name_en, name_zh, order))
+        
+        # Insert sample errors
+        sample_errors = [
+            ('logical_null_pointer', 1, 'Null Pointer Dereference', 
+             'Accessing methods or fields of an object that might be null',
+             'Always check for null before accessing object methods'),
+            ('syntax_missing_semicolon', 2, 'Missing Semicolon',
+             'Forgetting to terminate statements with semicolons',
+             'Add semicolon (;) at the end of every statement'),
+            ('code_quality_magic_numbers', 3, 'Magic Numbers',
+             'Using literal numbers instead of named constants',
+             'Replace magic numbers with named constants'),
+            ('java_specific_raw_types', 4, 'Raw Type Usage',
+             'Using raw types instead of parameterized generic types',
+             'Always specify generic type parameters')
+        ]
+        
+        for code, cat_id, name, desc, guide in sample_errors:
+            insert_err = """
+            INSERT IGNORE INTO java_errors 
+            (error_code, category_id, error_name_en, description_en, implementation_guide_en,
+             error_name_zh, description_zh, implementation_guide_zh)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            db.execute_query(insert_err, (code, cat_id, name, desc, guide, name, desc, guide))
+        
+        logger.info("Sample data created successfully")
+        return True
         
     except Exception as e:
-        logger.error(f"Error populating translations: {str(e)}")
+        logger.error(f"Error creating sample data: {str(e)}")
+        return False
 
 def verify_migration():
     """Verify the migration was successful."""
@@ -419,15 +443,24 @@ def run_full_migration():
     logger.info("Starting JSON to database migration...")
     
     try:
-        # Step 1: Migrate JSON data
-        if not migrate_json_to_database():
-            logger.error("Failed to migrate JSON data")
+        # Step 1: Create tables first
+        if not create_error_storage_tables():
+            logger.error("Failed to create error storage tables")
             return False
         
-        # Step 2: Populate missing translations
+        # Step 2: Try to migrate JSON data
+        json_migrated = migrate_json_to_database()
+        
+        if not json_migrated:
+            logger.warning("JSON migration failed, creating sample data instead")
+            if not create_sample_data_if_missing():
+                logger.error("Failed to create sample data")
+                return False
+        
+        # Step 3: Populate missing translations
         populate_missing_translations()
         
-        # Step 3: Verify migration
+        # Step 4: Verify migration
         if verify_migration():
             logger.info("Migration completed successfully!")
             return True

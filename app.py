@@ -13,7 +13,7 @@ from state_schema import WorkflowState
 # Import CSS utilities
 from static.css_utils import load_css
 
-# Import language utilities
+# Import language utilities with i18n support
 from utils.language_utils import init_language, render_language_selector, t
 
 # Configure logging
@@ -65,7 +65,7 @@ except Exception as e:
 def main():
     """Enhanced main application function with provider selection."""
 
-    # Initialize language selection
+    # Initialize language selection and i18n system
     init_language()
 
     try:
@@ -197,13 +197,12 @@ def main():
         render_feedback_tab(workflow, auth_ui)
         
     with tabs[3]: # Tutorial Tab
-        # Retrieve user_id. A common way is from the auth_ui object or session_state.
-        # Assuming auth_ui.get_user_id() is the correct method:
-        user_id = st.session_state.auth.get("user_id") # Corrected line
+        # Make tutorial optional - no user authentication required
+        user_id = st.session_state.auth.get("user_id")
         if user_id:
-            enhanced_tutorial_ui.render(user_id=user_id, on_complete=lambda: st.session_state.update({"tutorial_completed": True, "active_tab": 0})) # Added on_complete to switch tab
+            enhanced_tutorial_ui.render(user_id=user_id, on_complete=lambda: st.session_state.update({"active_tab": 0}))
         else:
-            st.warning(t("user_not_authenticated_tutorial")) # Message for user not found
+            st.info(t("tutorial_available_after_login"))
 
     with tabs[4]: # Dashboard Tab
         user_id = st.session_state.auth.get("user_id") # Corrected line

@@ -1,12 +1,10 @@
 """
-JSON Error Repository module for Java Peer Review Training System.
+Database Error Repository module for Java Peer Review Training System.
 
-This module provides direct access to error data from JSON files,
-eliminating the need for intermediate data transformation.
+This module provides access to error data from the database,
+replacing the JSON file-based approach for better performance and maintainability.
 """
 
-import os
-import json
 import logging
 import random
 from typing import Dict, List, Any, Optional, Set, Union, Tuple
@@ -21,85 +19,114 @@ logger = logging.getLogger(__name__)
 
 class JsonErrorRepository:
     """
-    Repository for accessing Java error data directly from JSON files.
+    Repository for accessing Java error data from the database.
     
-    This class handles loading, categorizing, and providing access to
-    error data from Java_code_review_errors.json file.
+    This class maintains compatibility with the JSON-based interface
+    while using database backend for better performance and maintainability.
     """
-    
     
     def __init__(self, java_errors_path: str = None):
         """
-        Initialize the JSON Error Repository.
+        Initialize the Database Error Repository.
         
         Args:
-            java_errors_path: Path to the Java code review errors JSON file
+            java_errors_path: Deprecated - kept for compatibility
         """
-        # Get current language
+        # Import here to avoid circular imports
+        from db.mysql_connection import MySQLConnection
+        
+        self.db = MySQLConnection()
         self.current_language = get_current_language()
-        self.java_errors_path = java_errors_path
-        self.DATA_DIR = os.path.join(os.path.dirname(__file__))
-        # Determine file path based on language
-        if java_errors_path is None:
-            self.java_errors_path = f"{self.DATA_DIR}/{self.current_language}_Java_code_review_errors.json"
-        else:
-            self.java_errors_path = java_errors_path     
-        # Initialize data
+        
+        # Cache for frequently accessed data
         self.java_errors = {}
         self.java_error_categories = []
         
-        # Load error data from JSON files
+        # Load error data from database
         self.load_error_data()
-       
+    
+    def _get_language_fields(self, base_field: str) -> str:
+        """Get the appropriate language field name."""
+        if self.current_language == 'zh':
+            return f"{base_field}_zh"
+        else:
+            return f"{base_field}_en"
+    
     def load_error_data(self) -> bool:
         """
-        Load error data from JSON files.
+        Load error data from database.
         
         Returns:
-            True if files are loaded successfully, False otherwise
+            True if data is loaded successfully, False otherwise
         """
-        java_loaded = self._load_java_errors()
-        if not java_loaded and self.current_language != "en":
-            logger.warning(f"Failed to load {self.current_language} Java errors, trying English version")
-            self.java_errors_path = os.path.join(self.DATA_DIR, "en_Java_code_review_errors.json")
-            java_loaded = self._load_java_errors()
-        
-        # If still not loaded, use hardcoded fallback categories
-        if not java_loaded:
-            logger.warning("Using fallback error categories")
-            # Provide fallback error categories to ensure UI doesn't break
-            self.java_errors = {
-                "Logical": [],
-                "Syntax": [],
-                "Code Quality": [],
-                "Standard Violation": [],
-                "Java Specific": []
-            }
-            self.java_error_categories = list(self.java_errors.keys())
-        
-        return java_loaded
-
-    def _load_java_errors(self) -> bool:
-        """
-        Load Java errors from JSON file.
-        
-        Returns:
-            True if file is loaded successfully, False otherwise
-        """
-        try:                    
-           if os.path.exists(self.java_errors_path):
-            with open(self.java_errors_path, 'r', encoding='utf-8') as file:
-                self.java_errors = json.load(file)
-                self.java_error_categories = list(self.java_errors.keys())
-                logger.debug(f"Loaded Java errors from {self.java_errors_path} with {len(self.java_error_categories)} categories")
-                return True
-        
-            logger.warning(f"Could not find Java errors file: {self.java_errors_path}")
-            return False
-                    
+        try:
+            # Test database connection
+            if not self.db.test_connection_only():
+                logger.warning("Database connection not available, using fallback")
+                self._setup_fallback_data()
+                return False
+            
+            # Load categories
+            self._load_categories()
+            
+            # Load errors by category
+            self._load_errors_by_category()
+            
+            logger.info(f"Loaded {len(self.java_error_categories)} categories with errors from database")
+            return True
+            
         except Exception as e:
-            logger.error(f"Error loading Java errors: {str(e)}")
+            logger.error(f"Error loading data from database: {str(e)}")
+            self._setup_fallback_data()
             return False
+    
+    def _load_categories(self):
+        """Load categories from database."""
+        try:
+            name_field = self._get_language_fields('name')
+            
+            query = f"""
+            SELECT category_code, {name_field} as name
+            FROM error_categories 
+            WHERE is_active = TRUE
+            ORDER BY sort_order
+            """
+            
+            categories = self.db.execute_query(query)
+            
+            if categories:
+                self.java_error_categories = [cat['name'] for cat in categories]
+            else:
+                self.java_error_categories = []
+                
+        except Exception as e:
+            logger.error(f"Error loading categories: {str(e)}")
+            self.java_error_categories = []
+    
+    def _load_errors_by_category(self):
+        """Load errors organized by category."""
+        try:
+            self.java_errors = {}
+            
+            for category_name in self.java_error_categories:
+                category_errors = self.get_category_errors(category_name)
+                self.java_errors[category_name] = category_errors
+                
+        except Exception as e:
+            logger.error(f"Error loading errors by category: {str(e)}")
+            self.java_errors = {}
+    
+    def _setup_fallback_data(self):
+        """Setup fallback data when database is not available."""
+        logger.warning("Using fallback error categories")
+        self.java_errors = {
+            "Logical Errors": [],
+            "Syntax Errors": [],
+            "Code Quality": [],
+            "Standard Violation": [],
+            "Java Specific": []
+        }
+        self.java_error_categories = list(self.java_errors.keys())
     
     def get_all_categories(self) -> Dict[str, List[str]]:
         """
@@ -108,13 +135,11 @@ class JsonErrorRepository:
         Returns:
             Dictionary with 'java_errors' categories
         """
-        return {
-            "java_errors": self.java_error_categories
-        }
+        return {"java_errors": self.java_error_categories}
     
     def get_category_errors(self, category_name: str) -> List[Dict[str, str]]:
         """
-        Get errors for a specific category with language-aware field mapping.
+        Get errors for a specific category.
         
         Args:
             category_name: Name of the category
@@ -122,10 +147,60 @@ class JsonErrorRepository:
         Returns:
             List of error dictionaries for the category
         """
-        if category_name in self.java_errors:
-             return self.java_errors[category_name]
-                
-        return []
+        try:
+            if not self.db.test_connection_only():
+                return self.java_errors.get(category_name, [])
+            
+            # Get field names based on language
+            name_field = self._get_language_fields('error_name')
+            desc_field = self._get_language_fields('description')
+            guide_field = self._get_language_fields('implementation_guide')
+            
+            # First, find the category by name in current language
+            cat_name_field = self._get_language_fields('name')
+            category_query = f"""
+            SELECT id, category_code 
+            FROM error_categories 
+            WHERE {cat_name_field} = %s AND is_active = TRUE
+            """
+            
+            category = self.db.execute_query(category_query, (category_name,), fetch_one=True)
+            
+            if not category:
+                logger.warning(f"Category not found: {category_name}")
+                return []
+            
+            # Get errors for this category
+            errors_query = f"""
+            SELECT 
+                {name_field} as error_name,
+                {desc_field} as description,
+                {guide_field} as implementation_guide,
+                difficulty_level,
+                error_code
+            FROM java_errors 
+            WHERE category_id = %s AND is_active = TRUE
+            ORDER BY error_name_en
+            """
+            
+            errors = self.db.execute_query(errors_query, (category['id'],))
+            
+            # Format the results to match the expected JSON structure
+            formatted_errors = []
+            for error in errors or []:
+                formatted_errors.append({
+                    t("error_name"): error['error_name'],
+                    t("description"): error['description'],
+                    t("implementation_guide"): error.get('implementation_guide', ''),
+                    "difficulty_level": error.get('difficulty_level', 'medium'),
+                    "error_code": error.get('error_code', '')
+                })
+            
+            return formatted_errors
+            
+        except Exception as e:
+            logger.error(f"Error getting category errors for {category_name}: {str(e)}")
+            return []
     
     def get_errors_by_categories(self, selected_categories: Dict[str, List[str]]) -> Dict[str, List[Dict[str, str]]]:
         """
@@ -138,15 +213,12 @@ class JsonErrorRepository:
         Returns:
             Dictionary with selected errors by category type
         """
-        selected_errors = {
-            "java_errors": []
-        }
+        selected_errors = {"java_errors": []}
         
-        # Get Java errors
         if "java_errors" in selected_categories:
             for category in selected_categories["java_errors"]:
-                if category in self.java_errors:
-                    selected_errors["java_errors"].extend(self.java_errors[category])
+                category_errors = self.get_category_errors(category)
+                selected_errors["java_errors"].extend(category_errors)
         
         return selected_errors
     
@@ -161,15 +233,52 @@ class JsonErrorRepository:
         Returns:
             Error details dictionary or None if not found
         """
-        if error_type == "java_error":
-            for category in self.java_errors:
-                for error in self.java_errors[category]:
-                    if error.get(t("error_name")) == error_name:
-                        return error
-        return None
+        if error_type != "java_error":
+            return None
+        
+        try:
+            if not self.db.test_connection_only():
+                # Fallback to loaded data
+                for category in self.java_errors:
+                    for error in self.java_errors[category]:
+                        if error.get(t("error_name")) == error_name:
+                            return error
+                return None
+            
+            name_field = self._get_language_fields('error_name')
+            desc_field = self._get_language_fields('description')
+            guide_field = self._get_language_fields('implementation_guide')
+            
+            query = f"""
+            SELECT 
+                {name_field} as error_name,
+                {desc_field} as description,
+                {guide_field} as implementation_guide,
+                difficulty_level,
+                error_code
+            FROM java_errors 
+            WHERE {name_field} = %s AND is_active = TRUE
+            """
+            
+            error = self.db.execute_query(query, (error_name,), fetch_one=True)
+            
+            if error:
+                return {
+                    t("error_name"): error['error_name'],
+                    t("description"): error['description'],
+                    t("implementation_guide"): error.get('implementation_guide', ''),
+                    "difficulty_level": error.get('difficulty_level', 'medium'),
+                    "error_code": error.get('error_code', '')
+                }
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting error details for {error_name}: {str(e)}")
+            return None
     
     def get_random_errors_by_categories(self, selected_categories: Dict[str, List[str]], 
-                                  count: int = 4) -> List[Dict[str, Any]]:
+                                      count: int = 4) -> List[Dict[str, Any]]:
         """
         Get random errors from selected categories.
         
@@ -181,37 +290,83 @@ class JsonErrorRepository:
         Returns:
             List of selected errors with type and category information
         """
-        all_errors = []
-        java_error_categories = selected_categories.get("java_errors", [])
-        
-        # Java errors
-        for category in java_error_categories:
-            if category in self.java_errors:
-                for error in self.java_errors[category]:
-                    all_errors.append({
-                        "type": "java_error",
-                        "category": category,
-                        "name": error.get(t("error_name")),
-                        "description": error.get(t("description")),
-                        "implementation_guide": error.get(t("implementation_guide"), "")
-                    })
-        
-        # Select random errors
-        if all_errors:
-            # If we have fewer errors than requested, return all
-            if len(all_errors) <= count:
-                return all_errors
+        try:
+            java_error_categories = selected_categories.get("java_errors", [])
+            if not java_error_categories:
+                return []
             
-            # Otherwise select random errors
-            return random.sample(all_errors, count)
-        
-        return []
+            if not self.db.test_connection_only():
+                # Use fallback logic
+                all_errors = []
+                for category in java_error_categories:
+                    if category in self.java_errors:
+                        for error in self.java_errors[category]:
+                            all_errors.append({
+                                "type": "java_error",
+                                "category": category,
+                                "name": error.get(t("error_name")),
+                                "description": error.get(t("description")),
+                                "implementation_guide": error.get(t("implementation_guide"), "")
+                            })
+                
+                if all_errors:
+                    if len(all_errors) <= count:
+                        return all_errors
+                    return random.sample(all_errors, count)
+                return []
+            
+            # Database logic
+            name_field = self._get_language_fields('error_name')
+            desc_field = self._get_language_fields('description')
+            guide_field = self._get_language_fields('implementation_guide')
+            cat_name_field = self._get_language_fields('name')
+            
+            # Build query to get random errors from selected categories
+            placeholders = ','.join(['%s'] * len(java_error_categories))
+            
+            query = f"""
+            SELECT 
+                je.{name_field} as error_name,
+                je.{desc_field} as description,
+                je.{guide_field} as implementation_guide,
+                je.difficulty_level,
+                je.error_code,
+                ec.{cat_name_field} as category_name
+            FROM java_errors je
+            JOIN error_categories ec ON je.category_id = ec.id
+            WHERE ec.{cat_name_field} IN ({placeholders}) 
+            AND je.is_active = TRUE AND ec.is_active = TRUE
+            ORDER BY RAND()
+            LIMIT %s
+            """
+            
+            params = tuple(java_error_categories) + (count,)
+            errors = self.db.execute_query(query, params)
+            
+            # Format results
+            formatted_errors = []
+            for error in errors or []:
+                formatted_errors.append({
+                    "type": "java_error",
+                    "category": error['category_name'],
+                    "name": error['error_name'],
+                    "description": error['description'],
+                    "implementation_guide": error.get('implementation_guide', ''),
+                    "difficulty_level": error.get('difficulty_level', 'medium'),
+                    "error_code": error.get('error_code', '')
+                })
+            
+            return formatted_errors
+            
+        except Exception as e:
+            logger.error(f"Error getting random errors: {str(e)}")
+            return []
     
     def get_errors_for_llm(self, 
-                 selected_categories: Dict[str, List[str]] = None, 
-                 specific_errors: List[Dict[str, Any]] = None,
-                 count: int = 4, 
-                 difficulty: str = "medium") -> Tuple[List[Dict[str, Any]], List[str]]:
+                          selected_categories: Dict[str, List[str]] = None, 
+                          specific_errors: List[Dict[str, Any]] = None,
+                          count: int = 4, 
+                          difficulty: str = "medium") -> Tuple[List[Dict[str, Any]], List[str]]:
         """
         Get errors suitable for sending to the LLM for code generation.
         Can use either category-based selection or specific errors.
@@ -224,129 +379,59 @@ class JsonErrorRepository:
             
         Returns:
             Tuple of (list of error objects, list of problem descriptions)
-        """       
-        # Adjust count based on difficulty
-        error_counts = {
-            t("easy"): max(2, count - 2),
-            t("medium"): count,
-            t("hard"): count + 2
-        }
-
-        adjusted_count = error_counts.get(difficulty.lower(), count)
-       
-        # If specific errors are provided, use those
-        if specific_errors and len(specific_errors) > 0:
-            problem_descriptions = []
-            selected_errors = []
-            # Process each selected error to ensure it has all required fields
-            for error in specific_errors:
-                processed_error = error.copy()               
-                name = processed_error.get(t("error_name_variable"), "Unknown")
-                description = processed_error.get(t("description"), "")
-                category = processed_error.get(t("category"), "")
-                
-                # Add implementation guide if available
-                implementation_guide = self._get_implementation_guide(name, category)
-                if implementation_guide:
-                    processed_error[t("implementation_guide")] = implementation_guide
-                
-                # Create problem description
-                problem_descriptions.append(f"{category}: {name} - {description}")
-                selected_errors.append(processed_error)
-            
-            # If we don't have exactly the adjusted count, log a notice but proceed
-            if len(selected_errors) != adjusted_count:
-                print(f"Note: Using {len(selected_errors)} specific errors instead of adjusted count {adjusted_count}")
-            return selected_errors, problem_descriptions
-        
-        # Otherwise use category-based selection
-        elif selected_categories:          
-            print(f"Selected Categories: {selected_categories}")
-            # Check if any categories are actually selected
-            java_error_categories = selected_categories.get("java_errors", [])
-            print(f"Java Error Categories: {java_error_categories}")
-        
-            if not java_error_categories:
-                print("WARNING: No categories specified, using defaults")
-                selected_categories = {
-                    "java_errors": ["LogicalErrors", "SyntaxErrors", "CodeQualityErrors"]
-                }
-
-            error_selection_ranges = {
-                t("easy"): (1, 2),    # Easy: 1-2 errors per category
-                t("medium"): (1, 3),  # Medium: 1-3 errors per category
-                t("hard"): (1, 4)     # Hard: 1-4 errors per category
-            }
-
-            min_errors, max_errors = error_selection_ranges.get(
-                difficulty.lower(), 
-                (1, 2)  # Default to 1-2 if difficulty not recognized
-            )
-            
-            # Collect errors from each selected category
-            all_errors = []
-          
-            for category in selected_categories.get("java_errors", []):
-                if category in self.java_errors:
-                    # Use get_category_errors to get language-mapped errors
-                    category_errors = self.get_category_errors(category)
-
-                    # For each selected category, randomly select 1-2 errors
-                    num_to_select = min(len(category_errors), random.randint(min_errors, max_errors))
-
-                    if num_to_select > 0:
-                        selected_from_category = random.sample(category_errors, num_to_select)
-                        print(f"Selected {num_to_select} errors from Java error category '{category}'")                        
-                        for error in selected_from_category:
-                            all_errors.append({                                
-                                t("category"): category,
-                                t("error_name_variable"): error.get(t("error_name_variable")),
-                                t("description"): error.get(t("description")),
-                                t("implementation_guide"): error.get(t("implementation_guide"), "")
-                            })                       
-            # If we have more errors than needed, randomly select the required number
-            if len(all_errors) > adjusted_count:
-                print(f"Too many errors ({len(all_errors)}), selecting {adjusted_count} randomly")
-                selected_errors = random.sample(all_errors, adjusted_count)
-            else:
-                print(f"Using all {len(all_errors)} errors from categories")
-                selected_errors = all_errors
-            
-            # Format problem descriptions
-            problem_descriptions = []
-            for error in selected_errors:
-                category = error.get(t("category"), "")                
-                name = error.get(t("error_name_variable"), "Unknown")
-                description = error.get(t("description"), "")
-
-                problem_descriptions.append(f"{category} - {name}: {description}")
-
-            
-            return selected_errors, problem_descriptions
-        
-        # If no selection method was provided, return empty lists
-        print("WARNING: No selection method provided, returning empty error list")
-        return [], []
+        """
+        # Use database repository implementation
+        try:
+            from data.database_error_repository import DatabaseErrorRepository
+            db_repo = DatabaseErrorRepository()
+            return db_repo.get_errors_for_llm(selected_categories, specific_errors, count, difficulty)
+        except Exception as e:
+            logger.error(f"Error using database repository: {str(e)}")
+            return [], []
     
     def _get_implementation_guide(self, error_name: str, category: str) -> Optional[str]:
         """
         Get implementation guide for a specific error.
         
         Args:
-            error_type: Type of error
             error_name: Name of the error
             category: Category of the error
             
         Returns:
             Implementation guide string or None if not found
         """
-      
-        if category in self.java_errors:
-            for error in self.java_errors[category]:
-                if error.get(t("error_name")) == error_name:
-                    return error.get(t("implementation_guide"))
-        return None
-
+        try:
+            if not self.db.test_connection_only():
+                # Fallback logic
+                if category in self.java_errors:
+                    for error in self.java_errors[category]:
+                        if error.get(t("error_name")) == error_name:
+                            return error.get(t("implementation_guide"))
+                return None
+            
+            name_field = self._get_language_fields('error_name')
+            guide_field = self._get_language_fields('implementation_guide')
+            cat_name_field = self._get_language_fields('name')
+            
+            query = f"""
+            SELECT je.{guide_field} as implementation_guide
+            FROM java_errors je
+            JOIN error_categories ec ON je.category_id = ec.id
+            WHERE je.{name_field} = %s AND ec.{cat_name_field} = %s
+            AND je.is_active = TRUE AND ec.is_active = TRUE
+            """
+            
+            result = self.db.execute_query(query, (error_name, category), fetch_one=True)
+            
+            if result:
+                return result.get('implementation_guide')
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting implementation guide: {str(e)}")
+            return None
+    
     def get_error_by_name(self, error_type: str, error_name: str) -> Optional[Dict[str, Any]]:
         """
         Get a specific error by name.
@@ -358,13 +443,48 @@ class JsonErrorRepository:
         Returns:
             Error dictionary with added type and category, or None if not found
         """
-        if error_type == "java_error":
-            for category, errors in self.java_errors.items():
-                for error in errors:
-                    if error.get(t("error_name_variable")) == error_name:
-                        return {                            
-                            t("category"): category,
-                            t("error_name_variable"): error.get(t("error_name_variable")),
-                            t("description"): error.get(t("description"))
-                        }
-        return None
+        if error_type != "java_error":
+            return None
+        
+        try:
+            if not self.db.test_connection_only():
+                # Fallback logic
+                for category, errors in self.java_errors.items():
+                    for error in errors:
+                        if error.get(t("error_name_variable")) == error_name:
+                            return {
+                                t("category"): category,
+                                t("error_name_variable"): error.get(t("error_name_variable")),
+                                t("description"): error.get(t("description"))
+                            }
+                return None
+            
+            name_field = self._get_language_fields('error_name')
+            desc_field = self._get_language_fields('description')
+            cat_name_field = self._get_language_fields('name')
+            
+            query = f"""
+            SELECT 
+                je.{name_field} as error_name,
+                je.{desc_field} as description,
+                ec.{cat_name_field} as category_name
+            FROM java_errors je
+            JOIN error_categories ec ON je.category_id = ec.id
+            WHERE je.{name_field} = %s 
+            AND je.is_active = TRUE AND ec.is_active = TRUE
+            """
+            
+            result = self.db.execute_query(query, (error_name,), fetch_one=True)
+            
+            if result:
+                return {
+                    t("category"): result['category_name'],
+                    t("error_name_variable"): result['error_name'],
+                    t("description"): result['description']
+                }
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting error by name {error_name}: {str(e)}")
+            return None

@@ -23,90 +23,111 @@ class SmartHintSystem:
     def __init__(self):
         self.db = MySQLConnection()
         
-        # Hint templates for different error types
+        # Enhanced hint templates with visual elements
         self.hint_templates = {
             "off_by_one": {
                 "level_1": {
-                    "focus_area": t("hint_off_by_one_focus"),
-                    "question": t("hint_off_by_one_question"),
-                    "general_tip": t("hint_off_by_one_general")
+                    "icon": "🟢",
+                    "title": "General Guidance",
+                    "focus_area": "Look at the loop condition carefully",
+                    "question": "What happens when the loop reaches the last element?",
+                    "general_tip": "Arrays in Java are zero-indexed",
+                    "visual_hint": "array_bounds_basic"
                 },
                 "level_2": {
-                    "location": t("hint_off_by_one_location"),
-                    "issue": t("hint_off_by_one_issue"),
+                    "icon": "🟡",
+                    "title": "More Specific",
+                    "location": "Line with the for loop condition",
+                    "issue": "The condition allows accessing an index that doesn't exist",
                     "code_highlight": "<=",
-                    "think_about": t("hint_off_by_one_think")
+                    "think_about": "What's the highest valid index for an array?",
+                    "visual_hint": "array_bounds_detailed"
                 },
                 "level_3": {
-                    "exact_problem": t("hint_off_by_one_exact"),
-                    "why_wrong": t("hint_off_by_one_why"),
-                    "fix": t("hint_off_by_one_fix"),
-                    "consequence": t("hint_off_by_one_consequence")
+                    "icon": "🔴",
+                    "title": "Almost the Answer",
+                    "exact_problem": "Off-by-one error in loop boundary",
+                    "why_wrong": "`array.length` is 1 more than the highest valid index",
+                    "fix": "Change `<=` to `<` or use `array.length - 1`",
+                    "consequence": "This will throw ArrayIndexOutOfBoundsException at runtime",
+                    "code_example": {
+                        "wrong": "for(int i = 0; i <= array.length; i++)",
+                        "correct": "for(int i = 0; i < array.length; i++)"
+                    },
+                    "visual_hint": "array_bounds_solution"
                 }
             },
             "null_check": {
                 "level_1": {
-                    "focus_area": t("hint_null_focus"),
-                    "question": t("hint_null_question"),
-                    "general_tip": t("hint_null_general")
+                    "icon": "🟢",
+                    "title": "General Guidance",
+                    "focus_area": "Check for potential null references",
+                    "question": "What happens if an object is null when you try to use it?",
+                    "general_tip": "Always verify objects exist before using them",
+                    "visual_hint": "null_pointer_basic"
                 },
                 "level_2": {
-                    "location": t("hint_null_location"),
-                    "issue": t("hint_null_issue"),
-                    "think_about": t("hint_null_think")
+                    "icon": "🟡",
+                    "title": "More Specific",
+                    "location": "Method calls on potentially null objects",
+                    "issue": "Calling methods without checking if the object is null",
+                    "think_about": "Which objects might be null at this point?",
+                    "visual_hint": "null_pointer_flow"
                 },
                 "level_3": {
-                    "exact_problem": t("hint_null_exact"),
-                    "why_wrong": t("hint_null_why"),
-                    "fix": t("hint_null_fix"),
-                    "consequence": t("hint_null_consequence")
+                    "icon": "🔴",
+                    "title": "Almost the Answer",
+                    "exact_problem": "Missing null check before method call",
+                    "why_wrong": "Null objects cannot have methods called on them",
+                    "fix": "Add null checks before accessing object methods",
+                    "consequence": "This will throw NullPointerException at runtime",
+                    "code_example": {
+                        "wrong": "user.getProfile().updateBio(newBio);",
+                        "correct": "if (user != null && user.getProfile() != null) { user.getProfile().updateBio(newBio); }"
+                    },
+                    "visual_hint": "null_pointer_solution"
                 }
             },
             "string_comparison": {
                 "level_1": {
-                    "focus_area": t("hint_string_focus"),
-                    "question": t("hint_string_question"),
-                    "general_tip": t("hint_string_general")
+                    "icon": "🟢",
+                    "title": "General Guidance",
+                    "focus_area": "Look at how strings are being compared",
+                    "question": "Is this comparing string content or object references?",
+                    "general_tip": "String comparison has specific rules in Java",
+                    "visual_hint": "string_comparison_basic"
                 },
                 "level_2": {
-                    "location": t("hint_string_location"),
-                    "issue": t("hint_string_issue"),
-                    "think_about": t("hint_string_think")
+                    "icon": "🟡",
+                    "title": "More Specific",
+                    "location": "String comparison using == operator",
+                    "issue": "Using == compares references, not content",
+                    "think_about": "What's the difference between == and .equals() for strings?",
+                    "visual_hint": "string_comparison_detailed"
                 },
                 "level_3": {
-                    "exact_problem": t("hint_string_exact"),
-                    "why_wrong": t("hint_string_why"),
-                    "fix": t("hint_string_fix"),
-                    "consequence": t("hint_string_consequence")
-                }
-            },
-            "missing_break": {
-                "level_1": {
-                    "focus_area": t("hint_break_focus"),
-                    "question": t("hint_break_question"),
-                    "general_tip": t("hint_break_general")
-                },
-                "level_2": {
-                    "location": t("hint_break_location"),
-                    "issue": t("hint_break_issue"),
-                    "think_about": t("hint_break_think")
-                },
-                "level_3": {
-                    "exact_problem": t("hint_break_exact"),
-                    "why_wrong": t("hint_break_why"),
-                    "fix": t("hint_break_fix"),
-                    "consequence": t("hint_break_consequence")
+                    "icon": "🔴",
+                    "title": "Almost the Answer",
+                    "exact_problem": "Using == instead of .equals() for string comparison",
+                    "why_wrong": "== compares object references, not string content",
+                    "fix": "Use .equals() method for content comparison",
+                    "consequence": "String comparison may fail even when content is identical",
+                    "code_example": {
+                        "wrong": "if (str1 == str2)",
+                        "correct": "if (str1 != null && str1.equals(str2))"
+                    },
+                    "visual_hint": "string_comparison_solution"
                 }
             }
         }
         
-        # Hint timing rules (in seconds)
+        # Enhanced timing rules with skill-based adjustments
         self.hint_timing = {
-            "level_1": {"min_time": 30, "max_attempts": 1},
-            "level_2": {"min_time": 90, "max_attempts": 2},
-            "level_3": {"min_time": 180, "max_attempts": 3}
+            "level_1": {"min_time": 30, "max_attempts": 1, "skill_multiplier": {"beginner": 0.7, "intermediate": 1.0, "advanced": 1.3}},
+            "level_2": {"min_time": 90, "max_attempts": 2, "skill_multiplier": {"beginner": 0.8, "intermediate": 1.0, "advanced": 1.2}},
+            "level_3": {"min_time": 180, "max_attempts": 3, "skill_multiplier": {"beginner": 0.9, "intermediate": 1.0, "advanced": 1.1}}
         }
-    
+
     def get_hint(self, user_id: str, session_id: str, error_type: str, 
                  session_start_time: float, attempt_count: int,
                  user_skill_level: str = "beginner") -> Optional[Dict[str, Any]]:
