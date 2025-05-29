@@ -594,10 +594,160 @@ class LearningDashboardUI:
 
 def render_learning_dashboard(user_id: str):
     """
-    Standalone function to render learning dashboard.
+    Standalone function to render learning dashboard with enhanced styling.
     
     Args:
         user_id: Current user's ID
     """
-    dashboard = LearningDashboardUI()
-    dashboard.render(user_id)
+    try:
+        dashboard = LearningDashboardUI()
+        dashboard.render(user_id)
+    except Exception as e:
+        logger.error(f"Error rendering learning dashboard: {str(e)}")
+        st.error(f"{t('dashboard_error')}: {str(e)}")
+
+
+def create_skill_progress_chart(skill_data: List[Dict[str, Any]]) -> go.Figure:
+    """
+    Create an enhanced skill progress chart with better visualization.
+    
+    Args:
+        skill_data: List of skill progress data
+        
+    Returns:
+        Plotly figure object
+    """
+    if not skill_data:
+        return None
+    
+    # Create radar chart for skills
+    skills = [skill.get('skill_category', 'Unknown') for skill in skill_data]
+    mastery = [skill.get('mastery_percentage', 0) for skill in skill_data]
+    
+    fig = go.Figure()
+    
+    fig.add_trace(go.Scatterpolar(
+        r=mastery,
+        theta=skills,
+        fill='toself',
+        name=t('mastery_level'),
+        line_color='rgb(0, 123, 255)',
+        fillcolor='rgba(0, 123, 255, 0.25)'
+    ))
+    
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(
+                visible=True,
+                range=[0, 100],
+                ticksuffix='%'
+            )
+        ),
+        showlegend=False,
+        title={
+            'text': t('skill_mastery_overview'),
+            'x': 0.5,
+            'xanchor': 'center'
+        },
+        height=400
+    )
+    
+    return fig
+
+
+def render_achievement_showcase(user_badges: List[Dict[str, Any]]) -> None:
+    """
+    Render achievement showcase with enhanced styling.
+    
+    Args:
+        user_badges: List of user badges
+    """
+    if not user_badges:
+        st.info(t("no_badges_yet"))
+        st.markdown(t("earn_badges_by_practicing"))
+        return
+    
+    # Enhanced badge display with better organization
+    st.markdown(f"""
+    <div class="achievement-showcase">
+        <h3 class="showcase-title">🏆 {t('achievements')}</h3>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Group by difficulty
+    difficulty_groups = {"easy": [], "medium": [], "hard": []}
+    for badge in user_badges:
+        difficulty = badge.get('difficulty', 'easy')
+        if difficulty in difficulty_groups:
+            difficulty_groups[difficulty].append(badge)
+    
+    # Display by difficulty with tabs
+    difficulty_tabs = st.tabs([f"{t(diff)} ({len(badges)})" for diff, badges in difficulty_groups.items() if badges])
+    
+    tab_index = 0
+    for difficulty, badges in difficulty_groups.items():
+        if badges:
+            with difficulty_tabs[tab_index]:
+                cols = st.columns(min(len(badges), 3))
+                for i, badge in enumerate(badges):
+                    with cols[i % 3]:
+                        render_enhanced_badge_card(badge)
+            tab_index += 1
+
+
+def render_enhanced_badge_card(badge: Dict[str, Any]) -> None:
+    """
+    Render an enhanced badge card with improved styling.
+    
+    Args:
+        badge: Badge data dictionary
+    """
+    badge_name = badge.get('name', t('unknown_badge'))
+    badge_icon = badge.get('icon', '🏅')
+    badge_description = badge.get('description', '')
+    badge_difficulty = badge.get('difficulty', 'easy')
+    points = badge.get('points', 0)
+    
+    # Difficulty color mapping
+    difficulty_colors = {
+        'easy': '#28a745',
+        'medium': '#ffc107', 
+        'hard': '#dc3545'
+    }
+    
+    color = difficulty_colors.get(badge_difficulty, '#6c757d')
+    
+    st.markdown(f"""
+    <div class="enhanced-badge-card" style="
+        border: 2px solid {color}; 
+        border-radius: 15px; 
+        padding: 20px; 
+        text-align: center; 
+        background: linear-gradient(135deg, white, #f8f9fa);
+        margin: 15px 0;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        transition: transform 0.3s ease;
+    " onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+        <div style="font-size: 3em; margin-bottom: 10px;">{badge_icon}</div>
+        <h4 style="margin: 10px 0; color: {color}; font-weight: bold;">{badge_name}</h4>
+        <p style="font-size: 0.9em; color: #6c757d; margin-bottom: 15px;">{badge_description}</p>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="
+                background: {color}; 
+                color: white; 
+                padding: 5px 10px; 
+                border-radius: 15px; 
+                font-size: 0.8em;
+                font-weight: bold;
+            ">{t(badge_difficulty)}</span>
+            <span style="
+                background: #007bff; 
+                color: white; 
+                padding: 5px 10px; 
+                border-radius: 15px; 
+                font-size: 0.8em;
+                font-weight: bold;
+            ">{points} {t('points')}</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)

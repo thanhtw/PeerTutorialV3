@@ -163,7 +163,7 @@ class MySQLAuthManager:
     
     def authenticate_user(self, email: str, password: str) -> Dict[str, Any]:
         """
-        Authenticate user with email and password.
+        Authenticate user with email and password with proper password verification.
         
         Args:
             email: User email
@@ -173,7 +173,7 @@ class MySQLAuthManager:
             Dictionary with authentication result
         """
         try:
-            # Get user by email without tutorial completion status
+            # Get user by email including password hash
             query = """
             SELECT uid, email, password, display_name_en, display_name_zh, 
                 level_name_en, level_name_zh,
@@ -191,17 +191,30 @@ class MySQLAuthManager:
                     "error": "Invalid email or password"
                 }
             
-            return {
-                    "success": True,
-                    "user_id": user_data["uid"],
-                    "email": user_data["email"],
-                    "display_name_en": user_data["display_name_en"],
-                    "display_name_zh": user_data["display_name_zh"],
-                    "level_name_en": user_data["level_name_en"],
-                    "level_name_zh": user_data["level_name_zh"],                    
-                    "reviews_completed": user_data["reviews_completed"],
-                    "score": user_data["score"]
+            # Verify password
+            stored_password_hash = user_data["password"]
+            provided_password_hash = self._hash_password(password)
+            
+            if stored_password_hash != provided_password_hash:
+                logger.warning(f"Authentication failed: Invalid password for email {email}")
+                return {
+                    "success": False,
+                    "error": "Invalid email or password"
                 }
+            
+            # Authentication successful
+            logger.info(f"User authenticated successfully: {email}")
+            return {
+                "success": True,
+                "user_id": user_data["uid"],
+                "email": user_data["email"],
+                "display_name_en": user_data["display_name_en"],
+                "display_name_zh": user_data["display_name_zh"],
+                "level_name_en": user_data["level_name_en"],
+                "level_name_zh": user_data["level_name_zh"],                    
+                "reviews_completed": user_data["reviews_completed"],
+                "score": user_data["score"]
+            }
             
         except Exception as e:
             logger.error(f"Error during authentication for email {email}: {str(e)}")

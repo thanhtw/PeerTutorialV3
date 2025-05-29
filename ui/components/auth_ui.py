@@ -44,75 +44,164 @@ class AuthUI:
     
     def render_auth_page(self) -> bool:
         """
-        Render the authentication page with login and registration forms.
-        Uses t() function for all translations instead of hardcoded maps.
+        Render a professional authentication page with enhanced styling and proper i18n.
         
         Returns:
             bool: True if user is authenticated, False otherwise
         """
         
-        #st.markdown('<div class="auth-container">', unsafe_allow_html=True)
-        
-        # Header with logo and title
+        # Professional header with enhanced styling
         st.markdown(f"""
-            <div class="auth-header">
-                <h1>{t('app_title')}</h1>
-                <p>{t('app_subtitle')}</p>
+        <div class="auth-page-container">
+            <div class="auth-header-enhanced">
+                <div class="auth-logo">
+                    <div class="logo-icon">💻</div>
+                    <h1 class="app-title">{t('app_title')}</h1>
+                </div>
+                <p class="app-description">{t('app_subtitle')}</p>
+                <div class="auth-features">
+                    <div class="feature-item">
+                        <span class="feature-icon">🎯</span>
+                        <span>{t('practice_code_review_skills')}</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-icon">🏆</span>
+                        <span>{t('earn_achievements_and_badges')}</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-icon">📈</span>
+                        <span>{t('track_your_progress')}</span>
+                    </div>
+                </div>
             </div>
-            """, unsafe_allow_html=True)
+        </div>
+        """, unsafe_allow_html=True)
 
-        # Create columns for login and registration
-        col1, col2 = st.columns(2)
+        # Language selector
+        self._render_language_selector()
+
+        # Professional auth forms
+        col1, col2 = st.columns(2, gap="large")
         
         with col1:
-            # Login form - unchanged
-            #st.markdown('<div class="auth-form">', unsafe_allow_html=True)
-            st.markdown(f'<h3>{t("login")}</h3>', unsafe_allow_html=True)
-            
-            email = st.text_input(t("email"), key="login_email")
-            password = st.text_input(t("password"), type="password", key="login_password")
-            
-            if st.button(t("login"), use_container_width=True, key="login_button"):
-                if not email or not password:
-                    st.error(t("fill_all_fields"))
-                else:
-                    # Authenticate user
-                    result = self.auth_manager.authenticate_user(email, password)                    
-                    if result.get("success", False):
-                        # Set authenticated state
-                        st.session_state.auth["is_authenticated"] = True
-                        st.session_state.auth["user_id"] = result.get("user_id")
-                        st.session_state.auth["user_info"] = {
-                            "display_name_en": result.get("display_name_en"),
-                            "display_name_zh": result.get("display_name_zh"),
-                            "email": result.get("email"),
-                            "level_name_en": result.get("level_name_en"),
-                            "level_name_zh": result.get("level_name_zh"),
-                            "reviews_completed": result.get("reviews_completed"),
-                            "score": result.get("score")
-                            # Removed tutorial_completed field
-                        }                     
-                        st.success(t("login_success"))
-                        
-                        # Force UI refresh
-                        st.rerun()
-                    else:
-                        st.error(f"{t('login_failed')}: {result.get('error', t('invalid_credentials'))}")
-            st.markdown('</div>', unsafe_allow_html=True)
+            self._render_professional_login_form()
         
         with col2:
-            # Registration form - updated to use t() function
-            #st.markdown('<div class="auth-form">', unsafe_allow_html=True)
-            st.markdown(f'<h3>{t("register")}</h3>', unsafe_allow_html=True)
+            self._render_professional_registration_form()
+        
+        # Demo mode section
+        self._render_demo_section()
+        
+        return st.session_state.auth["is_authenticated"]
+
+    def _render_language_selector(self):
+        """Render professional language selector."""
+        st.markdown(f"""
+        <div class="language-selector-container">
+            <h4>🌐 {t('select_language')}</h4>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            language_options = {
+                "English": "en",
+                "中文": "zh"
+            }
             
-            # Get the current language
             current_lang = get_current_language()
+            current_display = [k for k, v in language_options.items() if v == current_lang][0]
             
-            # Primary display name (will be used for both languages if only one is provided)
-            display_name = st.text_input(t("display_name"), key="reg_name")
+            selected_lang = st.selectbox(
+                "",
+                options=list(language_options.keys()),
+                index=list(language_options.keys()).index(current_display),
+                key="language_selector"
+            )
             
-            # Show language-specific name fields if needed
-            show_lang_specific = st.checkbox(t("specify_different_names_per_language"), value=False, key="show_lang_names")
+            if language_options[selected_lang] != current_lang:
+                set_language(language_options[selected_lang])
+                st.rerun()
+
+    def _render_professional_login_form(self):
+        """Render professional login form with enhanced styling."""
+        st.markdown(f"""
+        <div class="auth-form-container">
+            <div class="auth-form-header">
+                <h3>🔐 {t('welcome_back')}</h3>
+                <p>{t('sign_in_to_continue')}</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        with st.container():
+            # Enhanced form styling
+            st.markdown('<div class="login-form-enhanced">', unsafe_allow_html=True)
+            
+            email = st.text_input(
+                f"📧 {t('email')}",
+                placeholder=t('enter_your_email'),
+                key="login_email",
+                help=t('email_help_text')
+            )
+            
+            password = st.text_input(
+                f"🔒 {t('password')}",
+                type="password",
+                placeholder=t('enter_your_password'),
+                key="login_password",
+                help=t('password_help_text')
+            )
+            
+            # Enhanced login button
+            login_button_container = st.container()
+            with login_button_container:
+                if st.button(
+                    f"🚀 {t('sign_in')}",
+                    use_container_width=True,
+                    type="primary",
+                    key="enhanced_login_button"
+                ):
+                    self._handle_login(email, password)
+            
+            # Additional login options
+            st.markdown(f"""
+            <div class="login-footer">
+                <p><a href="#" class="auth-link">{t('forgot_password')}</a></p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    def _render_professional_registration_form(self):
+        """Render professional registration form with enhanced styling."""
+        st.markdown(f"""
+        <div class="auth-form-container">
+            <div class="auth-form-header">
+                <h3>✨ {t('join_the_community')}</h3>
+                <p>{t('create_account_to_start')}</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        with st.container():
+            st.markdown('<div class="registration-form-enhanced">', unsafe_allow_html=True)
+            
+            # Enhanced form fields
+            display_name = st.text_input(
+                f"👤 {t('display_name')}",
+                placeholder=t('enter_display_name'),
+                key="reg_name",
+                help=t('display_name_help')
+            )
+            
+            # Language-specific names option
+            show_lang_specific = st.checkbox(
+                f"🌐 {t('specify_different_names_per_language')}",
+                value=False,
+                key="show_lang_names",
+                help=t('multilingual_names_help')
+            )
             
             display_name_en = display_name
             display_name_zh = display_name
@@ -120,94 +209,258 @@ class AuthUI:
             if show_lang_specific:
                 col_a, col_b = st.columns(2)
                 with col_a:
-                    display_name_en = st.text_input(t("english_name"), value=display_name, key="reg_name_en")
+                    display_name_en = st.text_input(
+                        f"🇺🇸 {t('english_name')}",
+                        value=display_name,
+                        key="reg_name_en",
+                        placeholder="John Doe"
+                    )
                 with col_b:
-                    display_name_zh = st.text_input(t("chinese_name"), value=display_name, key="reg_name_zh")
+                    display_name_zh = st.text_input(
+                        f"🇨🇳 {t('chinese_name')}",
+                        value=display_name,
+                        key="reg_name_zh",
+                        placeholder="王小明"
+                    )
             
-            email = st.text_input(t("email"), key="reg_email")
-            password = st.text_input(t("password"), type="password", key="reg_password")
-            confirm_password = st.text_input(t("confirm_password"), type="password", key="reg_confirm")
+            email = st.text_input(
+                f"📧 {t('email')}",
+                placeholder=t('enter_your_email'),
+                key="reg_email",
+                help=t('email_registration_help')
+            )
             
-            # Student level selection using t() function
+            password = st.text_input(
+                f"🔒 {t('password')}",
+                type="password",
+                placeholder=t('create_strong_password'),
+                key="reg_password",
+                help=t('password_requirements')
+            )
+            
+            confirm_password = st.text_input(
+                f"🔒 {t('confirm_password')}",
+                type="password",
+                placeholder=t('confirm_your_password'),
+                key="reg_confirm",
+                help=t('password_confirmation_help')
+            )
+            
+            # Enhanced level selection
+            st.markdown(f"""
+            <div class="level-selection-header">
+                <h4>🎯 {t('experience_level')}</h4>
+                <p>{t('select_experience_level_help')}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
             level_internal_values = ["basic", "medium", "senior"]
             level_options = [t(level) for level in level_internal_values]
             
+            # Enhanced level selector with descriptions
+            level_descriptions = {
+                "basic": t('basic_level_description'),
+                "medium": t('medium_level_description'),
+                "senior": t('senior_level_description')
+            }
+            
             selected_level_index = st.selectbox(
-                t("experience_level"),
+                "",
                 options=level_options,
                 index=0,
-                key="reg_level"
+                key="reg_level",
+                help=t('level_selection_help')
             )
             
-            # Get the internal level value from the index
-            level = level_internal_values[level_options.index(selected_level_index)]
+            # Show level description
+            selected_level = level_internal_values[level_options.index(selected_level_index)]
+            st.info(f"ℹ️ {level_descriptions[selected_level]}")
             
-            # Store level names for both languages
-            level_name_en = t(level) if current_lang == "en" else ""
-            level_name_zh = t(level) if current_lang == "zh" else ""
+            # Get level names for both languages
+            level_name_en, level_name_zh = self._get_level_names_for_both_languages(selected_level)
             
-            # If we didn't get level names for both languages, we need to switch language temporarily
-            if not level_name_en or not level_name_zh:
-                # Save current language
-                saved_language = get_current_language()
-                
-                # Get English level name
-                if not level_name_en:
-                    set_language("en")
-                    level_name_en = t(level)
-                
-                # Get Chinese level name
-                if not level_name_zh:
-                    set_language("zh")
-                    level_name_zh = t(level)
-                
-                # Restore original language
-                set_language(saved_language)
+            # Enhanced registration button
+            if st.button(
+                f"🎉 {t('create_account')}",
+                use_container_width=True,
+                type="primary",
+                key="enhanced_register_button"
+            ):
+                self._handle_registration(
+                    display_name, display_name_en, display_name_zh,
+                    email, password, confirm_password,
+                    level_name_en, level_name_zh
+                )
             
-            if st.button(t("register"), use_container_width=True, key="register_button"):
-                # Validate inputs
-                if not display_name or not email or not password or not confirm_password:
-                    st.error(t("fill_all_fields"))
-                elif password != confirm_password:
-                    st.error(t("passwords_mismatch"))
-                else:
-                    # Register user with multilingual support
-                    result = self.auth_manager.register_user(
-                        email=email,
-                        password=password,                        
-                        display_name_en=display_name_en,
-                        display_name_zh=display_name_zh,                        
-                        level_name_en=level_name_en,
-                        level_name_zh=level_name_zh
-                    )
-                    
-                    # Handle registration result
-                    if result.get("success", False):
-                        # Set authenticated state
-                        st.session_state.auth["is_authenticated"] = True
-                        st.session_state.auth["user_id"] = result.get("user_id")
-                        st.session_state.auth["user_info"] = {
-                            "display_name": result.get("display_name"),
-                            "display_name_en": result.get("display_name_en"),
-                            "display_name_zh": result.get("display_name_zh"),
-                            "email": result.get("email"),
-                            "level": result.get("level", "basic"),
-                            "level_name_en": result.get("level_name_en"),
-                            "level_name_zh": result.get("level_name_zh"),
-                            "tutorial_completed": False  # New users haven't completed tutorial
-                        }                     
-                        st.success(t("registration_success"))
-                        
-                        # Force UI refresh
-                        st.rerun()
-                    else:
-                        st.error(f"{t('registration_failed')}: {result.get('error', t('email_in_use'))}")
             st.markdown('</div>', unsafe_allow_html=True)
-        # Close main container
-        st.markdown('</div>', unsafe_allow_html=True)
+
+    def _render_demo_section(self):
+        """Render enhanced demo section."""
+        st.markdown("---")
+        st.markdown(f"""
+        <div class="demo-section-enhanced">
+            <div class="demo-header">
+                <h3>🚀 {t('try_demo_mode')}</h3>
+                <p>{t('explore_features_without_account')}</p>
+            </div>
+            <div class="demo-features">
+                <div class="demo-feature">
+                    <span class="demo-icon">⚡</span>
+                    <span>{t('instant_access')}</span>
+                </div>
+                <div class="demo-feature">
+                    <span class="demo-icon">🎮</span>
+                    <span>{t('full_functionality')}</span>
+                </div>
+                <div class="demo-feature">
+                    <span class="demo-icon">🔒</span>
+                    <span>{t('no_registration_required')}</span>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         
-        return st.session_state.auth["is_authenticated"]
-     
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button(
+                f"🎯 {t('continue_demo')}",
+                use_container_width=True,
+                key="demo_mode_button",
+                help=t('demo_mode_help')
+            ):
+                st.session_state.auth["is_authenticated"] = True
+                st.session_state.auth["user_id"] = "demo_user"
+                st.session_state.auth["user_info"] = {
+                    "display_name_en": "Demo User",
+                    "display_name_zh": "演示用戶",
+                    "email": "demo@example.com",
+                    "level_name_en": "Basic",
+                    "level_name_zh": "基礎",
+                    "reviews_completed": 0,
+                    "score": 0,
+                    "is_demo": True
+                }
+                st.success(t("demo_mode_activated"))
+                st.rerun()
+
+    def _handle_login(self, email: str, password: str):
+        """Handle enhanced login with better validation and feedback."""
+        if not email or not password:
+            st.error(f"❌ {t('fill_all_fields')}")
+            return
+        
+        # Email validation
+        if not self._validate_email(email):
+            st.error(f"❌ {t('invalid_email_format')}")
+            return
+        
+        with st.spinner(f"🔄 {t('authenticating')}..."):
+            result = self.auth_manager.authenticate_user(email, password)
+            
+            if result.get("success", False):
+                # Set authenticated state
+                st.session_state.auth["is_authenticated"] = True
+                st.session_state.auth["user_id"] = result.get("user_id")
+                st.session_state.auth["user_info"] = {
+                    "display_name_en": result.get("display_name_en"),
+                    "display_name_zh": result.get("display_name_zh"),
+                    "email": result.get("email"),
+                    "level_name_en": result.get("level_name_en"),
+                    "level_name_zh": result.get("level_name_zh"),
+                    "reviews_completed": result.get("reviews_completed", 0),
+                    "score": result.get("score", 0),
+                    "is_demo": False
+                }
+                
+                st.success(f"✅ {t('login_success')}")
+                time.sleep(1)  # Brief pause for user feedback
+                st.rerun()
+            else:
+                st.error(f"❌ {t('login_failed')}: {result.get('error', t('invalid_credentials'))}")
+
+    def _handle_registration(self, display_name: str, display_name_en: str, display_name_zh: str,
+                           email: str, password: str, confirm_password: str,
+                           level_name_en: str, level_name_zh: str):
+        """Handle enhanced registration with comprehensive validation."""
+        # Comprehensive validation
+        validation_errors = []
+        
+        if not display_name or not email or not password or not confirm_password:
+            validation_errors.append(t('fill_all_fields'))
+        
+        if not self._validate_email(email):
+            validation_errors.append(t('invalid_email_format'))
+        
+        if len(password) < 6:
+            validation_errors.append(t('password_too_short'))
+        
+        if password != confirm_password:
+            validation_errors.append(t('passwords_mismatch'))
+        
+        if len(display_name.strip()) < 2:
+            validation_errors.append(t('display_name_too_short'))
+        
+        if validation_errors:
+            for error in validation_errors:
+                st.error(f"❌ {error}")
+            return
+        
+        with st.spinner(f"🔄 {t('creating_account')}..."):
+            result = self.auth_manager.register_user(
+                email=email,
+                password=password,
+                display_name_en=display_name_en,
+                display_name_zh=display_name_zh,
+                level_name_en=level_name_en,
+                level_name_zh=level_name_zh
+            )
+            
+            if result.get("success", False):
+                # Set authenticated state
+                st.session_state.auth["is_authenticated"] = True
+                st.session_state.auth["user_id"] = result.get("user_id")
+                st.session_state.auth["user_info"] = {
+                    "display_name_en": result.get("display_name_en"),
+                    "display_name_zh": result.get("display_name_zh"),
+                    "email": result.get("email"),
+                    "level_name_en": result.get("level_name_en"),
+                    "level_name_zh": result.get("level_name_zh"),
+                    "reviews_completed": 0,
+                    "score": 0,
+                    "tutorial_completed": False,
+                    "is_demo": False
+                }
+                
+                st.success(f"🎉 {t('registration_success')}")
+                st.balloons()  # Celebration effect
+                time.sleep(2)  # Longer pause for celebration
+                st.rerun()
+            else:
+                st.error(f"❌ {t('registration_failed')}: {result.get('error', t('email_in_use'))}")
+
+    def _validate_email(self, email: str) -> bool:
+        """Validate email format."""
+        import re
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        return re.match(pattern, email) is not None
+
+    def _get_level_names_for_both_languages(self, level: str) -> tuple:
+        """Get level names for both English and Chinese."""
+        current_lang = get_current_language()
+        
+        # Get English level name
+        set_language("en")
+        level_name_en = t(level)
+        
+        # Get Chinese level name
+        set_language("zh")
+        level_name_zh = t(level)
+        
+        # Restore original language
+        set_language(current_lang)
+        
+        return level_name_en, level_name_zh
+
     def logout(self):
         """Handle user logout by clearing authentication state and triggering full reset."""
         logger.debug("User logout initiated")
