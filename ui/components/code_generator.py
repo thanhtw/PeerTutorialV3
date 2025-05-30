@@ -150,12 +150,6 @@ class CodeGeneratorUI:
 
     def _render_advanced_error_selection(self):
         """Render the advanced error selection interface with all categories and errors loaded."""
-        st.markdown(f"""
-        <div class="error-selection-section">
-            <h4>🎯 {t('select_specific_errors')}</h4>
-            <p>Choose which specific errors to include in the generated code from all available categories</p>
-        </div>
-        """, unsafe_allow_html=True)
         
         # Initialize selected specific errors
         if "selected_specific_errors" not in st.session_state:
@@ -172,17 +166,30 @@ class CodeGeneratorUI:
         # Track current selected errors
         current_selected = []
         
+        # Difficulty order for sorting
+        difficulty_order = {"easy": 1, "medium": 2, "hard": 3}
+
         # Display all categories and their errors
         for category in all_categories:
-            with st.expander(f"📁 {category}", expanded=True):
+            icon = self._get_category_icon(category)
+            with st.expander(f"{icon} {category}", expanded=True):
                 errors = self._load_errors_by_category(category)
                 
                 if not errors:
                     st.warning(f"No errors found for category: {category}")
                     continue
+
+                # Sort errors by difficulty_level (easy, medium, hard)
+                errors_sorted = sorted(
+                    errors,
+                    key=lambda x: (
+                        difficulty_order.get(x.get('difficulty_level', 'medium'), 2),
+                        x.get(t("error_name"), x.get("name", ""))
+                    )
+                )
                 
                 # Create columns for error selection
-                for i, error in enumerate(errors):
+                for i, error in enumerate(errors_sorted):
                     error_name = error.get(t("error_name"), error.get("name", "Unknown"))
                     description = error.get(t("description"), "")
                     difficulty = error.get("difficulty_level", "medium")
@@ -241,7 +248,15 @@ class CodeGeneratorUI:
                 all_selected = []
                 for category in all_categories:
                     errors = self._load_errors_by_category(category)
-                    for error in errors:
+                    # Sort errors by difficulty_level for consistency
+                    errors_sorted = sorted(
+                        errors,
+                        key=lambda x: (
+                            difficulty_order.get(x.get('difficulty_level', 'medium'), 2),
+                            x.get(t("error_name"), x.get("name", ""))
+                        )
+                    )
+                    for error in errors_sorted:
                         error_with_metadata = error.copy()
                         error_with_metadata["category"] = category
                         error_with_metadata[t("category")] = category
@@ -337,14 +352,6 @@ class CodeGeneratorUI:
 
     def _render_category_selection(self):
         """Render the category selection interface with professional styling."""
-        st.markdown(f"""
-        <div class="category-selection-enhanced">
-            <div class="selection-header">
-                <h4>🎯 {t('select_error_categories')}</h4>
-                <p>{t('choose_error_types')}</p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
         
         # Load error categories
         categories_dict = self._get_error_categories()
