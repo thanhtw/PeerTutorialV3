@@ -248,17 +248,49 @@ class CodeGeneratorUI:
         """, unsafe_allow_html=True)
         
         # Load error categories
-        categories = self._get_error_categories()      
+        categories_dict = self._get_error_categories()
+        
         # Initialize selected categories
         if "selected_categories" not in st.session_state:
             st.session_state.selected_categories = []
         
-        # Category grid
-        self._render_category_grid(categories)
+        # Extract the java_errors list and pass it to the grid
+        java_categories = categories_dict.get("java_errors", [])
+        if java_categories:
+            self._render_category_grid(java_categories)
+        else:
+            st.warning("No categories available")
         
         # Selected categories display
         self._render_selected_categories()
 
+
+    def _get_category_icon(self, category_name: str) -> str:
+        """Get icon for category based on name."""
+        icon_mapping = {
+            "syntax_errors": "🔤",
+            "logic_errors": "🧠", 
+            "runtime_errors": "⚡",
+            "null_pointer": "🚫",
+            "array_errors": "📊",
+            "loop_errors": "🔄",
+            "condition_errors": "❓",
+            "method_errors": "🔧",
+            "class_errors": "🏗️",
+            "variable_errors": "📝"
+        }
+        return icon_mapping.get(category_name.lower(), "🐛")
+
+    def _toggle_category(self, category_name: str):
+        """Toggle category selection."""
+        if "selected_categories" not in st.session_state:
+            st.session_state.selected_categories = []
+        
+        if category_name in st.session_state.selected_categories:
+            st.session_state.selected_categories.remove(category_name)
+        else:
+            st.session_state.selected_categories.append(category_name)
+            
     def _render_selected_categories(self):
         """Render the selected categories display."""
         selected = st.session_state.get("selected_categories", [])
@@ -292,17 +324,16 @@ class CodeGeneratorUI:
             </div>
             """, unsafe_allow_html=True)
 
-    def _render_category_grid(self, categories: List[Dict]):
+    def _render_category_grid(self, categories: List[str]):
         """Render categories in a professional grid layout."""
         st.markdown('<div class="problem-area-grid-enhanced">', unsafe_allow_html=True)
         
-        for category in categories:
-            print("******", category)
-            category_name = category.get("category_name", "Unknown")
-            description = category.get("description", "No description available")
+        for category_name in categories:
+            # category is now a string, not a dictionary
+            description = f"Practice with {category_name} related errors"
             icon = self._get_category_icon(category_name)
             
-            is_selected = category_name in st.session_state.selected_categories
+            is_selected = category_name in st.session_state.get("selected_categories", [])
             selected_class = "selected" if is_selected else ""
             
             if st.button(
