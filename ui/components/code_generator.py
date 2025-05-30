@@ -127,9 +127,9 @@ class CodeGeneratorUI:
         with mode_tabs[0]:  # Random Mode Tab
             st.session_state.error_selection_mode = "random"
             
-            st.markdown("""
+            st.markdown(f"""
             <div class="mode-description">
-                <p>🎲 <strong>Random Mode</strong>: System will automatically select appropriate errors based on your level and chosen categories.</p>
+                <p>🎲 {t('random_mode_description')}</p>
             </div>
             """, unsafe_allow_html=True)
             
@@ -139,9 +139,9 @@ class CodeGeneratorUI:
         with mode_tabs[1]:  # Advanced Mode Tab
             st.session_state.error_selection_mode = "advanced"
             
-            st.markdown("""
+            st.markdown(f"""
             <div class="mode-description">
-                <p>🎯 <strong>Advanced Mode</strong>: Choose specific error categories and individual errors to include in the generated code.</p>
+                <p>🎯 {t('advanced_mode_help')}</p>
             </div>
             """, unsafe_allow_html=True)
             
@@ -194,6 +194,13 @@ class CodeGeneratorUI:
                     description = error.get(t("description"), "")
                     difficulty = error.get("difficulty_level", "medium")
                     
+                    # Map internal difficulty to localized label
+                    difficulty_label = {
+                        "easy": t("easy"),
+                        "medium": t("medium"),
+                        "hard": t("hard")
+                    }.get(difficulty, difficulty)
+                    
                     # Create unique key for this error
                     error_key = f"{category}_{error_name}"
                     
@@ -221,9 +228,13 @@ class CodeGeneratorUI:
                             current_selected.append(error_with_metadata)
                     
                     with col2:
-                        # Show difficulty badge
-                        difficulty_colors = {"easy": "🟢", "medium": "🟡", "hard": "🔴"}
-                        st.write(f"{difficulty_colors.get(difficulty, '⚪')} {difficulty}")
+                        # Show difficulty badge with localized label
+                        difficulty_colors = {
+                            "easy": "🟢", t("easy"): "🟢",
+                            "medium": "🟡", t("medium"): "🟡",
+                            "hard": "🔴", t("hard"): "🔴"
+                        }
+                        st.write(f"{difficulty_colors.get(difficulty_label, '⚪')} {difficulty_label}")
         
         # Update session state with currently selected errors
         st.session_state.selected_specific_errors = current_selected
@@ -484,7 +495,7 @@ class CodeGeneratorUI:
             
             with col1:
                 if st.button(
-                    f"🎯 {t('select')} All",
+                    f"🎯 {t('select')} {t('all')}",
                     key=f"select_all_categories_{st.session_state.error_selection_mode}",
                     help="Select all available categories",
                     use_container_width=True,
@@ -495,7 +506,7 @@ class CodeGeneratorUI:
             
             with col2:
                 if st.button(
-                    f"🗑️ Clear All",
+                    f"🗑️ {t('clear_all')}",
                     key=f"clear_all_categories_{st.session_state.error_selection_mode}", 
                     help="Remove all selected categories",
                     use_container_width=True,

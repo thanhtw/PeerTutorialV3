@@ -570,6 +570,15 @@
     "deselect": "Deselect",
     "quick_actions": "Quick Actions",
     "categories_selected": "categories selected",
-    "please_select_at_least_one_error_category": "Please select at least one error category to proceed with code generation"
+    "please_select_at_least_one_error_category": "Please select at least one error category to proceed with code generation",
+    "domain": "Domain",
+    "selected_errors": "Selected Errors",
+    "generating_java_code_with_provider": "Generating Java code with provider: {provider}",
+    "generating_java_code_with_groq": "Generating Java code with Groq model: {model}",
+    "generating_java_code_with_llm": "Generating Java code with LLM (length={length}, difficulty={difficulty}, domain={domain})",
+    "llm_response_type": "LLM response type: {type}",
+    "error_generating_code_with_llm": "Error generating code with LLM: {error}",
+    "clear_all": "Clear All",
+    "all": "ALL"
   }
 }

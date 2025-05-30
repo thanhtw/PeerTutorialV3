@@ -338,6 +338,17 @@
     "deselect": "取消選擇",
     "categories_selected": "個類別已選擇",
     "quick_actions": "快速操作",
-    "please_select_at_least_one_error_category": "請選擇至少一個錯誤類別以繼續生成程式碼"
+    "please_select_at_least_one_error_category": "請選擇至少一個錯誤類別以繼續生成程式碼",
+    "domain": "領域",
+    "selected_errors": "已選錯誤",
+    "difficulty_level": "難度等級",
+    "provider": "提供者",
+    "generating_java_code_with_provider": "使用提供者生成Java程式碼: {provider}",
+    "generating_java_code_with_groq": "使用Groq模型生成Java程式碼: {model}",
+    "generating_java_code_with_llm": "使用LLM生成Java程式碼（長度={length}, 難度={difficulty}, 領域={domain}）",
+    "llm_response_type": "LLM回應類型: {type}",
+    "error_generating_code_with_llm": "使用LLM生成程式碼時發生錯誤: {error}",
+    "clear_all": "全部清除",
+    "all": "全部"
   }
 }
