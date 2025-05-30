@@ -26,7 +26,7 @@ class ErrorExplorerUI:
         error_list: List[Dict[str, str]] = self.manager.get_all_error_codes_and_titles()
 
         if not error_list:
-            st.sidebar.warning("No errors found in the library.")
+            st.sidebar.warning(f"{t('no_errors_found_in_library')}")
             st.session_state.selected_error_code = None
             return None
 
@@ -246,7 +246,7 @@ class ErrorExplorerUI:
         filtered_errors = self._apply_filters()
         
         if not filtered_errors:
-            st.warning(t("no_errors_found"))
+            st.warning(t("no_errors_found_in_library"))
             return None
         
         # Create selection list

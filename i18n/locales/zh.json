@@ -349,6 +349,8 @@
     "llm_response_type": "LLM回應類型: {type}",
     "error_generating_code_with_llm": "使用LLM生成程式碼時發生錯誤: {error}",
     "clear_all": "全部清除",
-    "all": "全部"
+    "all": "全部",
+    "no_leaderboard_data": "沒有排行榜資料",
+    "no_errors_found_in_library": "資料庫中未找到錯誤。"
   }
 }

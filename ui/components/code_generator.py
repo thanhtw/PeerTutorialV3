@@ -312,10 +312,26 @@ class CodeGeneratorUI:
 
     def _render_parameters_display(self, user_level: str):
         """Render the parameters display with visual cards."""
-        
-        # Parameter mapping based on user level
-        params = self._get_level_parameters(user_level)
-        
+
+        # Always use the canonical user_level key for lookup
+        user_level_key = user_level.lower()
+        if user_level_key not in ["basic", "medium", "senior"]:
+            user_level_key = "medium"
+        params = self._get_level_parameters(user_level_key)
+
+        # Localize code_length and difficulty values
+        code_length_localized = {
+            "short": t("short"),
+            "medium": t("medium"),
+            "long": t("long")
+        }.get(params['code_length'], params['code_length'])
+
+        difficulty_localized = {
+            "easy": t("easy"),
+            "medium": t("medium"),
+            "hard": t("hard")
+        }.get(params['difficulty'], params['difficulty'])
+
         # Display parameters in a grid
         cols = st.columns(4)
         
@@ -324,7 +340,7 @@ class CodeGeneratorUI:
             <div class="parameter-card">
                 <span class="parameter-icon">📏</span>
                 <div class="parameter-label">{t('code_length')}</div>
-                <div class="parameter-value">{params['code_length'].title()}</div>
+                <div class="parameter-value">{code_length_localized}</div>
             </div>
             """, unsafe_allow_html=True)
         
@@ -333,7 +349,7 @@ class CodeGeneratorUI:
             <div class="parameter-card">
                 <span class="parameter-icon">⭐</span>
                 <div class="parameter-label">{t('difficulty')}</div>
-                <div class="parameter-value">{params['difficulty'].title()}</div>
+                <div class="parameter-value">{difficulty_localized}</div>
             </div>
             """, unsafe_allow_html=True)
         
@@ -351,7 +367,7 @@ class CodeGeneratorUI:
             <div class="parameter-card">
                 <span class="parameter-icon">👤</span>
                 <div class="parameter-label">{t('your_level')}</div>
-                <div class="parameter-value">{user_level.title()}</div>
+                <div class="parameter-value">{t(user_level_key)}</div>
             </div>
             """, unsafe_allow_html=True)
 

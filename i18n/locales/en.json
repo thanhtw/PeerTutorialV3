@@ -579,6 +579,8 @@
     "llm_response_type": "LLM response type: {type}",
     "error_generating_code_with_llm": "Error generating code with LLM: {error}",
     "clear_all": "Clear All",
-    "all": "ALL"
+    "all": "ALL",
+    "no_leaderboard_data": "No leaderboard data available",
+    "no_errors_found_in_library": "No errors found in the library."
   }
 }

@@ -39,7 +39,7 @@ class ProfileLeaderboardSidebar:
             if leaders:
                 self._render_leaderboard_section(leaders, user_id)
             else:
-                st.info("No leaderboard data available")
+                st.info(f"{t('no_leaderboard_data')}")
                 
         except Exception as e:
             logger.error(f"Error rendering enhanced sidebar: {str(e)}")
