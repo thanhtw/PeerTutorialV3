@@ -116,9 +116,10 @@ class DatabaseErrorRepository:
         try:
             self.current_language = get_current_language()
             name_field = self._get_language_fields('name')
+            description_field = self._get_language_fields('description')
             
             query = f"""
-            SELECT category_code, {name_field} as name
+            SELECT category_code, {name_field} as name, {description_field} as description
             FROM error_categories 
             WHERE is_active = TRUE
             ORDER BY sort_order
@@ -128,15 +129,17 @@ class DatabaseErrorRepository:
             
             if categories:
                 category_names = [cat['name'] for cat in categories]
-                return {"java_errors": category_names}
+                categories_descriptions = [cat['description'] for cat in categories]
+                logger.debug(f"Found {len(category_names)} categories in database")
+                return {"java_errors": category_names, "descriptions": categories_descriptions}
             else:
                 logger.warning("No categories found in database")
-                return {"java_errors": []}
-                
+                return {"java_errors": [], "descriptions": []}
+
         except Exception as e:
             logger.error(f"Error getting categories: {str(e)}")
-            return {"java_errors": []}
-    
+            return {"java_errors": [], "descriptions": []}
+
     def get_category_errors(self, category_name: str) -> List[Dict[str, str]]:
         """
         Get errors for a specific category.

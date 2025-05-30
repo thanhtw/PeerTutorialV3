@@ -434,7 +434,6 @@ class AuthUI:
                     "level_name_zh": result.get("level_name_zh"),
                     "reviews_completed": 0,
                     "score": 0,
-                    "tutorial_completed": False,
                     "is_demo": False
                 }
                 
@@ -576,65 +575,7 @@ class AuthUI:
             # Fallback to session state
             return st.session_state.auth.get("user_info", {}).get("level", "basic")
     
-    def has_completed_tutorial(self) -> bool:
-        """
-        Check if the user has completed the tutorial.
-        
-        Returns:
-            bool: True if user has completed tutorial, False otherwise
-        """
-        if not self.is_authenticated():
-            return False
-            
-        # First check session state
-        user_info = st.session_state.auth.get("user_info", {})
-        tutorial_completed = user_info.get("tutorial_completed", False)
-        
-        # If not completed in session, check database
-        if not tutorial_completed:
-            user_id = st.session_state.auth.get("user_id")
-            if user_id:
-                try:
-                    profile = self.auth_manager.get_user_profile(user_id)
-                    if profile.get("success", False):
-                        tutorial_completed = profile.get("tutorial_completed", False)
-                        # Update session state
-                        st.session_state.auth["user_info"]["tutorial_completed"] = tutorial_completed
-                except Exception as e:
-                    logger.error(f"Error checking tutorial completion status: {str(e)}")
-        
-        return tutorial_completed
     
-    def mark_tutorial_completed(self) -> bool:
-        """
-        Mark the tutorial as completed for the current user.
-        
-        Returns:
-            bool: True if successfully updated, False otherwise
-        """
-        if not self.is_authenticated():
-            return False
-            
-        user_id = st.session_state.auth.get("user_id")
-        if not user_id:
-            return False
-            
-        try:
-            # Update database
-            result = self.auth_manager.update_tutorial_completion(user_id, True)
-            
-            if result.get("success", False):
-                # Update session state
-                st.session_state.auth["user_info"]["tutorial_completed"] = True
-                logger.debug(f"Marked tutorial as completed for user {user_id}")
-                return True
-            else:
-                logger.error(f"Failed to update tutorial completion: {result.get('error', 'Unknown error')}")
-                return False
-                
-        except Exception as e:
-            logger.error(f"Error marking tutorial as completed: {str(e)}")
-            return False
         
     def render_combined_profile_leaderboard(self):
         """Render enhanced combined profile and leaderboard in sidebar with better error handling."""

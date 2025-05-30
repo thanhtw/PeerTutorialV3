@@ -52,47 +52,6 @@ class MySQLAuthManager:
         return hashlib.sha256(password.encode()).hexdigest()
     
 
-    def update_tutorial_completion(self, user_id: str, completed: bool) -> Dict[str, Any]:
-        """
-        Update the tutorial completion status for a user.
-        
-        Args:
-            user_id: User ID
-            completed: True if tutorial is completed, False otherwise
-            
-        Returns:
-            Dictionary with success status and any error messages
-        """
-        try:
-            # Update tutorial completion status
-            update_query = """
-            UPDATE users 
-            SET tutorial_completed = %s 
-            WHERE uid = %s
-            """
-            
-            affected_rows = self.db.execute_query(update_query, (completed, user_id))
-            
-            if affected_rows is not None and affected_rows > 0:
-                logger.debug(f"Updated tutorial completion status for user {user_id} to {completed}")
-                return {
-                    "success": True,
-                    "tutorial_completed": completed
-                }
-            else:
-                logger.warning(f"No rows affected when updating tutorial completion for user {user_id}")
-                return {
-                    "success": False,
-                    "error": "Failed to update tutorial completion status"
-                }
-                
-        except Exception as e:
-            logger.error(f"Error updating tutorial completion for user {user_id}: {str(e)}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
-
     def register_user(self, email: str, password: str, display_name_en: str = None, display_name_zh: str = None,
                  level_name_en: str = None, 
                  level_name_zh: str = None) -> Dict[str, Any]:
@@ -241,7 +200,7 @@ class MySQLAuthManager:
             query = """
             SELECT uid, email, display_name_en, display_name_zh, 
                 level_name_en, level_name_zh,
-                reviews_completed, score, tutorial_completed,
+                reviews_completed, score,
                 created_at, last_activity, consecutive_days, total_points
             FROM users 
             WHERE uid = %s
@@ -259,8 +218,7 @@ class MySQLAuthManager:
                     "level_name_en": user_data["level_name_en"],
                     "level_name_zh": user_data["level_name_zh"],                   
                     "reviews_completed": user_data["reviews_completed"],
-                    "score": user_data["score"],
-                    "tutorial_completed": user_data["tutorial_completed"],
+                    "score": user_data["score"],                    
                     "created_at": user_data["created_at"],
                     "last_activity": user_data["last_activity"],
                     "consecutive_days": user_data["consecutive_days"],

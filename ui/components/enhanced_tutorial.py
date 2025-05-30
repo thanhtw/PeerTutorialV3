@@ -323,64 +323,6 @@ class EnhancedTutorialUI:
             else:
                 st.warning(t("please_complete_review"))
     
-    def _render_completion_step(self, user_id: str, content: Dict[str, Any], on_complete: Callable):
-        """Render tutorial completion step."""
-        
-        st.balloons()
-        
-        st.markdown(f"""
-        <div class="completion-celebration">
-            <h2>🎉 {t('congratulations')}</h2>
-            <p>{t('tutorial_completed_message')}</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Show completion stats
-        progress = self.tutorial_system.get_tutorial_progress(user_id)
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric(t("steps_completed"), len(progress.get("completed_steps", [])))
-        with col2:
-            st.metric(t("total_attempts"), progress.get("attempts_count", 0))
-        with col3:
-            # Calculate time spent
-            start_time = progress.get("started_at")
-            if start_time:
-                time_diff = (time.time() - start_time.timestamp()) / 60
-                st.metric(t("time_spent"), f"{time_diff:.0f} {t('minutes')}")
-        
-        # Show what was learned
-        st.markdown(f"### {t('what_you_learned')}")
-        achievements = [
-            t("learned_error_types"),
-            t("practiced_pattern_recognition"),
-            t("completed_guided_reviews"),
-            t("earned_tutorial_badge")
-        ]
-        
-        for achievement in achievements:
-            st.markdown(f"✅ {achievement}")
-        
-        # Complete tutorial button
-        if st.button(t("start_practicing"), type="primary", size="large"):
-            # Mark tutorial as completed
-            self.tutorial_system.complete_tutorial_step(user_id, 8)
-            
-            # Start learning session
-            session_id = self.progress_manager.start_learning_session(user_id, "tutorial")
-            if session_id:
-                self.progress_manager.end_learning_session(
-                    session_id, 
-                    activities_completed=8, 
-                    performance_score=100.0,
-                    session_data={"tutorial_completed": True}
-                )
-            
-            st.session_state.tutorial_completed = True
-            if on_complete:
-                on_complete()
-            st.rerun()
     
     def _render_step_navigation(self, user_id: str, navigation: Dict[str, Any], step_config: Dict[str, Any]):
         """Render step navigation controls."""

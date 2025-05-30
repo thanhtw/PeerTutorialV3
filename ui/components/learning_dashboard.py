@@ -555,20 +555,8 @@ class LearningDashboardUI:
         for feature, description in features:
             st.markdown(f"**{feature}:** {description}")
         
-        st.info(t("start_tutorial_to_begin_journey"))
-        
-        # Add tutorial start button
-        if st.button(t("start_tutorial"), key="start_tutorial_button", type="primary"):
-            self._start_tutorial()
-    
-    def _start_tutorial(self):
-        """Handle starting the tutorial."""
-        # Mark that tutorial should be shown
-        st.session_state.tutorial_completed = False
-        st.session_state.show_tutorial = True
-        
-        # Switch to the main app view
-        st.rerun()
+      
+   
     
     def _handle_recommendation_action(self, recommendation: Dict[str, Any]):
         """Handle recommendation action button click."""
