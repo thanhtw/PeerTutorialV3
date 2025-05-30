@@ -126,14 +126,7 @@ class CodeGeneratorUI:
 
     def _render_mode_selection(self):
         """Render the error selection mode with professional styling."""
-        st.markdown(f"""
-        <div class="mode-selector-container">
-            <div class="mode-selector-header">
-                <h4>{t('error_selection_mode')}</h4>
-                <p>{t('choose_error_selection_method')}</p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        
         
         # Mode selection with custom styling
         col1, col2 = st.columns(2)
@@ -159,13 +152,6 @@ class CodeGeneratorUI:
 
     def _render_parameters_display(self, user_level: str):
         """Render the parameters display with visual cards."""
-        st.markdown(f"""
-        <div class="parameters-display">
-            <div class="parameters-header">
-                <h4>📊 {t('generation_parameters')}</h4>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
         
         # Parameter mapping based on user level
         params = self._get_level_parameters(user_level)
@@ -233,15 +219,6 @@ class CodeGeneratorUI:
         </div>
         """, unsafe_allow_html=True)
         
-        # Help section
-        st.markdown(f"""
-        <div class="selection-help">
-            <span class="selection-help-icon">💡</span>
-            <strong>{t('select_categories_tip')}</strong>
-            <br>
-        </div>
-        """, unsafe_allow_html=True)
-        
         # Load error categories
         categories_dict = self._get_error_categories()
         
@@ -256,8 +233,6 @@ class CodeGeneratorUI:
         else:
             st.warning(t("no_categories_available"))
         
-        # Selected categories display
-        #self._render_selected_categories()
 
     def _get_category_icon(self, category_name: str) -> str:
         """Get icon for category based on name (language-aware)."""
@@ -432,7 +407,7 @@ class CodeGeneratorUI:
             """, unsafe_allow_html=True)
 
     def _render_category_grid(self, categories: List[str]):
-        """Render categories in a compact three-column layout for better space utilization."""
+        """Render categories in a compact three-column layout with parameter card styling."""
         selected = st.session_state.get("selected_categories", [])
         
         # Three-column grid for better space utilization
@@ -448,36 +423,32 @@ class CodeGeneratorUI:
             current_col = cols[i % 3]
             
             with current_col:
-                # Compact card similar to parameter cards
+                # Parameter card style with selection state
                 selected_class = "selected" if is_selected else ""
+                selection_indicator = f"✓ {t('selected')}" if is_selected else f"{t('click_to_select')}"
+
                 st.markdown(f"""
-                <div class="parameter-card category-card {selected_class}">
-                    <span class="parameter-icon category-icon">{icon}</span>
-                    <div class="parameter-label category-title">{category_name}</div>
-                    <div class="parameter-value category-status">
-                        {'✓ ' + t('selected') if is_selected else t('click_to_select')}
-                    </div>
-                </div>
+                <div class="parameter-card category-card {selected_class}" style="{
+                    'border: 2px solid #28a745; background: rgba(40, 167, 69, 0.1);' if is_selected 
+                    else 'border: 1px solid #dee2e6; background: #f8f9fa;'
+                }">
+                    <span class="parameter-icon">{icon}</span>
+                    <div class="parameter-label">{category_name}</div>
                 """, unsafe_allow_html=True)
                 
-                # Compact button
-                button_type = "primary" if is_selected else "secondary"
-                button_label = f"{'✓ ' if is_selected else '+ '}{category_name}"
-                
+                # Hidden button for interaction (maintains functionality)
                 if st.button(
-                    button_label,
-                    key=f"category_btn_{category_name}",
+                    selection_indicator,  # Empty label for hidden appearance
+                    key=f"category_card_{category_name}",
                     help=description,
-                    use_container_width=True,
-                    type=button_type
+                    use_container_width=True
                 ):
                     self._toggle_category(category_name)
                     st.rerun()
         
         # Compact quick actions optimized for 3-column layout
         if categories and len(categories) > 1:
-            st.markdown("---")
-            col1, col2, col3 = st.columns(3)
+            col1, col2 = st.columns(2)
             
             with col1:
                 if st.button(
@@ -501,20 +472,7 @@ class CodeGeneratorUI:
                     st.session_state.selected_categories = []
                     st.rerun()
             
-            with col3:
-                # Status indicator in the third column
-                if selected:
-                    st.markdown(f"""
-                    <div style="text-align: center; padding: 8px; background: rgba(40, 167, 69, 0.1); border-radius: 4px; color: #28a745; font-weight: 600;">
-                        ✅ Ready to Generate
-                    </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.markdown(f"""
-                    <div style="text-align: center; padding: 8px; background: rgba(108, 117, 125, 0.1); border-radius: 4px; color: #6c757d; font-style: italic;">
-                        Select categories above
-                    </div>
-                    """, unsafe_allow_html=True)
+            
 
     def _can_generate(self) -> bool:
         """Check if we can generate code."""
