@@ -145,13 +145,121 @@ class CodeGeneratorUI:
             </div>
             """, unsafe_allow_html=True)
             
-            # Category selection for advanced mode
-            self._render_category_selection()
-            
-            # Specific error selection (only in advanced mode)
-            selected_categories = st.session_state.get("selected_categories", [])
-            if selected_categories:
-                self._render_specific_error_selection()
+            # Load all categories and their errors for advanced mode
+            self._render_advanced_error_selection()
+
+    def _render_advanced_error_selection(self):
+        """Render the advanced error selection interface with all categories and errors loaded."""
+        st.markdown(f"""
+        <div class="error-selection-section">
+            <h4>🎯 {t('select_specific_errors')}</h4>
+            <p>Choose which specific errors to include in the generated code from all available categories</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Initialize selected specific errors
+        if "selected_specific_errors" not in st.session_state:
+            st.session_state.selected_specific_errors = []
+        
+        # Load all categories from database
+        categories_dict = self._get_error_categories()
+        all_categories = categories_dict.get("java_errors", [])
+        
+        if not all_categories:
+            st.warning("No categories available in the database")
+            return
+        
+        # Track current selected errors
+        current_selected = []
+        
+        # Display all categories and their errors
+        for category in all_categories:
+            with st.expander(f"📁 {category}", expanded=True):
+                errors = self._load_errors_by_category(category)
+                
+                if not errors:
+                    st.warning(f"No errors found for category: {category}")
+                    continue
+                
+                # Create columns for error selection
+                for i, error in enumerate(errors):
+                    error_name = error.get(t("error_name"), error.get("name", "Unknown"))
+                    description = error.get(t("description"), "")
+                    difficulty = error.get("difficulty_level", "medium")
+                    
+                    # Create unique key for this error
+                    error_key = f"{category}_{error_name}"
+                    
+                    # Check if this error was previously selected
+                    was_selected = any(
+                        e.get("category") == category and e.get(t("error_name")) == error_name 
+                        for e in st.session_state.selected_specific_errors
+                    )
+                    
+                    col1, col2 = st.columns([4, 1])
+                    
+                    with col1:
+                        is_selected = st.checkbox(
+                            f"**{error_name}**",
+                            value=was_selected,
+                            key=f"advanced_error_check_{error_key}",
+                            help=description[:200] + "..." if len(description) > 200 else description
+                        )
+                        
+                        if is_selected:
+                            # Add complete error information
+                            error_with_metadata = error.copy()
+                            error_with_metadata["category"] = category
+                            error_with_metadata[t("category")] = category
+                            current_selected.append(error_with_metadata)
+                    
+                    with col2:
+                        # Show difficulty badge
+                        difficulty_colors = {"easy": "🟢", "medium": "🟡", "hard": "🔴"}
+                        st.write(f"{difficulty_colors.get(difficulty, '⚪')} {difficulty}")
+        
+        # Update session state with currently selected errors
+        st.session_state.selected_specific_errors = current_selected
+        
+        # Show selected count and quick actions
+        col1, col2, col3 = st.columns([2, 1, 1])
+        
+        with col1:
+            if current_selected:
+                st.success(f"✅ {len(current_selected)} errors selected")
+            else:
+                st.warning("⚠️ No specific errors selected")
+        
+        with col2:
+            if st.button(
+                "🎯 Select All",
+                key="select_all_advanced_errors",
+                help="Select all available errors",
+                use_container_width=True
+            ):
+                # Select all errors from all categories
+                all_selected = []
+                for category in all_categories:
+                    errors = self._load_errors_by_category(category)
+                    for error in errors:
+                        error_with_metadata = error.copy()
+                        error_with_metadata["category"] = category
+                        error_with_metadata[t("category")] = category
+                        all_selected.append(error_with_metadata)
+                
+                st.session_state.selected_specific_errors = all_selected
+                st.rerun()
+        
+        with col3:
+            if st.button(
+                "🗑️ Clear All",
+                key="clear_all_advanced_errors",
+                help="Clear all selected errors",
+                use_container_width=True,
+                disabled=len(current_selected) == 0
+            ):
+                st.session_state.selected_specific_errors = []
+                st.rerun()
 
     def _render_generation_section(self):
         """Render the generation button and controls."""
@@ -254,79 +362,10 @@ class CodeGeneratorUI:
 
     def _render_specific_error_selection(self):
         """Render specific error selection for advanced mode."""
-        selected_categories = st.session_state.get("selected_categories", [])
-        
-        if not selected_categories:
-            return
-        
-        st.markdown(f"""
-        <div class="error-selection-section">
-            <h4>🎯 {t('select_specific_errors')}</h4>
-            <p>Choose which specific errors to include in the generated code</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Initialize selected specific errors
-        if "selected_specific_errors" not in st.session_state:
-            st.session_state.selected_specific_errors = []
-        
-        # Track current selected errors
-        current_selected = []
-        
-        for category in selected_categories:
-            with st.expander(f"📁 {category}", expanded=True):
-                errors = self._load_errors_by_category(category)
-                
-                if not errors:
-                    st.warning(f"No errors found for category: {category}")
-                    continue
-                
-                # Create columns for error selection
-                for i, error in enumerate(errors):
-                    error_name = error.get(t("error_name"), error.get("name", "Unknown"))
-                    description = error.get(t("description"), "")
-                    difficulty = error.get("difficulty_level", "medium")
-                    
-                    # Create unique key for this error
-                    error_key = f"{category}_{error_name}"
-                    
-                    # Check if this error was previously selected
-                    was_selected = any(
-                        e.get("category") == category and e.get(t("error_name")) == error_name 
-                        for e in st.session_state.selected_specific_errors
-                    )
-                    
-                    col1, col2 = st.columns([4, 1])
-                    
-                    with col1:
-                        is_selected = st.checkbox(
-                            f"**{error_name}**",
-                            value=was_selected,
-                            key=f"error_check_{error_key}",
-                            help=description[:200] + "..." if len(description) > 200 else description
-                        )
-                        
-                        if is_selected:
-                            # Add complete error information
-                            error_with_metadata = error.copy()
-                            error_with_metadata["category"] = category
-                            error_with_metadata[t("category")] = category
-                            current_selected.append(error_with_metadata)
-                    
-                    with col2:
-                        # Show difficulty badge
-                        difficulty_colors = {"easy": "🟢", "medium": "🟡", "hard": "🔴"}
-                        st.write(f"{difficulty_colors.get(difficulty, '⚪')} {difficulty}")
-        
-        # Update session state with currently selected errors
-        st.session_state.selected_specific_errors = current_selected
-        
-        # Show selected count
-        if current_selected:
-            st.success(f"✅ {len(current_selected)} errors selected")
-        else:
-            st.warning("⚠️ No specific errors selected")
-        
+        # This method is now replaced by _render_advanced_error_selection
+        # Keep for backward compatibility but redirect
+        self._render_advanced_error_selection()
+
     def _get_category_icon(self, category_name: str) -> str:
         """Get icon for category based on name (language-aware)."""
         # Map both English and Chinese category names to icons
