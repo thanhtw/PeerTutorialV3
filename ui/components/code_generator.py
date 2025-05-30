@@ -80,12 +80,12 @@ class CodeGeneratorUI:
         st.markdown('<div class="generate-section">', unsafe_allow_html=True)
         
         # Section header
-        st.markdown("""
+        st.markdown(f"""
         <div class="section-header">
             <span class="section-icon">⚙️</span>
             <div>
-                <h3 class="section-title">Configuration</h3>
-                <p class="section-subtitle">Set up your code generation parameters</p>
+                <h3 class="section-title">{t('configuration')}</h3>
+                <p class="section-subtitle">{t('setup_code_generation_parameters')}</p>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -103,10 +103,10 @@ class CodeGeneratorUI:
 
     def _render_generation_section(self):
         """Render the generation button and controls."""
-        st.markdown("""
+        st.markdown(f"""
         <div class="generate-button-section">
-            <h4>🚀 Ready to Generate</h4>
-            <p>Click below to generate a Java code snippet with your selected configuration</p>
+            <h4>🚀 {t('ready_to_generate')}</h4>
+            <p>{t('click_to_generate_java_code')}</p>
         </div>
         """, unsafe_allow_html=True)
         
@@ -115,16 +115,16 @@ class CodeGeneratorUI:
         
         if can_generate:
             if st.button(
-                "🔧 Generate Code Problem",
+                f"🔧 {t('generate_code_problem')}",
                 key="generate_code_main",
                 type="primary",
                 use_container_width=True
             ):
                 self._handle_code_generation()
         else:
-            st.error("⚠️ Please select at least one error category in Advanced Mode")
+            st.error(f"⚠️ {t('please_select_at_least_one_error_category')}")
             st.button(
-                "🔧 Generate Code Problem",
+                f"🔧 {t('generate_code_problem')}",
                 key="generate_code_disabled",
                 disabled=True,
                 use_container_width=True
@@ -132,11 +132,11 @@ class CodeGeneratorUI:
 
     def _render_mode_selection(self):
         """Render the error selection mode with professional styling."""
-        st.markdown("""
+        st.markdown(f"""
         <div class="mode-selector-container">
             <div class="mode-selector-header">
-                <h4>Error Selection Mode</h4>
-                <p>Choose how you want to select errors for the generated code</p>
+                <h4>{t('error_selection_mode')}</h4>
+                <p>{t('choose_error_selection_method')}</p>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -145,11 +145,11 @@ class CodeGeneratorUI:
         col1, col2 = st.columns(2)
         
         with col1:
-            if st.button("🎲 Random Mode", key="random_mode", use_container_width=True):
+            if st.button(f"🎲 {t('random_mode')}", key="random_mode", use_container_width=True):
                 st.session_state.error_selection_mode = "random"
         
         with col2:
-            if st.button("🎯 Advanced Mode", key="advanced_mode", use_container_width=True):
+            if st.button(f"🎯 {t('advanced_mode')}", key="advanced_mode", use_container_width=True):
                 st.session_state.error_selection_mode = "advanced"
         
         # Initialize mode if not set
@@ -165,10 +165,10 @@ class CodeGeneratorUI:
 
     def _render_parameters_display(self, user_level: str):
         """Render the parameters display with visual cards."""
-        st.markdown("""
+        st.markdown(f"""
         <div class="parameters-display">
             <div class="parameters-header">
-                <h4>📊 Generation Parameters</h4>
+                <h4>📊 {t('generation_parameters')}</h4>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -183,7 +183,7 @@ class CodeGeneratorUI:
             st.markdown(f"""
             <div class="parameter-card">
                 <span class="parameter-icon">📏</span>
-                <div class="parameter-label">Code Length</div>
+                <div class="parameter-label">{t('code_length')}</div>
                 <div class="parameter-value">{params['code_length'].title()}</div>
             </div>
             """, unsafe_allow_html=True)
@@ -192,7 +192,7 @@ class CodeGeneratorUI:
             st.markdown(f"""
             <div class="parameter-card">
                 <span class="parameter-icon">⭐</span>
-                <div class="parameter-label">Difficulty</div>
+                <div class="parameter-label">{t('difficulty')}</div>
                 <div class="parameter-value">{params['difficulty'].title()}</div>
             </div>
             """, unsafe_allow_html=True)
@@ -201,7 +201,7 @@ class CodeGeneratorUI:
             st.markdown(f"""
             <div class="parameter-card">
                 <span class="parameter-icon">🐛</span>
-                <div class="parameter-label">Error Count</div>
+                <div class="parameter-label">{t('error_count')}</div>
                 <div class="parameter-value">{params['error_count']}</div>
             </div>
             """, unsafe_allow_html=True)
@@ -210,14 +210,14 @@ class CodeGeneratorUI:
             st.markdown(f"""
             <div class="parameter-card">
                 <span class="parameter-icon">👤</span>
-                <div class="parameter-label">Your Level</div>
+                <div class="parameter-label">{t('your_level')}</div>
                 <div class="parameter-value">{user_level.title()}</div>
             </div>
             """, unsafe_allow_html=True)
-        
-        st.markdown("""
+
+        st.markdown(f"""
         <div class="parameters-note">
-            💡 These parameters are automatically optimized based on your experience level
+            💡 {t('these_parameters_optimized')}
         </div>
         """, unsafe_allow_html=True)
 
@@ -230,20 +230,21 @@ class CodeGeneratorUI:
 
     def _render_category_selection(self):
         """Render the category selection interface with professional styling."""
-        st.markdown("""
+        st.markdown(f"""
         <div class="category-selection-enhanced">
             <div class="selection-header">
-                <h4>🎯 Select Error Categories</h4>
-                <p>Choose the types of errors you want to practice identifying</p>
+                <h4>🎯 {t('select_error_categories')}</h4>
+                <p>{t('choose_error_types')}</p>
             </div>
         </div>
         """, unsafe_allow_html=True)
         
         # Help section
-        st.markdown("""
+        st.markdown(f"""
         <div class="selection-help">
             <span class="selection-help-icon">💡</span>
-            <strong>Tip:</strong> Select multiple categories to create more challenging review scenarios
+            <strong>{t('select_categories_tip')}</strong>
+            <br>
         </div>
         """, unsafe_allow_html=True)
         
@@ -259,17 +260,39 @@ class CodeGeneratorUI:
         if java_categories:
             self._render_category_grid(java_categories)
         else:
-            st.warning("No categories available")
+            st.warning(t("no_categories_available"))
         
         # Selected categories display
         self._render_selected_categories()
 
 
     def _get_category_icon(self, category_name: str) -> str:
-        """Get icon for category based on name."""
+        """Get icon for category based on name (language-aware)."""
+        # Map both English and Chinese category names to icons
         icon_mapping = {
-            "syntax_errors": "🔤",
-            "logic_errors": "🧠", 
+            # English category names (from database)
+            "logical errors": "🧠",
+            "syntax errors": "🔤", 
+            "code quality": "⭐",
+            "standard violation": "📋",
+            "java specific": "☕",
+            
+            # Chinese category names (from database)
+            "邏輯錯誤": "🧠",
+            "語法錯誤": "🔤",
+            "程式碼品質": "⭐", 
+            "標準違規": "📋",
+            "java 特定錯誤": "☕",
+            
+            # Category codes (fallback)
+            "logical": "🧠",
+            "syntax": "🔤",
+            "code_quality": "⭐",
+            "standard_violation": "📋", 
+            "java_specific": "☕",
+            
+            # Legacy mappings (in case they're still used)
+            "logic_errors": "🧠",
             "runtime_errors": "⚡",
             "null_pointer": "🚫",
             "array_errors": "📊",
@@ -279,7 +302,19 @@ class CodeGeneratorUI:
             "class_errors": "🏗️",
             "variable_errors": "📝"
         }
-        return icon_mapping.get(category_name.lower(), "🐛")
+        
+        # Try exact match first (case-sensitive)
+        if category_name in icon_mapping:
+            return icon_mapping[category_name]
+        
+        # Try case-insensitive match
+        category_lower = category_name.lower()
+        for key, icon in icon_mapping.items():
+            if key.lower() == category_lower:
+                return icon
+        
+        # Default fallback icon
+        return "🐛"
 
     def _toggle_category(self, category_name: str):
         """Toggle category selection."""
@@ -296,11 +331,11 @@ class CodeGeneratorUI:
         selected = st.session_state.get("selected_categories", [])
         
         if selected:
-            st.markdown("""
+            st.markdown(f"""
             <div class="selected-categories-enhanced">
                 <div class="selected-categories-header">
-                    <h4>Selected Categories</h4>
-                    <span class="selected-categories-count">{}</span>
+                    <h4>{t('selected_categories')}</h4>
+                    <span class="selected-categories-count">{t('count', count=len(selected))}</span>
                 </div>
             </div>
             """.format(len(selected)), unsafe_allow_html=True)
@@ -318,9 +353,9 @@ class CodeGeneratorUI:
                     </div>
                     """, unsafe_allow_html=True)
         else:
-            st.markdown("""
+            st.markdown(f"""
             <div class="no-selection-message">
-                🎯 Select at least one error category to generate code
+                🎯 {t('select_at_least_one_category')}
             </div>
             """, unsafe_allow_html=True)
 
@@ -330,7 +365,7 @@ class CodeGeneratorUI:
         
         for category_name in categories:
             # category is now a string, not a dictionary
-            description = f"Practice with {category_name} related errors"
+            description = f"{t('practice_with')} {category_name} {t('related_errors')}"
             icon = self._get_category_icon(category_name)
             
             is_selected = category_name in st.session_state.get("selected_categories", [])
@@ -399,10 +434,10 @@ class CodeGeneratorUI:
 
     def _render_header(self):
         """Render the professional header with branding and description."""
-        st.markdown("""
+        st.markdown(f"""
         <div class="generate-header">
-            <h2>🔧 Code Generation Workshop</h2>
-            <p>Configure and generate Java code snippets with intentional errors for review practice</p>
+            <h2>🔧 {t('code_generation_workshop')}</h2>
+            <p>{t('configure_generate_java_code')}</p>
         </div>
         """, unsafe_allow_html=True)
     
