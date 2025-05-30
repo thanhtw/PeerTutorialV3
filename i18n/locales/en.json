@@ -565,6 +565,12 @@
     "most_used_errors": "Most Used Errors",
     "database_statistics_unavailable": "Database statistics unavailable",
     "practice_with": "Practice with",
-    "related_errors": "related errors"
+    "related_errors": "related errors",
+    "click_to_select": "Click to select",
+    "deselect": "Deselect",
+    "quick_actions": "Quick Actions",
+    "categories_selected": "categories selected"
+
+
   }
 }

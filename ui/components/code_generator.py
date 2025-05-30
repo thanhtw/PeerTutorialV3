@@ -103,12 +103,6 @@ class CodeGeneratorUI:
 
     def _render_generation_section(self):
         """Render the generation button and controls."""
-        st.markdown(f"""
-        <div class="generate-button-section">
-            <h4>🚀 {t('ready_to_generate')}</h4>
-            <p>{t('click_to_generate_java_code')}</p>
-        </div>
-        """, unsafe_allow_html=True)
         
         # Check if we can generate
         can_generate = self._can_generate()
@@ -263,8 +257,7 @@ class CodeGeneratorUI:
             st.warning(t("no_categories_available"))
         
         # Selected categories display
-        self._render_selected_categories()
-
+        #self._render_selected_categories()
 
     def _get_category_icon(self, category_name: str) -> str:
         """Get icon for category based on name (language-aware)."""
@@ -327,60 +320,201 @@ class CodeGeneratorUI:
             st.session_state.selected_categories.append(category_name)
             
     def _render_selected_categories(self):
-        """Render the selected categories display."""
+        """Render the selected categories display with professional UI design."""
         selected = st.session_state.get("selected_categories", [])
         
+        # Professional summary section with visual hierarchy
+        st.markdown(f"""
+        <div class="category-selection-summary">
+            <div class="summary-content">
+                <span class="summary-icon">🎯</span>
+                <div class="summary-text">
+                    {len(selected)} {t('categories_selected')}
+                </div>
+                <span class="summary-badge">{len(selected)}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
         if selected:
+            # Professional selected categories display
             st.markdown(f"""
             <div class="selected-categories-enhanced">
                 <div class="selected-categories-header">
-                    <h4>{t('selected_categories')}</h4>
-                    <span class="selected-categories-count">{t('count', count=len(selected))}</span>
+                    <h4>✅ {t('selected_categories')}</h4>
+                    <div class="categories-actions">
+                        <span class="selection-count">{len(selected)} selected</span>
+                    </div>
                 </div>
             </div>
-            """.format(len(selected)), unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
             
-            # Display selected categories as tags
-            cols = st.columns(min(len(selected), 4))
+            # Create a responsive grid for selected category tags
+            num_cols = min(len(selected), 3)  # Maximum 3 columns for better readability
+            cols = st.columns(num_cols)
+            
             for i, category in enumerate(selected):
-                col_idx = i % len(cols)
+                col_idx = i % num_cols
                 with cols[col_idx]:
                     icon = self._get_category_icon(category)
+                    
+                    # Professional category tag with remove functionality
                     st.markdown(f"""
-                    <div class="selected-category-tag">
-                        <span class="category-tag-icon">{icon}</span>
-                        {category}
+                    <div class="selected-category-tag-enhanced">
+                        <div class="tag-content">
+                            <span class="category-tag-icon">{icon}</span>
+                            <span class="category-tag-text">{category}</span>
+                        </div>
+                        <div class="tag-actions">
+                            <span class="remove-hint">Click to remove</span>
+                        </div>
                     </div>
                     """, unsafe_allow_html=True)
-        else:
+                    
+                    # Remove button with professional styling
+                    if st.button(
+                        f"✖ {t('remove')} {category}",
+                        key=f"remove_{category}",
+                        help=f"Remove {category} from selection",
+                        use_container_width=True,
+                        type="secondary"
+                    ):
+                        self._toggle_category(category)
+                        st.rerun()
+            
+            # Professional action section
             st.markdown(f"""
-            <div class="no-selection-message">
-                🎯 {t('select_at_least_one_category')}
+            <div class="selection-actions-section">
+                <div class="actions-header">
+                    <h5>📋 {t('quick_actions')}</h5>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Quick action buttons in columns
+            action_cols = st.columns([1, 1, 2])
+            
+            with action_cols[0]:
+                if st.button(
+                    f"🗑️ Clear All",
+                    key="clear_all_categories",
+                    help="Remove all selected categories",
+                    use_container_width=True,
+                    type="secondary"
+                ):
+                    st.session_state.selected_categories = []
+                    st.rerun()
+            
+            with action_cols[1]:
+                # Show generation readiness status
+                st.markdown(f"""
+                <div class="generation-status ready">
+                    <span class="status-icon">✅</span>
+                    <span class="status-text">Ready to Generate</span>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        else:
+            # Professional empty state with guidance
+            st.markdown(f"""
+            <div class="empty-selection-state">
+                <div class="empty-state-content">
+                    <div class="empty-state-icon">🎯</div>
+                    <div class="empty-state-title">No Categories Selected</div>
+                    <div class="empty-state-description">
+                        {t('select_at_least_one_category')}
+                    </div>
+                    <div class="empty-state-guidance">
+                        💡 Choose from the categories above to create your personalized code review challenge
+                    </div>
+                </div>
             </div>
             """, unsafe_allow_html=True)
 
     def _render_category_grid(self, categories: List[str]):
-        """Render categories in a professional grid layout."""
-        st.markdown('<div class="problem-area-grid-enhanced">', unsafe_allow_html=True)
+        """Render categories in a compact three-column layout for better space utilization."""
+        selected = st.session_state.get("selected_categories", [])
         
-        for category_name in categories:
-            # category is now a string, not a dictionary
+        # Three-column grid for better space utilization
+        cols = st.columns(3, gap="medium")
+        
+        # Distribute categories across three columns
+        for i, category_name in enumerate(categories):
             description = f"{t('practice_with')} {category_name} {t('related_errors')}"
             icon = self._get_category_icon(category_name)
+            is_selected = category_name in selected
             
-            is_selected = category_name in st.session_state.get("selected_categories", [])
-            selected_class = "selected" if is_selected else ""
+            # Current column (cycle through 0, 1, 2)
+            current_col = cols[i % 3]
             
-            if st.button(
-                f"{icon} {category_name}",
-                key=f"category_{category_name}",
-                help=description,
-                use_container_width=True
-            ):
-                self._toggle_category(category_name)
-                st.rerun()
+            with current_col:
+                # Compact card similar to parameter cards
+                selected_class = "selected" if is_selected else ""
+                st.markdown(f"""
+                <div class="parameter-card category-card {selected_class}">
+                    <span class="parameter-icon category-icon">{icon}</span>
+                    <div class="parameter-label category-title">{category_name}</div>
+                    <div class="parameter-value category-status">
+                        {'✓ ' + t('selected') if is_selected else t('click_to_select')}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Compact button
+                button_type = "primary" if is_selected else "secondary"
+                button_label = f"{'✓ ' if is_selected else '+ '}{category_name}"
+                
+                if st.button(
+                    button_label,
+                    key=f"category_btn_{category_name}",
+                    help=description,
+                    use_container_width=True,
+                    type=button_type
+                ):
+                    self._toggle_category(category_name)
+                    st.rerun()
         
-        st.markdown('</div>', unsafe_allow_html=True)
+        # Compact quick actions optimized for 3-column layout
+        if categories and len(categories) > 1:
+            st.markdown("---")
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                if st.button(
+                    f"🎯 {t('select')} All",
+                    key="select_all_categories",
+                    help="Select all available categories",
+                    use_container_width=True,
+                    disabled=len(selected) == len(categories)
+                ):
+                    st.session_state.selected_categories = categories.copy()
+                    st.rerun()
+            
+            with col2:
+                if st.button(
+                    f"🗑️ Clear All",
+                    key="clear_all_categories", 
+                    help="Remove all selected categories",
+                    use_container_width=True,
+                    disabled=len(selected) == 0
+                ):
+                    st.session_state.selected_categories = []
+                    st.rerun()
+            
+            with col3:
+                # Status indicator in the third column
+                if selected:
+                    st.markdown(f"""
+                    <div style="text-align: center; padding: 8px; background: rgba(40, 167, 69, 0.1); border-radius: 4px; color: #28a745; font-weight: 600;">
+                        ✅ Ready to Generate
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div style="text-align: center; padding: 8px; background: rgba(108, 117, 125, 0.1); border-radius: 4px; color: #6c757d; font-style: italic;">
+                        Select categories above
+                    </div>
+                    """, unsafe_allow_html=True)
 
     def _can_generate(self) -> bool:
         """Check if we can generate code."""

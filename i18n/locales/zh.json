@@ -333,7 +333,10 @@
     "most_used_errors": "最常使用的錯誤",
     "database_statistics_unavailable": "資料庫統計資料不可用",
     "practice_with": "練習",
-    "related_errors": "相關錯誤"
-
+    "related_errors": "相關錯誤",
+    "click_to_select": "點擊選擇",
+    "deselect": "取消選擇",
+    "categories_selected": "個類別已選擇",
+    "quick_actions": "快速操作"
   }
 }
