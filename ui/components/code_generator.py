@@ -233,7 +233,6 @@ class CodeGeneratorUI:
         else:
             st.warning(t("no_categories_available"))
         
-
     def _get_category_icon(self, category_name: str) -> str:
         """Get icon for category based on name (language-aware)."""
         # Map both English and Chinese category names to icons
@@ -473,14 +472,20 @@ class CodeGeneratorUI:
                     st.rerun()
             
             
-
     def _can_generate(self) -> bool:
-        """Check if we can generate code."""
+        """Check if we can generate code based on selected categories."""
         mode = st.session_state.get("error_selection_mode", "random")
-        if mode == "random":
-            return True
-        else:
-            return len(st.session_state.get("selected_categories", [])) > 0
+        selected_categories = st.session_state.get("selected_categories", [])
+        
+        # For both modes, we need at least one category selected
+        if not selected_categories or len(selected_categories) == 0:
+            return False
+            
+        # Additional validation: ensure categories contain actual error types
+        if not any(category.strip() for category in selected_categories):
+            return False
+            
+        return True
 
     def _get_level_parameters(self, user_level: str) -> Dict[str, Any]:
         """Get parameters based on user level."""

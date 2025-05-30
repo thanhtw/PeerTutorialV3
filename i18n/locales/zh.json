@@ -337,6 +337,7 @@
     "click_to_select": "點擊選擇",
     "deselect": "取消選擇",
     "categories_selected": "個類別已選擇",
-    "quick_actions": "快速操作"
+    "quick_actions": "快速操作",
+    "please_select_at_least_one_error_category": "請選擇至少一個錯誤類別以繼續生成程式碼"
   }
 }
