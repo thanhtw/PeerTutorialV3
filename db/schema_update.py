@@ -242,16 +242,17 @@ def create_learning_tables(db):
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id VARCHAR(36) NOT NULL,
         path_id INT NOT NULL,
-        status VARCHAR(20) NOT NULL DEFAULT 'not_started', /* e.g., 'not_started', 'in_progress', 'completed' */
-        current_step_id INT NULL, /* FK to learning_path_steps.id */
-        total_steps INT DEFAULT 0, /* Should be set upon enrollment based on path definition */
+        status VARCHAR(20) NOT NULL DEFAULT 'not_started',
+        current_step INT DEFAULT 0,  /* Add this line for backward compatibility */
+        current_step_id INT NULL,
+        total_steps INT DEFAULT 0,
         progress_percentage FLOAT DEFAULT 0.0,
         started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         completed_at TIMESTAMP NULL,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE,
         FOREIGN KEY (path_id) REFERENCES learning_paths(id) ON DELETE CASCADE,
-        FOREIGN KEY (current_step_id) REFERENCES learning_path_steps(id) ON DELETE SET NULL, /* If a step is deleted, nullify here */
+        FOREIGN KEY (current_step_id) REFERENCES learning_path_steps(id) ON DELETE SET NULL,
         UNIQUE KEY (user_id, path_id)
     ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     """
