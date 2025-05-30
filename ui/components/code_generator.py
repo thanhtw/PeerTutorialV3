@@ -293,118 +293,6 @@ class CodeGeneratorUI:
         else:
             st.session_state.selected_categories.append(category_name)
             
-    def _render_selected_categories(self):
-        """Render the selected categories display with professional UI design."""
-        selected = st.session_state.get("selected_categories", [])
-        
-        # Professional summary section with visual hierarchy
-        st.markdown(f"""
-        <div class="category-selection-summary">
-            <div class="summary-content">
-                <span class="summary-icon">🎯</span>
-                <div class="summary-text">
-                    {len(selected)} {t('categories_selected')}
-                </div>
-                <span class="summary-badge">{len(selected)}</span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        if selected:
-            # Professional selected categories display
-            st.markdown(f"""
-            <div class="selected-categories-enhanced">
-                <div class="selected-categories-header">
-                    <h4>✅ {t('selected_categories')}</h4>
-                    <div class="categories-actions">
-                        <span class="selection-count">{len(selected)} selected</span>
-                    </div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Create a responsive grid for selected category tags
-            num_cols = min(len(selected), 3)  # Maximum 3 columns for better readability
-            cols = st.columns(num_cols)
-            
-            for i, category in enumerate(selected):
-                col_idx = i % num_cols
-                with cols[col_idx]:
-                    icon = self._get_category_icon(category)
-                    
-                    # Professional category tag with remove functionality
-                    st.markdown(f"""
-                    <div class="selected-category-tag-enhanced">
-                        <div class="tag-content">
-                            <span class="category-tag-icon">{icon}</span>
-                            <span class="category-tag-text">{category}</span>
-                        </div>
-                        <div class="tag-actions">
-                            <span class="remove-hint">Click to remove</span>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # Remove button with professional styling
-                    if st.button(
-                        f"✖ {t('remove')} {category}",
-                        key=f"remove_{category}",
-                        help=f"Remove {category} from selection",
-                        use_container_width=True,
-                        type="secondary"
-                    ):
-                        self._toggle_category(category)
-                        st.rerun()
-            
-            # Professional action section
-            st.markdown(f"""
-            <div class="selection-actions-section">
-                <div class="actions-header">
-                    <h5>📋 {t('quick_actions')}</h5>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Quick action buttons in columns
-            action_cols = st.columns([1, 1, 2])
-            
-            with action_cols[0]:
-                if st.button(
-                    f"🗑️ Clear All",
-                    key="clear_all_categories",
-                    help="Remove all selected categories",
-                    use_container_width=True,
-                    type="secondary"
-                ):
-                    st.session_state.selected_categories = []
-                    st.rerun()
-            
-            with action_cols[1]:
-                # Show generation readiness status
-                st.markdown(f"""
-                <div class="generation-status ready">
-                    <span class="status-icon">✅</span>
-                    <span class="status-text">Ready to Generate</span>
-                </div>
-                """, unsafe_allow_html=True)
-        
-        else:
-            # Professional empty state with guidance
-            st.markdown(f"""
-            <div class="empty-selection-state">
-                <div class="empty-state-content">
-                    <div class="empty-state-icon">🎯</div>
-                    <div class="empty-state-title">No Categories Selected</div>
-                    <div class="empty-state-description">
-                        {t('select_at_least_one_category')}
-                    </div>
-                    <div class="empty-state-guidance">
-                        💡 Choose from the categories above to create your personalized code review challenge
-                    </div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
     def _render_category_grid(self, categories: List[str]):
         """Render categories in a compact three-column layout with parameter card styling."""
         selected = st.session_state.get("selected_categories", [])
@@ -470,8 +358,7 @@ class CodeGeneratorUI:
                 ):
                     st.session_state.selected_categories = []
                     st.rerun()
-            
-            
+                   
     def _can_generate(self) -> bool:
         """Check if we can generate code based on selected categories."""
         mode = st.session_state.get("error_selection_mode", "random")
@@ -508,27 +395,6 @@ class CodeGeneratorUI:
         }
         return level_configs.get(user_level, level_configs["medium"])
 
-    def _load_all_errors(self) -> List[Dict]:
-        """Load all available errors from the database."""
-        try:
-            # Get all categories first
-            categories = self.db_repository.get_all_categories()
-            all_errors = []
-            # Get errors from all categories
-            for category_list in categories.values():
-                for category in category_list:
-                    category_errors = self.db_repository.get_category_errors(category)
-                    for error in category_errors:
-                        error['category'] = category
-                        all_errors.append(error)
-            
-            logger.info(f"Loaded {len(all_errors)} total errors from database")
-            return all_errors
-            
-        except Exception as e:
-            logger.error(f"Error loading all errors: {str(e)}")
-            return []
-
     def _render_header(self):
         """Render the professional header with branding and description."""
         st.markdown(f"""
@@ -556,38 +422,6 @@ class CodeGeneratorUI:
             logger.error(f"Error getting categories: {str(e)}")
             return {"java_errors": []}
     
-    def _get_error_details(self, error_name: str) -> Optional[Dict[str, str]]:
-        """Get detailed information for a specific error."""
-        try:
-            return self.db_repository.get_error_details("java_error", error_name)
-        except Exception as e:
-            logger.error(f"Error getting details for {error_name}: {str(e)}")
-            return None
-    
-    def _get_errors_for_llm(self, selected_categories: Dict[str, List[str]], 
-                           count: int = 4, difficulty: str = "medium") -> tuple:
-        """Get errors formatted for LLM processing."""
-        try:
-            return self.db_repository.get_errors_for_llm(
-                selected_categories=selected_categories,
-                count=count,
-                difficulty=difficulty
-            )
-        except Exception as e:
-            logger.error(f"Error getting errors for LLM: {str(e)}")
-            return [], []
-    
-    def _get_random_errors(self, selected_categories: Dict[str, List[str]], 
-                          count: int = 4) -> List[Dict[str, Any]]:
-        """Get random errors from selected categories."""
-        try:
-            return self.db_repository.get_random_errors_by_categories(
-                selected_categories, count
-            )
-        except Exception as e:
-            logger.error(f"Error getting random errors: {str(e)}")
-            return []
-    
     def _update_error_usage(self, error_code: str, user_id: str = None, 
                            action_type: str = 'viewed'):
         """Track error usage for analytics."""
@@ -599,14 +433,6 @@ class CodeGeneratorUI:
             )
         except Exception as e:
             logger.error(f"Error updating usage stats: {str(e)}")
-    
-    def _get_database_statistics(self) -> Dict[str, Any]:
-        """Get database statistics for display."""
-        try:
-            return self.db_repository.get_error_statistics()
-        except Exception as e:
-            logger.error(f"Error getting database statistics: {str(e)}")
-            return {}
     
     def render_category_selection(self) -> Dict[str, List[str]]:
         """Render the category selection interface."""
@@ -663,98 +489,6 @@ class CodeGeneratorUI:
         
         return selected_errors
     
-    def render_difficulty_selection(self) -> str:
-        """Render difficulty selection interface."""
-        difficulty_options = [
-            ("easy", t("easy")),
-            ("medium", t("medium")),
-            ("hard", t("hard"))
-        ]
-        
-        selected_difficulty = st.selectbox(
-            t("select_difficulty"),
-            options=[opt[0] for opt in difficulty_options],
-            format_func=lambda x: dict(difficulty_options)[x],
-            index=1  # Default to medium
-        )
-        
-        return selected_difficulty
-    
-    def render_error_count_selection(self) -> int:
-        """Render error count selection interface."""
-        return st.slider(
-            t("number_of_errors"),
-            min_value=1,
-            max_value=10,
-            value=4,
-            help=t("select_number_of_errors_help")
-        )
-    
-    def render_database_info(self):
-        """Render database information and statistics."""
-        with st.expander(t("database_information")):
-            stats = self._get_database_statistics()
-            
-            if stats:
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.metric(t("total_categories"), stats.get('total_categories', 0))
-                    st.metric(t("total_errors"), stats.get('total_errors', 0))
-                
-                with col2:
-                    if 'errors_by_category' in stats:
-                        st.write(t("errors_by_category"))
-                        for category, count in stats['errors_by_category'].items():
-                            st.write(f"• {category}: {count}")
-                
-                if 'most_used_errors' in stats and stats['most_used_errors']:
-                    st.write(t("most_used_errors"))
-                    for error in stats['most_used_errors'][:5]:
-                        st.write(f"• {error['name']}: {error['usage_count']} uses")
-            else:
-                st.warning(t("database_statistics_unavailable"))
-    
-    def render_error_preview(self, errors: List[Dict]):
-        """Render preview of selected errors."""
-        if not errors:
-            return
-        
-        st.subheader(t("selected_errors_preview"))
-        
-        for i, error in enumerate(errors, 1):
-            with st.expander(f"{i}. {error.get(t('error_name'), error.get('name', 'Unknown'))}"):
-                st.write(f"**{t('category')}:** {error.get('category', 'Unknown')}")
-                st.write(f"**{t('description')}:** {error.get(t('description'), '')}")
-                
-                # Show implementation guide if available
-                impl_guide = error.get(t('implementation_guide'), '')
-                if impl_guide:
-                    st.write(f"**{t('implementation_guide')}:** {impl_guide}")
-                
-                # Show difficulty level
-                difficulty = error.get('difficulty_level', 'medium')
-                st.write(f"**{t('difficulty')}:** {difficulty}")
-    
-    def get_errors_for_generation(self, selected_categories: Dict[str, List[str]], 
-                                 specific_errors: List[Dict] = None,
-                                 count: int = 4, 
-                                 difficulty: str = "medium") -> tuple:
-        """Get errors prepared for code generation."""
-        if specific_errors:
-            # Use specific errors if provided
-            problem_descriptions = []
-            for error in specific_errors:
-                name = error.get(t("error_name"), error.get("name", "Unknown"))
-                description = error.get(t("description"), "")
-                category = error.get("category", "")
-                problem_descriptions.append(f"{category}: {name} - {description}")
-            
-            return specific_errors, problem_descriptions
-        else:
-            # Use category-based selection
-            return self._get_errors_for_llm(selected_categories, count, difficulty)
-    
     def _handle_code_generation(self):
         """Handle the code generation process."""
         with st.spinner("🔧 Generating your Java code challenge..."):
@@ -781,55 +515,4 @@ class CodeGeneratorUI:
                 logger.error(f"Code generation error: {str(e)}")
                 st.error(f"❌ Generation failed: {str(e)}")
 
-    def render_main_interface(self):
-        """Render the main code generator interface."""
-        st.title(t("java_code_generator"))
-        
-        # Database information
-        self.render_database_info()
-        
-        # Selection method
-        selection_method = st.radio(
-            t("selection_method"),
-            [t("by_categories"), t("specific_errors")],
-            horizontal=True
-        )
-        
-        selected_categories = {}
-        specific_errors = []
-        
-        if selection_method == t("by_categories"):
-            # Category-based selection
-            selected_categories = self.render_category_selection()
-            
-            if selected_categories.get("java_errors"):
-                # Additional options
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    difficulty = self.render_difficulty_selection()
-                
-                with col2:
-                    error_count = self.render_error_count_selection()
-                
-                # Preview random errors from selected categories
-                if st.button(t("preview_random_errors")):
-                    preview_errors = self._get_random_errors(selected_categories, error_count)
-                    self.render_error_preview(preview_errors)
-        
-        else:
-            # Specific error selection
-            selected_categories = self.render_category_selection()
-            if selected_categories.get("java_errors"):
-                specific_errors = self.render_error_selection(selected_categories)
-                self.render_error_preview(specific_errors)
-                difficulty = "medium"  # Default for specific errors
-                error_count = len(specific_errors)
-        
-        # Return the configuration for code generation
-        return {
-            "selected_categories": selected_categories,
-            "specific_errors": specific_errors,
-            "difficulty": difficulty if 'difficulty' in locals() else "medium",
-            "error_count": error_count if 'error_count' in locals() else 4
-        }
+    
