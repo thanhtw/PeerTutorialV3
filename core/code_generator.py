@@ -12,6 +12,7 @@ from langchain_core.language_models import BaseLanguageModel
 from utils.code_utils import create_code_generation_prompt
 from utils.llm_logger import LLMInteractionLogger
 from utils.language_utils import t
+from data.database_error_repository import DatabaseErrorRepository
 
 # Configure logging
 logging.basicConfig(
@@ -24,6 +25,7 @@ class CodeGenerator:
     """
     Generates Java code snippets dynamically without relying on predefined templates.
     This class creates realistic Java code based on specified complexity and length.
+    Enhanced with database integration to show all error categories and their errors.
     """
     def __init__(self, llm: BaseLanguageModel = None, llm_logger: LLMInteractionLogger = None):
         """
@@ -35,6 +37,9 @@ class CodeGenerator:
         """
         self.llm = llm
         self.llm_logger = llm_logger or LLMInteractionLogger()
+        
+        # Initialize database repository for error management
+        self.error_repository = DatabaseErrorRepository()
         
         # Define complexity profiles for different code lengths
         self.complexity_profiles = {
@@ -70,7 +75,239 @@ class CodeGenerator:
             "calculation", "inventory_system", "notification_service",
             "logging", "banking", "e-commerce", "student_management"
         ]
-     
+    
+    def get_all_categories_and_errors(self) -> dict:
+        """
+        Get all error categories and their errors, ordered by difficulty level.
+        
+        Returns:
+            Dictionary containing all categories with their errors ordered by difficulty
+        """
+        try:
+            # Get all categories from the database
+            categories_data = self.error_repository.get_all_categories()
+            java_error_categories = categories_data.get("java_errors", [])
+            
+            if not java_error_categories:
+                logger.warning("No error categories found in database")
+                return {}
+            
+            # Dictionary to store all categories and their errors
+            all_categories_errors = {}
+            
+            # Difficulty order for sorting
+            difficulty_order = {"easy": 1, "medium": 2, "hard": 3}
+            
+            for category in java_error_categories:
+                logger.info(f"Processing category: {category}")
+                
+                # Get errors for this category
+                category_errors = self.error_repository.get_category_errors(category)
+                
+                if category_errors:
+                    # Sort errors by difficulty level
+                    sorted_errors = sorted(
+                        category_errors,
+                        key=lambda x: (
+                            difficulty_order.get(x.get('difficulty_level', 'medium'), 2),
+                            x.get(t("error_name"), "")
+                        )
+                    )
+                    
+                    all_categories_errors[category] = sorted_errors
+                    logger.info(f"Found {len(sorted_errors)} errors in {category}")
+                else:
+                    logger.warning(f"No errors found for category: {category}")
+                    all_categories_errors[category] = []
+            
+            return all_categories_errors
+            
+        except Exception as e:
+            logger.error(f"Error getting all categories and errors: {str(e)}")
+            return {}
+    
+    def display_all_categories_and_errors(self) -> str:
+        """
+        Display all categories and their errors in a formatted string.
+        
+        Returns:
+            Formatted string showing all categories and errors ordered by difficulty
+        """
+        try:
+            all_data = self.get_all_categories_and_errors()
+            
+            if not all_data:
+                return "No error data available"
+            
+            output_lines = []
+            output_lines.append("=" * 80)
+            output_lines.append("JAVA ERROR CATEGORIES AND ERRORS (Ordered by Difficulty)")
+            output_lines.append("=" * 80)
+            output_lines.append("")
+            
+            total_categories = len(all_data)
+            total_errors = sum(len(errors) for errors in all_data.values())
+            
+            output_lines.append(f"Total Categories: {total_categories}")
+            output_lines.append(f"Total Errors: {total_errors}")
+            output_lines.append("")
+            
+            for category_idx, (category, errors) in enumerate(all_data.items(), 1):
+                output_lines.append(f"{category_idx}. {category.upper()}")
+                output_lines.append("-" * (len(category) + 10))
+                
+                if not errors:
+                    output_lines.append("   No errors available")
+                    output_lines.append("")
+                    continue
+                
+                # Group errors by difficulty
+                difficulty_groups = {"easy": [], "medium": [], "hard": []}
+                
+                for error in errors:
+                    difficulty = error.get('difficulty_level', 'medium')
+                    difficulty_groups[difficulty].append(error)
+                
+                # Display errors by difficulty level
+                for difficulty in ["easy", "medium", "hard"]:
+                    if difficulty_groups[difficulty]:
+                        output_lines.append(f"   {difficulty.upper()} LEVEL ({len(difficulty_groups[difficulty])} errors):")
+                        
+                        for error_idx, error in enumerate(difficulty_groups[difficulty], 1):
+                            error_name = error.get(t("error_name"), "Unknown Error")
+                            error_desc = error.get(t("description"), "No description")
+                            
+                            # Truncate description if too long
+                            if len(error_desc) > 100:
+                                error_desc = error_desc[:100] + "..."
+                            
+                            output_lines.append(f"      {error_idx}. {error_name}")
+                            output_lines.append(f"         → {error_desc}")
+                            output_lines.append("")
+                
+                output_lines.append("")
+            
+            output_lines.append("=" * 80)
+            
+            return "\n".join(output_lines)
+            
+        except Exception as e:
+            logger.error(f"Error displaying categories and errors: {str(e)}")
+            return f"Error displaying data: {str(e)}"
+    
+    def get_errors_by_difficulty(self, difficulty: str) -> dict:
+        """
+        Get all errors filtered by difficulty level across all categories.
+        
+        Args:
+            difficulty: Difficulty level ("easy", "medium", "hard")
+            
+        Returns:
+            Dictionary containing errors grouped by category for the specified difficulty
+        """
+        try:
+            all_data = self.get_all_categories_and_errors()
+            filtered_data = {}
+            
+            for category, errors in all_data.items():
+                filtered_errors = [
+                    error for error in errors 
+                    if error.get('difficulty_level', 'medium').lower() == difficulty.lower()
+                ]
+                
+                if filtered_errors:
+                    filtered_data[category] = filtered_errors
+            
+            return filtered_data
+            
+        except Exception as e:
+            logger.error(f"Error filtering errors by difficulty {difficulty}: {str(e)}")
+            return {}
+    
+    def get_category_statistics(self) -> dict:
+        """
+        Get statistics about error categories and their difficulty distribution.
+        
+        Returns:
+            Dictionary containing statistics about categories and errors
+        """
+        try:
+            all_data = self.get_all_categories_and_errors()
+            
+            stats = {
+                "total_categories": len(all_data),
+                "total_errors": 0,
+                "difficulty_distribution": {"easy": 0, "medium": 0, "hard": 0},
+                "category_breakdown": {}
+            }
+            
+            for category, errors in all_data.items():
+                category_stats = {"easy": 0, "medium": 0, "hard": 0, "total": len(errors)}
+                
+                for error in errors:
+                    difficulty = error.get('difficulty_level', 'medium')
+                    category_stats[difficulty] += 1
+                    stats["difficulty_distribution"][difficulty] += 1
+                    stats["total_errors"] += 1
+                
+                stats["category_breakdown"][category] = category_stats
+            
+            return stats
+            
+        except Exception as e:
+            logger.error(f"Error getting category statistics: {str(e)}")
+            return {}
+    
+    def print_category_statistics(self) -> str:
+        """
+        Print formatted statistics about error categories.
+        
+        Returns:
+            Formatted string with category statistics
+        """
+        try:
+            stats = self.get_category_statistics()
+            
+            if not stats:
+                return "No statistics available"
+            
+            output_lines = []
+            output_lines.append("=" * 60)
+            output_lines.append("ERROR CATEGORY STATISTICS")
+            output_lines.append("=" * 60)
+            output_lines.append("")
+            
+            # Overall statistics
+            output_lines.append("OVERALL STATISTICS:")
+            output_lines.append(f"  Total Categories: {stats['total_categories']}")
+            output_lines.append(f"  Total Errors: {stats['total_errors']}")
+            output_lines.append("")
+            
+            # Difficulty distribution
+            output_lines.append("DIFFICULTY DISTRIBUTION:")
+            for difficulty, count in stats["difficulty_distribution"].items():
+                percentage = (count / stats["total_errors"] * 100) if stats["total_errors"] > 0 else 0
+                output_lines.append(f"  {difficulty.capitalize()}: {count} ({percentage:.1f}%)")
+            output_lines.append("")
+            
+            # Category breakdown
+            output_lines.append("CATEGORY BREAKDOWN:")
+            for category, category_stats in stats["category_breakdown"].items():
+                output_lines.append(f"  {category}:")
+                output_lines.append(f"    Total: {category_stats['total']}")
+                output_lines.append(f"    Easy: {category_stats['easy']}")
+                output_lines.append(f"    Medium: {category_stats['medium']}")
+                output_lines.append(f"    Hard: {category_stats['hard']}")
+                output_lines.append("")
+            
+            output_lines.append("=" * 60)
+            
+            return "\n".join(output_lines)
+            
+        except Exception as e:
+            logger.error(f"Error printing statistics: {str(e)}")
+            return f"Error generating statistics: {str(e)}"
+
     def _generate_with_llm(self, code_length: str, difficulty_level: str, domain: str = None, 
                        selected_errors=None) -> str:
         """
@@ -142,5 +379,4 @@ class CodeGenerator:
             logger.error(t("error_generating_code_with_llm").format(error=str(e)))          
             return """
     """
-           
-    
+
