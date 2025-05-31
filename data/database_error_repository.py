@@ -348,15 +348,7 @@ class DatabaseErrorRepository:
         """
         Get errors suitable for sending to the LLM for code generation.
         Can use either category-based selection or specific errors.
-        
-        Args:
-            selected_categories: Dictionary with selected error categories
-            specific_errors: List of specific errors to include
-            count: Number of errors to select if using categories
-            difficulty: Difficulty level to adjust error count
-            
-        Returns:
-            Tuple of (list of error objects, list of problem descriptions)
+        Tries to always return errors if possible.
         """
         # Map difficulty levels properly
         difficulty_map = {
@@ -367,61 +359,38 @@ class DatabaseErrorRepository:
             "中等": "medium",
             "困難": "hard"
         }
-        
         mapped_difficulty = difficulty_map.get(difficulty.lower(), "medium")
-        
-        # Adjust count based on difficulty
-        error_counts = {
-            "easy": max(2, count - 2),
-            "medium": count,
-            "hard": count + 2
-        }
-        
-        adjusted_count = error_counts.get(mapped_difficulty, count)
-        
+        adjusted_count = count
         # If specific errors are provided, use those
         if specific_errors and len(specific_errors) > 0:
             problem_descriptions = []
             selected_errors = []
-            
             for error in specific_errors:
                 processed_error = error.copy()
                 name = processed_error.get(t("error_name_variable"), processed_error.get("name", "Unknown"))
                 description = processed_error.get(t("description"), "")
                 category = processed_error.get(t("category"), "")
-                
-                # Add implementation guide if available
                 implementation_guide = self._get_implementation_guide(name, category)
                 if implementation_guide:
                     processed_error[t("implementation_guide")] = implementation_guide
-                
-                # Create problem description
                 problem_descriptions.append(f"{category}: {name} - {description}")
                 selected_errors.append(processed_error)
-            
             return selected_errors, problem_descriptions
         
-        # Otherwise use category-based selection with improved logic
         elif selected_categories:
             try:
                 self.current_language = get_current_language()
-                
                 java_error_categories = selected_categories.get("java_errors", [])
                 if not java_error_categories:
                     logger.warning("No categories specified, using defaults")
-                    # Get some default categories
                     default_cats = self.get_all_categories()
                     java_error_categories = default_cats.get("java_errors", [])[:3]
-                
-                # Get field names
                 name_field = self._get_language_fields('error_name')
                 desc_field = self._get_language_fields('description')
                 guide_field = self._get_language_fields('implementation_guide')
                 cat_name_field = self._get_language_fields('name')
-                
-                # Build query for selected categories
                 placeholders = ','.join(['%s'] * len(java_error_categories))
-                
+                # 1. Try with difficulty
                 query = f"""
                 SELECT 
                     je.{name_field} as error_name,
@@ -438,37 +407,15 @@ class DatabaseErrorRepository:
                 ORDER BY RAND()
                 LIMIT %s
                 """
-                
                 params = tuple(java_error_categories) + (mapped_difficulty, adjusted_count)
                 errors = self.db.execute_query(query, params)
-                
-                # If not enough errors found with exact difficulty, try without difficulty filter
-                if not errors or len(errors) < adjusted_count // 2:
-                    logger.debug(f"Not enough {mapped_difficulty} errors found, trying without difficulty filter")
-                    
-                    query_no_diff = f"""
-                    SELECT 
-                        je.{name_field} as error_name,
-                        je.{desc_field} as description,
-                        je.{guide_field} as implementation_guide,
-                        je.difficulty_level,
-                        je.error_code,
-                        ec.{cat_name_field} as category_name
-                    FROM java_errors je
-                    JOIN error_categories ec ON je.category_id = ec.id
-                    WHERE ec.{cat_name_field} IN ({placeholders}) 
-                    AND je.is_active = TRUE AND ec.is_active = TRUE
-                    ORDER BY RAND()
-                    LIMIT %s
-                    """
-                    
-                    params_no_diff = tuple(java_error_categories) + (adjusted_count,)
-                    errors = self.db.execute_query(query_no_diff, params_no_diff)
+                print(f"query: {query}")
+                if errors and len(errors) >= adjusted_count:
+                    logger.debug(f"Selected {len(errors)} errors for LLM (with difficulty)")
                 
                 # Format results
                 selected_errors = []
                 problem_descriptions = []
-                
                 for error in errors or []:
                     error_data = {
                         t("category"): error['category_name'],
@@ -478,22 +425,15 @@ class DatabaseErrorRepository:
                         "difficulty_level": error.get('difficulty_level', 'medium'),
                         "error_code": error.get('error_code', '')
                     }
-                    
                     selected_errors.append(error_data)
-                    
-                    # Create problem description
                     problem_descriptions.append(
                         f"{error['category_name']}: {error['error_name']} - {error['description']}"
                     )
-                
-                logger.debug(f"Selected {len(selected_errors)} errors for LLM")
+                logger.debug(f"Selected {len(selected_errors)} errors for LLM (final)")
                 return selected_errors, problem_descriptions
-                
             except Exception as e:
                 logger.error(f"Error getting errors for LLM: {str(e)}")
                 return [], []
-        
-        # If no selection method was provided, return empty lists
         logger.warning("No selection method provided, returning empty error list")
         return [], []
     
