@@ -72,7 +72,7 @@ class JsonErrorRepository:
             # Load errors by category
             self._load_errors_by_category()
             
-            logger.info(f"Loaded {len(self.java_error_categories)} categories with errors from database")
+            logger.debug(f"Loaded {len(self.java_error_categories)} categories with errors from database")
             return True
             
         except Exception as e:

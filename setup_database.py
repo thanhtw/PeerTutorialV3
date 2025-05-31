@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 def execute_sql_file_automated(db, file_path, description):
     """Execute a SQL file with improved automation and error handling."""
     try:
-        logger.info(f"Executing {description}: {file_path.name}")
+        logger.debug(f"Executing {description}: {file_path.name}")
         
         if not file_path.exists():
             logger.error(f"SQL file not found: {file_path}")
@@ -61,7 +61,7 @@ def execute_sql_file_automated(db, file_path, description):
                     statements.append(statement)
                 current_statement = ""
         
-        logger.info(f"Found {len(statements)} SQL statements to execute")
+        logger.debug(f"Found {len(statements)} SQL statements to execute")
         
         success_count = 0
         error_count = 0
@@ -74,7 +74,7 @@ def execute_sql_file_automated(db, file_path, description):
                 
                 # Show progress for large files
                 if i % 10 == 0 or i == len(statements):
-                    logger.info(f"Processed {i}/{len(statements)} statements")
+                    logger.debug(f"Processed {i}/{len(statements)} statements")
                 
             except Exception as e:
                 error_msg = str(e).lower()
@@ -87,7 +87,7 @@ def execute_sql_file_automated(db, file_path, description):
                     logger.warning(f"Statement {i} error: {str(e)[:150]}")
                     error_count += 1
         
-        logger.info(f"✅ {description} completed: {success_count}/{len(statements)} statements successful")
+        logger.debug(f"✅ {description} completed: {success_count}/{len(statements)} statements successful")
         if error_count > 0:
             logger.warning(f"⚠️  {error_count} statements had non-critical errors")
         
@@ -108,13 +108,13 @@ def find_sql_files():
     
     if create_sql.exists():
         files['create'] = create_sql
-        logger.info(f"✅ Found table creation SQL: {create_sql}")
+        logger.debug(f"✅ Found table creation SQL: {create_sql}")
     else:
         logger.error(f"❌ Create_db.sql not found: {create_sql}")
     
     if insert_sql.exists():
         files['insert'] = insert_sql
-        logger.info(f"✅ Found data insertion SQL: {insert_sql}")
+        logger.debug(f"✅ Found data insertion SQL: {insert_sql}")
     else:
         logger.error(f"❌ Insert_data.sql not found: {insert_sql}")
     
@@ -123,7 +123,7 @@ def find_sql_files():
 def verify_complete_setup():
     """Comprehensive verification of the database setup."""
     try:
-        logger.info("🔍 Performing comprehensive setup verification...")
+        logger.debug("🔍 Performing comprehensive setup verification...")
         
         db = MySQLConnection()
         
@@ -147,7 +147,7 @@ def verify_complete_setup():
         all_tables_ok = True
         total_records = 0
         
-        logger.info("📊 Database Verification Results:")
+        logger.debug("📊 Database Verification Results:")
         for table, count in tables_status.items():
             if count == -1:
                 logger.error(f"❌ {table}: Table missing or error")
@@ -157,7 +157,7 @@ def verify_complete_setup():
                 if table in ['error_categories', 'java_errors', 'badges']:
                     all_tables_ok = False
             else:
-                logger.info(f"✅ {table}: {count} records")
+                logger.debug(f"✅ {table}: {count} records")
                 total_records += count
         
         # Check critical data - Updated expected counts
@@ -175,7 +175,7 @@ def verify_complete_setup():
                     if actual < expected:
                         logger.warning(f"⚠️  {table}: Expected at least {expected}, got {actual}")
                     else:
-                        logger.info(f"✅ {table}: {actual} records (expected ≥{expected})")
+                        logger.debug(f"✅ {table}: {actual} records (expected ≥{expected})")
                 
                 # Verify active categories
                 active_cats = db.execute_query(
@@ -185,7 +185,7 @@ def verify_complete_setup():
                 active_count = active_cats['count'] if active_cats else 0
                 
                 if active_count > 0:
-                    logger.info(f"✅ Active error categories: {active_count}")
+                    logger.debug(f"✅ Active error categories: {active_count}")
                 else:
                     logger.error("❌ No active error categories found")
                     all_tables_ok = False
@@ -198,7 +198,7 @@ def verify_complete_setup():
                 """, fetch_one=True)
                 
                 if errors_with_cats and errors_with_cats['count'] > 0:
-                    logger.info(f"✅ Java errors with categories: {errors_with_cats['count']}")
+                    logger.debug(f"✅ Java errors with categories: {errors_with_cats['count']}")
                 else:
                     logger.error("❌ No Java errors properly linked to categories")
                     all_tables_ok = False
@@ -213,16 +213,16 @@ def verify_complete_setup():
                 """)
                 
                 if cat_distribution:
-                    logger.info("📊 Error distribution by category:")
+                    logger.debug("📊 Error distribution by category:")
                     for row in cat_distribution:
-                        logger.info(f"   {row['category_code']}: {row['error_count']} errors")
+                        logger.debug(f"   {row['category_code']}: {row['error_count']} errors")
                     
             except Exception as e:
                 logger.error(f"Error verifying data relationships: {str(e)}")
                 all_tables_ok = False
         
         if all_tables_ok and total_records > 50:  # Updated minimum expected records
-            logger.info(f"🎉 Database setup verification PASSED! Total records: {total_records}")
+            logger.debug(f"🎉 Database setup verification PASSED! Total records: {total_records}")
             return True
         else:
             logger.error("❌ Database setup verification FAILED")
@@ -234,8 +234,8 @@ def verify_complete_setup():
 
 def automated_database_setup():
     """Fully automated database setup process."""
-    logger.info("🚀 Starting Automated Database Setup")
-    logger.info("=" * 70)
+    logger.debug("🚀 Starting Automated Database Setup")
+    logger.debug("=" * 70)
     
     try:
         # Step 1: Initialize setup
@@ -245,7 +245,7 @@ def automated_database_setup():
             logger.error("❌ Cannot connect to MySQL server")
             return False
         
-        logger.info("✅ Database connection verified")
+        logger.debug("✅ Database connection verified")
         
         # Step 2: Create database and user
         if not setup.create_database():
@@ -256,7 +256,7 @@ def automated_database_setup():
             logger.error("❌ Failed to create application user")
             return False
         
-        logger.info("✅ Database and user setup completed")
+        logger.debug("✅ Database and user setup completed")
         
         # Step 3: Find SQL files
         sql_files = find_sql_files()
@@ -292,7 +292,7 @@ def automated_database_setup():
         
         # Step 6: Create/update .env file
         if setup.create_env_file():
-            logger.info("✅ .env file updated")
+            logger.debug("✅ .env file updated")
         
         return True
         

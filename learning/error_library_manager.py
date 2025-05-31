@@ -21,7 +21,7 @@ class ErrorLibraryManager:
                 # Potentially raise an exception or set a flag
                 self.db = None # Ensure db is None if connection fails
             else:
-                logger.info("ErrorLibraryManager initialized with database connection.")
+                logger.debug("ErrorLibraryManager initialized with database connection.")
         except Exception as e:
             logger.error(f"Error during ErrorLibraryManager initialization: {e}")
             self.db = None # Ensure db is None if connection fails
@@ -52,10 +52,10 @@ class ErrorLibraryManager:
             # Assuming execute_query with fetch_one=True returns a dict-like object or None
             result = self.db.execute_query(query, (error_code,), fetch_one=True)
             if result:
-                logger.info(f"Successfully fetched details for error_code: {error_code}")
+                logger.debug(f"Successfully fetched details for error_code: {error_code}")
                 return result 
             else:
-                logger.info(f"No details found for error_code: {error_code}")
+                logger.debug(f"No details found for error_code: {error_code}")
                 return None
         except Exception as e:
             logger.error(f"Database error while fetching details for error_code {error_code}: {e}")
@@ -87,10 +87,10 @@ class ErrorLibraryManager:
                 if not processed_results and results: # If results were not empty, but processing yielded empty
                     logger.warning("Fetched data for error codes/titles was not in the expected format (list of dicts).")
                     return []
-                logger.info(f"Successfully fetched {len(processed_results)} error codes and titles.")
+                logger.debug(f"Successfully fetched {len(processed_results)} error codes and titles.")
                 return processed_results
             else:
-                logger.info("No error codes and titles found in the database.")
+                logger.debug("No error codes and titles found in the database.")
                 return []
         except Exception as e:
             logger.error(f"Database error while fetching all error codes and titles: {e}")
@@ -99,9 +99,9 @@ class ErrorLibraryManager:
 if __name__ == '__main__':
     # Basic test (optional, for development)
     # This part will be expanded later or removed if not needed for automated tests
-    logger.info("Attempting to instantiate ErrorLibraryManager for basic test...")
+    logger.debug("Attempting to instantiate ErrorLibraryManager for basic test...")
     manager = ErrorLibraryManager()
     if manager.db and manager.db.connection and manager.db.connection.is_connected():
-        logger.info("ErrorLibraryManager instantiated and connected for basic test.")
+        logger.debug("ErrorLibraryManager instantiated and connected for basic test.")
     else:
         logger.error("ErrorLibraryManager failed to instantiate or connect for basic test.")

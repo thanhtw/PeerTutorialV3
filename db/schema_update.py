@@ -37,7 +37,7 @@ def update_database_schema():
         # Insert default data
         insert_default_data(db)
         
-        logger.info("Database schema updated successfully with all learning features")
+        logger.debug("Database schema updated successfully with all learning features")
         return True
         
     except Exception as e:
@@ -98,7 +98,7 @@ def create_core_tables(db):
     db.execute_query(users_table)
     db.execute_query(error_category_stats_table)
     db.execute_query(activity_log_table)
-    logger.info("Core tables created successfully")
+    logger.debug("Core tables created successfully")
 
 def create_learning_tables(db):
     """Create learning progress and tutorial tracking tables."""
@@ -284,7 +284,7 @@ def create_learning_tables(db):
     db.execute_query(learning_path_steps_table) # New call
     db.execute_query(user_learning_paths_table)
     db.execute_query(user_learning_preferences_table)
-    logger.info("Learning tables created successfully")
+    logger.debug("Learning tables created successfully")
 
 def create_achievement_tables(db):
     """Create badge and achievement system tables."""
@@ -336,7 +336,7 @@ def create_achievement_tables(db):
     db.execute_query(achievement_categories_table)
     db.execute_query(badges_table)
     db.execute_query(user_badges_table)
-    logger.info("Achievement tables created successfully")
+    logger.debug("Achievement tables created successfully")
 
 def create_peer_learning_tables(db):
     """Create peer learning and review system tables."""
@@ -373,7 +373,7 @@ def create_peer_learning_tables(db):
     
     db.execute_query(peer_review_sessions_table)
     db.execute_query(peer_review_participants_table)
-    logger.info("Peer learning tables created successfully")
+    logger.debug("Peer learning tables created successfully")
 
 def create_daily_challenge_tables(db):
     """Create daily challenge system tables."""
@@ -411,7 +411,7 @@ def create_daily_challenge_tables(db):
     
     db.execute_query(daily_challenges_table)
     db.execute_query(user_daily_challenges_table)
-    logger.info("Daily challenge tables created successfully")
+    logger.debug("Daily challenge tables created successfully")
 
 def create_additional_tables(db):
     """Create code examples library and other additional tables."""
@@ -437,7 +437,7 @@ def create_additional_tables(db):
     """
     
     db.execute_query(code_examples_table)
-    logger.info("Additional tables created successfully")
+    logger.debug("Additional tables created successfully")
 
 def create_error_library_tables(db):
     """Create tables for the error library, including detailed error information."""
@@ -462,7 +462,7 @@ def create_error_library_tables(db):
     ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
     """
     db.execute_query(error_details_table)
-    logger.info("Error library tables created successfully")
+    logger.debug("Error library tables created successfully")
 
 def create_indexes(db):
     """Create indexes for performance optimization."""
@@ -504,7 +504,7 @@ def create_indexes(db):
             logger.warning(f"Error creating index {index_name}: {str(e)}")
             continue
     
-    logger.info("Indexes processed successfully")
+    logger.debug("Indexes processed successfully")
 
 def insert_default_data(db):
     """Insert default achievement categories and badges."""
@@ -560,7 +560,7 @@ def insert_default_data(db):
                 """
                 db.execute_query(insert_query, badge_data)
         
-        logger.info("Default data inserted successfully")
+        logger.debug("Default data inserted successfully")
         return True
         
     except Exception as e:

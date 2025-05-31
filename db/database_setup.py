@@ -37,15 +37,15 @@ class DatabaseSetup:
         self.app_user = os.getenv("APP_DB_USER", "java_review_user")
         self.app_password = os.getenv("APP_DB_PASSWORD", "Thomas123!")
         
-        logger.info(f"Database setup initialized:")
-        logger.info(f"  Host: {self.db_host}:{self.db_port}")
-        logger.info(f"  Database: {self.db_name}")
-        logger.info(f"  App User: {self.app_user}")
+        logger.debug(f"Database setup initialized:")
+        logger.debug(f"  Host: {self.db_host}:{self.db_port}")
+        logger.debug(f"  Database: {self.db_name}")
+        logger.debug(f"  App User: {self.app_user}")
     
     def test_connection(self):
         """Test database connection without specifying database."""
         try:
-            logger.info("Testing database connection...")
+            logger.debug("Testing database connection...")
             
             connection = mysql.connector.connect(
                 host=self.db_host,
@@ -58,11 +58,11 @@ class DatabaseSetup:
             
             if connection.is_connected():
                 db_info = connection.get_server_info()
-                logger.info(f"Successfully connected to MySQL Server version {db_info}")
+                logger.debug(f"Successfully connected to MySQL Server version {db_info}")
                 cursor = connection.cursor()
                 cursor.execute("SELECT DATABASE();")
                 current_db = cursor.fetchone()
-                logger.info(f"Current database: {current_db}")
+                logger.debug(f"Current database: {current_db}")
                 cursor.close()
                 connection.close()
                 return True
@@ -83,7 +83,7 @@ class DatabaseSetup:
     def create_database(self):
         """Create the database if it doesn't exist."""
         try:
-            logger.info(f"Creating database '{self.db_name}' if it doesn't exist...")
+            logger.debug(f"Creating database '{self.db_name}' if it doesn't exist...")
             
             connection = mysql.connector.connect(
                 host=self.db_host,
@@ -98,11 +98,11 @@ class DatabaseSetup:
             
             # Create database
             cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{self.db_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
-            logger.info(f"Database '{self.db_name}' created or already exists")
+            logger.debug(f"Database '{self.db_name}' created or already exists")
             
             # Switch to the database
             cursor.execute(f"USE `{self.db_name}`")
-            logger.info(f"Switched to database '{self.db_name}'")
+            logger.debug(f"Switched to database '{self.db_name}'")
             
             connection.commit()
             cursor.close()
@@ -120,7 +120,7 @@ class DatabaseSetup:
     def create_application_user(self):
         """Create application user with proper permissions."""
         try:
-            logger.info(f"Creating application user '{self.app_user}'...")
+            logger.debug(f"Creating application user '{self.app_user}'...")
             
             connection = mysql.connector.connect(
                 host=self.db_host,
@@ -137,10 +137,10 @@ class DatabaseSetup:
             # Create user if not exists
             try:
                 cursor.execute(f"CREATE USER IF NOT EXISTS '{self.app_user}'@'%' IDENTIFIED BY '{self.app_password}'")
-                logger.info(f"User '{self.app_user}' created or already exists")
+                logger.debug(f"User '{self.app_user}' created or already exists")
             except mysql.connector.Error as e:
                 if e.errno == 1396:  # User already exists
-                    logger.info(f"User '{self.app_user}' already exists")
+                    logger.debug(f"User '{self.app_user}' already exists")
                 else:
                     raise e
             
@@ -148,7 +148,7 @@ class DatabaseSetup:
             cursor.execute(f"GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, ALTER ON `{self.db_name}`.* TO '{self.app_user}'@'%'")
             cursor.execute("FLUSH PRIVILEGES")
             
-            logger.info(f"Permissions granted to user '{self.app_user}'")
+            logger.debug(f"Permissions granted to user '{self.app_user}'")
             
             connection.commit()
             cursor.close()
@@ -166,7 +166,7 @@ class DatabaseSetup:
     def create_core_tables(self):
         """Create the core tables needed for the application."""
         try:
-            logger.info("Creating core tables...")
+            logger.debug("Creating core tables...")
             
             connection = mysql.connector.connect(
                 host=self.db_host,
@@ -200,7 +200,7 @@ class DatabaseSetup:
             """
             
             cursor.execute(users_table)
-            logger.info("Users table created")
+            logger.debug("Users table created")
             
             # Create error_categories table with enhanced structure
             error_categories_table = """
@@ -222,7 +222,7 @@ class DatabaseSetup:
             """
             
             cursor.execute(error_categories_table)
-            logger.info("Error categories table created")
+            logger.debug("Error categories table created")
             
             # Create java_errors table with enhanced structure
             java_errors_table = """
@@ -263,7 +263,7 @@ class DatabaseSetup:
             """
             
             cursor.execute(java_errors_table)
-            logger.info("Java errors table created")
+            logger.debug("Java errors table created")
             
             # Create other essential tables
             essential_tables = [
@@ -351,7 +351,7 @@ class DatabaseSetup:
             for table_sql in essential_tables:
                 cursor.execute(table_sql)
             
-            logger.info("All essential tables created")
+            logger.debug("All essential tables created")
             
             connection.commit()
             cursor.close()
@@ -369,7 +369,7 @@ class DatabaseSetup:
     def migrate_json_data(self):
         """Simple data validation - data is now inserted via SQL file."""
         try:
-            logger.info("Validating inserted data...")
+            logger.debug("Validating inserted data...")
             
             connection = self.get_connection()
             cursor = connection.cursor()
@@ -387,13 +387,13 @@ class DatabaseSetup:
             cursor.close()
             connection.close()
             
-            logger.info(f"Data validation results:")
-            logger.info(f"  Error categories: {categories_count}")
-            logger.info(f"  Java errors: {errors_count}")
-            logger.info(f"  Badges: {badges_count}")
+            logger.debug(f"Data validation results:")
+            logger.debug(f"  Error categories: {categories_count}")
+            logger.debug(f"  Java errors: {errors_count}")
+            logger.debug(f"  Badges: {badges_count}")
             
             if categories_count > 0 and errors_count > 0:
-                logger.info("✅ Data insertion validation successful")
+                logger.debug("✅ Data insertion validation successful")
                 return True
             else:
                 logger.error("❌ Data validation failed - no data found")
@@ -417,7 +417,7 @@ class DatabaseSetup:
 
     def run_complete_setup(self):
         """Run the complete database setup process."""
-        logger.info("Starting complete database setup...")
+        logger.debug("Starting complete database setup...")
         
         try:
             # Step 1: Test basic connection
@@ -450,7 +450,7 @@ class DatabaseSetup:
                 logger.error("❌ Application user connection test failed")
                 return False
             
-            logger.info("✅ Complete database setup with data migration successful!")
+            logger.debug("✅ Complete database setup with data migration successful!")
             return True
             
         except Exception as e:
@@ -480,7 +480,7 @@ APP_DB_PASSWORD={self.app_password}
             with open('.env', 'w') as f:
                 f.write(env_content)
             
-            logger.info("✅ .env file updated with database configuration")
+            logger.debug("✅ .env file updated with database configuration")
             return True
             
         except Exception as e:
@@ -490,7 +490,7 @@ APP_DB_PASSWORD={self.app_password}
     def test_application_connection(self):
         """Test connection using application user credentials."""
         try:
-            logger.info("Testing application user connection...")
+            logger.debug("Testing application user connection...")
             
             connection = mysql.connector.connect(
                 host=self.db_host,
@@ -506,7 +506,7 @@ APP_DB_PASSWORD={self.app_password}
                 cursor = connection.cursor()
                 cursor.execute("SELECT DATABASE(), USER(), VERSION()")
                 result = cursor.fetchone()
-                logger.info(f"Application connection successful: Database={result[0]}, User={result[1]}")
+                logger.debug(f"Application connection successful: Database={result[0]}, User={result[1]}")
                 cursor.close()
                 connection.close()
                 return True
@@ -633,7 +633,7 @@ def verify_tables_exist():
             
             print("✅ Table structure verification passed")
         
-        logger.info("All required tables exist and have proper structure")
+        logger.debug("All required tables exist and have proper structure")
         return True
             
     except Exception as e:

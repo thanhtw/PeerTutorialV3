@@ -99,7 +99,7 @@ class CodeGenerator:
             difficulty_order = {"easy": 1, "medium": 2, "hard": 3}
             
             for category in java_error_categories:
-                logger.info(f"Processing category: {category}")
+                logger.debug(f"Processing category: {category}")
                 
                 # Get errors for this category
                 category_errors = self.error_repository.get_category_errors(category)
@@ -115,7 +115,7 @@ class CodeGenerator:
                     )
                     
                     all_categories_errors[category] = sorted_errors
-                    logger.info(f"Found {len(sorted_errors)} errors in {category}")
+                    logger.debug(f"Found {len(sorted_errors)} errors in {category}")
                 else:
                     logger.warning(f"No errors found for category: {category}")
                     all_categories_errors[category] = []

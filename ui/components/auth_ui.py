@@ -518,7 +518,7 @@ class AuthUI:
                 # Update reviews_completed and score in session state
                 st.session_state.auth["user_info"]["reviews_completed"] = result.get("reviews_completed", 0)
                 st.session_state.auth["user_info"]["score"] = result.get("score", 0)
-                logger.info(f"Updated session state: reviews={result.get('reviews_completed')}, score={result.get('score')}")
+                logger.debug(f"Updated session state: reviews={result.get('reviews_completed')}, score={result.get('score')}")
 
             # Update session state if level changed
             if result.get("level_changed", False):

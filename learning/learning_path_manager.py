@@ -20,7 +20,7 @@ class LearningPathManager:
                 logger.error("Failed to establish database connection in LearningPathManager.")
                 self.db = None # Ensure db is None if connection fails
             else:
-                logger.info("LearningPathManager initialized with database connection.")
+                logger.debug("LearningPathManager initialized with database connection.")
         except Exception as e:
             logger.error(f"Error during LearningPathManager initialization: {e}")
             self.db = None
@@ -49,10 +49,10 @@ class LearningPathManager:
             if results:
                 # Assuming results from db.execute_query is already List[Dict[str, Any]]
                 # If not, conversion will be needed.
-                logger.info(f"Successfully fetched {len(results)} active learning paths.")
+                logger.debug(f"Successfully fetched {len(results)} active learning paths.")
                 return results
             else:
-                logger.info("No active learning paths found.")
+                logger.debug("No active learning paths found.")
                 return []
         except Exception as e:
             logger.error(f"Database error while fetching all learning paths: {e}")
@@ -85,10 +85,10 @@ class LearningPathManager:
             results = self.db.execute_query(query, (path_id,))
             if results:
                 # Assuming results from db.execute_query is already List[Dict[str, Any]]
-                logger.info(f"Successfully fetched {len(results)} steps for path_id {path_id}.")
+                logger.debug(f"Successfully fetched {len(results)} steps for path_id {path_id}.")
                 return results
             else:
-                logger.info(f"No steps found for path_id {path_id}.")
+                logger.debug(f"No steps found for path_id {path_id}.")
                 return []
         except Exception as e:
             logger.error(f"Database error while fetching steps for path_id {path_id}: {e}")
@@ -120,10 +120,10 @@ class LearningPathManager:
             result = self.db.execute_query(query, (user_id, path_id), fetch_one=True)
             if result:
                 # Assuming result from db.execute_query is already Dict[str, Any] or None
-                logger.info(f"Enrollment details found for user_id {user_id}, path_id {path_id}.")
+                logger.debug(f"Enrollment details found for user_id {user_id}, path_id {path_id}.")
                 return result
             else:
-                logger.info(f"No enrollment found for user_id {user_id}, path_id {path_id}.")
+                logger.debug(f"No enrollment found for user_id {user_id}, path_id {path_id}.")
                 return None
         except Exception as e:
             logger.error(f"DB error fetching enrollment for user_id {user_id}, path_id {path_id}: {e}")
@@ -148,7 +148,7 @@ class LearningPathManager:
         # Check if already enrolled
         existing_enrollment = self.get_user_enrollment(user_id, path_id)
         if existing_enrollment:
-            logger.info(f"User_id {user_id} is already enrolled in path_id {path_id}.")
+            logger.debug(f"User_id {user_id} is already enrolled in path_id {path_id}.")
             # Consider what status means 'already successfully enrolled' vs 're-enrollable'
             # For now, if enrollment exists, assume it's fine.
             return True
@@ -180,7 +180,7 @@ class LearningPathManager:
         try:
             progress_percentage = 100.0 if initial_status == 'completed' else 0.0
             self.db.execute_query(insert_query, (user_id, path_id, initial_status, first_step_id, total_steps, progress_percentage))
-            logger.info(f"Successfully enrolled user_id {user_id} in path_id {path_id} with status '{initial_status}' and {total_steps} steps. First step ID: {first_step_id}")
+            logger.debug(f"Successfully enrolled user_id {user_id} in path_id {path_id} with status '{initial_status}' and {total_steps} steps. First step ID: {first_step_id}")
             return True
         except Exception as e:
             # Consider specific exception handling for duplicate entry if UNIQUE constraint is violated
@@ -215,7 +215,7 @@ class LearningPathManager:
             # or if current_step_id is the completed_step_id (meaning this is a re-completion of the last step)
             # it's arguably fine / a no-op. For now, let's assume this is okay.
             if enrollment.get('current_step_id') is None or enrollment.get('current_step_id') == completed_step_id:
-                 logger.info(f"Path {path_id} already completed by user {user_id} and this step completion is consistent or a re-completion of the last step.")
+                 logger.debug(f"Path {path_id} already completed by user {user_id} and this step completion is consistent or a re-completion of the last step.")
                  return True
             else:
                 logger.warning(f"Path {path_id} already completed by user {user_id}, but trying to complete step {completed_step_id} which is not the recorded last step ({enrollment.get('current_step_id')}).")
@@ -295,7 +295,7 @@ class LearningPathManager:
                 path_id,
                 completed_step_id # For the WHERE clause condition
             ))
-            logger.info(f"User {user_id} completed step {completed_step_id} in path {path_id}. New current_step_id: {next_step_id}, Status: {new_status}, Progress: {progress_percentage:.2f}%")
+            logger.debug(f"User {user_id} completed step {completed_step_id} in path {path_id}. New current_step_id: {next_step_id}, Status: {new_status}, Progress: {progress_percentage:.2f}%")
             return True
         except Exception as e:
             logger.error(f"DB error updating step completion for user {user_id}, path {path_id}: {e}")
@@ -342,10 +342,10 @@ class LearningPathManager:
             results = self.db.execute_query(query, (user_id,))
             if results:
                 # Assuming results from db.execute_query is already List[Dict[str, Any]]
-                logger.info(f"Successfully fetched {len(results)} enrolled paths for user {user_id}.")
+                logger.debug(f"Successfully fetched {len(results)} enrolled paths for user {user_id}.")
                 return results
             else:
-                logger.info(f"No enrolled paths found for user {user_id}.")
+                logger.debug(f"No enrolled paths found for user {user_id}.")
                 return []
         except Exception as e:
             logger.error(f"DB error fetching enrolled paths for user {user_id}: {e}")
@@ -353,9 +353,9 @@ class LearningPathManager:
 
 if __name__ == '__main__':
     # Basic test (optional, for development)
-    logger.info("Attempting to instantiate LearningPathManager for basic test...")
+    logger.debug("Attempting to instantiate LearningPathManager for basic test...")
     manager = LearningPathManager()
     if manager.db and manager.db.connection and manager.db.connection.is_connected():
-        logger.info("LearningPathManager instantiated and connected for basic test.")
+        logger.debug("LearningPathManager instantiated and connected for basic test.")
     else:
         logger.error("LearningPathManager failed to instantiate or connect for basic test.")

@@ -44,7 +44,7 @@ class DatabaseErrorRepository:
         try:
             # Test basic connection first
             if not self.db.test_connection_only():
-                logger.info("Database connection not available. Please run setup first.")
+                logger.debug("Database connection not available. Please run setup first.")
                 return
             
             # Check if error_categories table exists and has data
@@ -57,7 +57,7 @@ class DatabaseErrorRepository:
             result = self.db.execute_query(check_query, fetch_one=True)
             
             if not result or result.get('count', 0) == 0:
-                logger.info("Error categories table not found. Please run database setup first.")
+                logger.debug("Error categories table not found. Please run database setup first.")
                 return
             
             # Check if categories have data
@@ -65,7 +65,7 @@ class DatabaseErrorRepository:
             data_result = self.db.execute_query(data_query, fetch_one=True)
             
             if not data_result or data_result.get('count', 0) == 0:
-                logger.info("No categories found. Please import data using the SQL file.")
+                logger.debug("No categories found. Please import data using the SQL file.")
                 return
             
             # Check if java_errors table exists and has data  
@@ -78,7 +78,7 @@ class DatabaseErrorRepository:
             result = self.db.execute_query(check_query, fetch_one=True)
             
             if not result or result.get('count', 0) == 0:
-                logger.info("Java errors table not found. Please run database setup first.")
+                logger.debug("Java errors table not found. Please run database setup first.")
                 return
             
             # Check if errors have data
@@ -86,13 +86,13 @@ class DatabaseErrorRepository:
             data_result = self.db.execute_query(data_query, fetch_one=True)
             
             if not data_result or data_result.get('count', 0) == 0:
-                logger.info("No error data found. Please import data using the SQL file.")
+                logger.debug("No error data found. Please import data using the SQL file.")
                 return
                 
             logger.debug(f"Database verified: {data_result['count']} errors available")
             
         except Exception as e:
-            logger.info(f"Database not ready: {str(e)}. Please run setup and import data first.")
+            logger.debug(f"Database not ready: {str(e)}. Please run setup and import data first.")
     
     def _get_language_fields(self, base_field: str) -> str:
         """Get the appropriate language field name."""
@@ -444,7 +444,7 @@ class DatabaseErrorRepository:
                 
                 # If not enough errors found with exact difficulty, try without difficulty filter
                 if not errors or len(errors) < adjusted_count // 2:
-                    logger.info(f"Not enough {mapped_difficulty} errors found, trying without difficulty filter")
+                    logger.debug(f"Not enough {mapped_difficulty} errors found, trying without difficulty filter")
                     
                     query_no_diff = f"""
                     SELECT 
@@ -486,7 +486,7 @@ class DatabaseErrorRepository:
                         f"{error['category_name']}: {error['error_name']} - {error['description']}"
                     )
                 
-                logger.info(f"Selected {len(selected_errors)} errors for LLM")
+                logger.debug(f"Selected {len(selected_errors)} errors for LLM")
                 return selected_errors, problem_descriptions
                 
             except Exception as e:

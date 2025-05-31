@@ -114,25 +114,39 @@ class CodeGeneratorUI:
         st.markdown('</div>', unsafe_allow_html=True)
 
     def _render_tabbed_mode_interface(self):
-        """Render the tabbed interface for random and advanced modes."""
-        # Create tabs for the two modes
-        mode_tabs = st.tabs([
+        """Render the tabbed interface for random and advanced modes with correct state sync."""
+        # Use localized tab names
+        tab_names = [
             f"🎲 {t('random_mode')}",
             f"🎯 {t('advanced_mode')}"
-        ])
-        
-        with mode_tabs[0]:  # Random Mode Tab
+        ]
+        # Track the last active tab in session state
+        if "codegen_active_tab" not in st.session_state:
+            st.session_state.codegen_active_tab = 0
+        # Use radio with localized tab names
+        tab_index = st.radio(
+            label="",
+            options=[0, 1],
+            index=st.session_state.codegen_active_tab,
+            key="codegen_tab_radio",
+            label_visibility="collapsed",
+            horizontal=True,
+            format_func=lambda x: tab_names[x]
+        )
+        if tab_index != st.session_state.codegen_active_tab:
+            st.session_state.codegen_active_tab = tab_index
+            st.session_state.error_selection_mode = "random" if tab_index == 0 else "advanced"
+
+        # Render the correct tab content
+        if st.session_state.codegen_active_tab == 0:
+            # Random Mode Tab
             st.session_state.error_selection_mode = "random"
-            
             st.markdown(f"""
             <div class="mode-description">
                 <p>🎲 {t('random_mode_description')}</p>
             </div>
             """, unsafe_allow_html=True)
-            
-            # Category selection for random mode
             self._render_category_selection()
-
             selected_categories = st.session_state.get("selected_categories", [])
             if selected_categories:
                 st.markdown(
@@ -144,7 +158,6 @@ class CodeGeneratorUI:
                     + "</div>",
                     unsafe_allow_html=True
                 )
-            # Always show the generate button, but enable/disable based on _can_generate
             st.markdown('<div class="generate-button-section">', unsafe_allow_html=True)
             st.button(
                 f"🔧 {t('generate_code_problem')}",
@@ -157,19 +170,15 @@ class CodeGeneratorUI:
             st.markdown('</div>', unsafe_allow_html=True)
             if not selected_categories:
                 st.warning(f"⚠️ {t('please_select_at_least_one_error_category')}")
-
-        with mode_tabs[1]:  # Advanced Mode Tab
+        else:
+            # Advanced Mode Tab
             st.session_state.error_selection_mode = "advanced"
-            
             st.markdown(f"""
             <div class="mode-description">
                 <p>🎯 {t('advanced_mode_help')}</p>
             </div>
             """, unsafe_allow_html=True)
-            
-            # Load all categories and their errors for advanced mode
             self._render_advanced_error_selection()
-            # Always show the generate button, but enable/disable based on _can_generate
             st.markdown('<div class="generate-button-section">', unsafe_allow_html=True)
             st.button(
                 f"🔧 {t('generate_code_problem')}",
@@ -321,8 +330,6 @@ class CodeGeneratorUI:
             ):
                 st.session_state.selected_specific_errors = []
                 st.rerun()
-
-    
 
     def _render_parameters_display(self, user_level: str):
         """Render the parameters display with visual cards, supporting both English and Chinese."""
@@ -603,7 +610,7 @@ class CodeGeneratorUI:
         """Load errors for a specific category."""
         try:
             errors = self.db_repository.get_category_errors(category_name)
-            logger.info(f"Loaded {len(errors)} errors for category {category_name}")
+            logger.debug(f"Loaded {len(errors)} errors for category {category_name}")
             return errors
         except Exception as e:
             logger.error(f"Error loading errors for category {category_name}: {str(e)}")
@@ -635,11 +642,11 @@ class CodeGeneratorUI:
             try:
                 # Prepare generation parameters based on mode
                 mode = st.session_state.get("error_selection_mode", "random")
-                
+                print(f"Current mode: {mode}")
                 if mode == "random":
                     # Random mode: use selected categories
                     selected_categories = st.session_state.get("selected_categories", [])
-                    
+                    print(f"Selected categories: {selected_categories}")
                     # Ensure it's a list
                     if not isinstance(selected_categories, list):
                         selected_categories = []

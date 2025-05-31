@@ -737,7 +737,7 @@ class EnhancedTutorial:
         """Log tutorial step completion for analytics."""
         try:
             # This could be expanded to track detailed learning analytics
-            logger.info(f"User {user_id} completed tutorial step {step_id}")
+            logger.debug(f"User {user_id} completed tutorial step {step_id}")
             
         except Exception as e:
             logger.error(f"Error logging step completion: {str(e)}")

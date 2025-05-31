@@ -88,7 +88,7 @@ def create_error_storage_tables():
         db.execute_query(java_errors_table)
         db.execute_query(error_usage_stats_table)
         
-        logger.info("Error storage tables created successfully")
+        logger.debug("Error storage tables created successfully")
         return True
         
     except Exception as e:
@@ -112,7 +112,7 @@ def migrate_json_to_database():
         zh_success = migrate_language_data(db, 'zh')
         
         if en_success or zh_success:
-            logger.info("JSON migration completed successfully")
+            logger.debug("JSON migration completed successfully")
             return True
         else:
             logger.error("Failed to migrate any JSON data")
@@ -138,7 +138,7 @@ def migrate_language_data(db, language_code):
         with open(json_file, 'r', encoding='utf-8') as file:
             error_data = json.load(file)
         
-        logger.info(f"Loaded {language_code} error data with {len(error_data)} categories")
+        logger.debug(f"Loaded {language_code} error data with {len(error_data)} categories")
         
         # Create category mapping for this language
         category_mapping = create_category_mapping(db, error_data, language_code)
@@ -274,7 +274,7 @@ def migrate_errors_for_language(db, error_data, category_mapping, language_code)
                 logger.error(f"Error processing error in {category_name}: {str(e)}")
                 continue
     
-    logger.info(f"Processed {errors_processed} errors for language {language_code}")
+    logger.debug(f"Processed {errors_processed} errors for language {language_code}")
 
 def generate_error_code(category_name, error_name, language_code):
     """Generate a unique error code."""
@@ -347,10 +347,10 @@ def create_sample_data_if_missing():
         # Check if we already have data
         cat_check = db.execute_query("SELECT COUNT(*) as count FROM error_categories", fetch_one=True)
         if cat_check and cat_check['count'] > 0:
-            logger.info("Categories already exist, skipping sample data creation")
+            logger.debug("Categories already exist, skipping sample data creation")
             return True
         
-        logger.info("Creating sample data...")
+        logger.debug("Creating sample data...")
         
         # Insert sample categories
         sample_categories = [
@@ -392,7 +392,7 @@ def create_sample_data_if_missing():
             """
             db.execute_query(insert_err, (code, cat_id, name, desc, guide, name, desc, guide))
         
-        logger.info("Sample data created successfully")
+        logger.debug("Sample data created successfully")
         return True
         
     except Exception as e:
@@ -424,13 +424,13 @@ def verify_migration():
         """
         breakdown = db.execute_query(cat_breakdown_query)
         
-        logger.info(f"Migration verification:")
-        logger.info(f"- Categories: {cat_count}")
-        logger.info(f"- Total errors: {err_count}")
-        logger.info(f"- Breakdown by category:")
+        logger.debug(f"Migration verification:")
+        logger.debug(f"- Categories: {cat_count}")
+        logger.debug(f"- Total errors: {err_count}")
+        logger.debug(f"- Breakdown by category:")
         
         for row in breakdown or []:
-            logger.info(f"  - {row['name_en']}: {row['error_count']} errors")
+            logger.debug(f"  - {row['name_en']}: {row['error_count']} errors")
         
         return cat_count > 0 and err_count > 0
         
@@ -440,7 +440,7 @@ def verify_migration():
 
 def run_full_migration():
     """Run the complete migration process."""
-    logger.info("Starting JSON to database migration...")
+    logger.debug("Starting JSON to database migration...")
     
     try:
         # Step 1: Create tables first
@@ -462,7 +462,7 @@ def run_full_migration():
         
         # Step 4: Verify migration
         if verify_migration():
-            logger.info("Migration completed successfully!")
+            logger.debug("Migration completed successfully!")
             return True
         else:
             logger.error("Migration verification failed")

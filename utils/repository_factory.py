@@ -35,14 +35,14 @@ class RepositoryFactory:
                 try:
                     # Try database repository first
                     self._repository = DatabaseErrorRepository()
-                    logger.info("Using DatabaseErrorRepository")
+                    logger.debug("Using DatabaseErrorRepository")
                 except Exception as e:
                     logger.warning(f"Database repository failed, falling back to JSON: {str(e)}")
                     self._repository = JsonErrorRepository()
             else:
                 # Use JSON repository (now database-backed)
                 self._repository = JsonErrorRepository()
-                logger.info("Using JsonErrorRepository (database-backed)")
+                logger.debug("Using JsonErrorRepository (database-backed)")
         
         return self._repository
     

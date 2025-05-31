@@ -165,7 +165,7 @@ class MySQLAuthManager:
                 }
             
             # Authentication successful
-            logger.info(f"User authenticated successfully: {email}")
+            logger.debug(f"User authenticated successfully: {email}")
             return {
                 "success": True,
                 "user_id": user_data["uid"],
