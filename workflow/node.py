@@ -111,8 +111,6 @@ class WorkflowNodes:
                     difficulty=difficulty_level
                 )
 
-                print(f"Selected {selected_errors} errors for generation")
-                
                 # Make sure we have the right number of errors
                 if len(selected_errors) < required_error_count:
                     logger.warning(f"Got fewer errors ({len(selected_errors)}) than requested ({required_error_count})")
@@ -137,6 +135,7 @@ class WorkflowNodes:
 
             # Extract both annotated and clean versions
             annotated_code, clean_code = extract_both_code_versions(response)
+
             # Create code snippet object
             code_snippet = CodeSnippet(
                 code=annotated_code,
@@ -145,8 +144,7 @@ class WorkflowNodes:
                     "java_errors": selected_errors
                 },
                 expected_error_count=original_error_count
-            )
-                                  
+            )                   
             # Update state with the original error count for consistency
             state.original_error_count = original_error_count
             
