@@ -43,7 +43,7 @@ class ErrorExplorerUI:
         
         st.sidebar.title("Error Explorer")
         selected_display_option = st.sidebar.selectbox(
-            "Select an Error to View Details:",
+            t("select_error_to_view"),  # Better descriptive label
             options=display_options,
             index=display_options.index(current_selected_display_option) if current_selected_display_option in display_options else 0,
             key="error_explorer_selectbox" 
@@ -260,7 +260,7 @@ class ErrorExplorerUI:
                 error_map[option_text] = {"error": error, "category": category}
         
         selected_option = st.selectbox(
-            t("error_details"),
+            t("select_error_for_details"),  # Better descriptive label
             error_options,
             key="selected_error"
         )

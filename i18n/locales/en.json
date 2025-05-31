@@ -589,6 +589,13 @@
     "clear_all_advanced_errors": "Clear All",
     "clear_all_selected_errors": "Clear all selected errors",
     "remove_all_selected_categories": "Remove all selected categories",
-    "select_all_available_categories": "Select all available categories"
+    "select_all_available_categories": "Select all available categories",
+    "select_error_to_view": "Select an Error to View Details",
+    "select_error_for_details": "Select Error for Details",
+    "language_selection": "Language Selection",
+    "experience_level_selection": "Experience Level Selection",
+    "start_practice_mode_help": "Start practicing without time pressure",
+    "start_timed_mode_help": "Start timed mode with 30-second limits",
+    "start_challenge_mode_help": "Start challenge mode with increasing difficulty"
   }
 }

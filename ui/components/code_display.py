@@ -187,12 +187,12 @@ class CodeDisplayUI:
         
         # Review input
         student_review_input = st.text_area(
-            t("enter_review"),
+            t("enter_review"),  # Proper label for accessibility
             value=initial_value, 
             height=300,
             key=text_area_key,
             placeholder=t("review_placeholder"),
-            label_visibility="collapsed",
+            label_visibility="collapsed",  # Keep collapsed for UI
             help=t("review_help_text")
         )
         

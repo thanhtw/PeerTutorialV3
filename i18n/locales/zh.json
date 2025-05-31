@@ -360,6 +360,13 @@
     "clear_all_advanced_errors": "全部清除",
     "clear_all_selected_errors": "清除所有已選錯誤",
     "random_mode_all_selected_categories": "移除所有已選類別",
-    "select_all_available_categories": "選擇所有可用類別"
+    "select_all_available_categories": "選擇所有可用類別",
+    "select_error_to_view": "選擇要查看詳細信息的錯誤",
+    "select_error_for_details": "選擇錯誤以查看詳細信息", 
+    "language_selection": "語言選擇",
+    "experience_level_selection": "經驗等級選擇",
+    "start_practice_mode_help": "開始練習模式，無時間壓力",
+    "start_timed_mode_help": "開始計時模式，30秒限制",
+    "start_challenge_mode_help": "開始挑戰模式，難度遞增"
   }
 }

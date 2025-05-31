@@ -1,3 +1,4 @@
+# db/schema_update.py
 import logging
 from db.mysql_connection import MySQLConnection
 
@@ -10,6 +11,11 @@ def update_database_schema():
     db = MySQLConnection()
 
     try:
+        # Check if schema update is needed
+        if not _schema_update_needed(db):
+            logger.debug("Database schema is up to date, skipping update")
+            return True
+        
         # Create core tables
         create_core_tables(db)
         
@@ -31,11 +37,14 @@ def update_database_schema():
         # Create code examples and preferences tables
         create_additional_tables(db)
         
-        # Create indexes for performance
-        create_indexes(db)
+        # Create indexes for performance (with proper existence checks)
+        create_indexes_safe(db)
         
         # Insert default data
         insert_default_data(db)
+        
+        # Mark schema as updated
+        _mark_schema_updated(db)
         
         logger.debug("Database schema updated successfully with all learning features")
         return True
@@ -44,6 +53,148 @@ def update_database_schema():
         logger.error(f"Error updating database schema: {str(e)}")
         return False
 
+def _schema_update_needed(db):
+    """Check if schema update is needed by checking for a schema version table."""
+    try:
+        # Check if schema_version table exists
+        check_query = """
+        SELECT COUNT(*) as count 
+        FROM information_schema.tables 
+        WHERE table_schema = DATABASE() 
+        AND table_name = 'schema_version'
+        """
+        result = db.execute_query(check_query, fetch_one=True)
+        
+        if not result or result.get('count', 0) == 0:
+            # Schema version table doesn't exist, need to update
+            return True
+        
+        # Check current schema version
+        version_query = "SELECT version FROM schema_version ORDER BY updated_at DESC LIMIT 1"
+        version_result = db.execute_query(version_query, fetch_one=True)
+        
+        current_version = version_result.get('version', 0) if version_result else 0
+        target_version = 2  # Increment this when schema changes are needed
+        
+        return current_version < target_version
+        
+    except Exception as e:
+        logger.error(f"Error checking schema version: {str(e)}")
+        return True  # If we can't check, assume update is needed
+
+def _mark_schema_updated(db):
+    """Mark schema as updated in the schema_version table."""
+    try:
+        # Create schema_version table if it doesn't exist
+        create_version_table_query = """
+        CREATE TABLE IF NOT EXISTS schema_version (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            version INT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            description VARCHAR(255)
+        ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+        """
+        db.execute_query(create_version_table_query)
+        
+        # Insert current version
+        target_version = 2  # Should match the target_version in _schema_update_needed
+        insert_version_query = """
+        INSERT INTO schema_version (version, description) 
+        VALUES (%s, %s)
+        """
+        db.execute_query(insert_version_query, (target_version, "Enhanced learning features and accessibility updates"))
+        
+        logger.debug(f"Schema marked as updated to version {target_version}")
+        
+    except Exception as e:
+        logger.error(f"Error marking schema as updated: {str(e)}")
+
+def create_indexes_safe(db):
+    """Create indexes for performance optimization with proper existence checks."""
+    
+    # Define indexes as (table_name, index_name, columns, index_type)
+    indexes = [
+        ("learning_progress", "idx_learning_progress_user", "user_id", "INDEX"),
+        ("learning_progress", "idx_learning_progress_category", "skill_category", "INDEX"),
+        ("hint_usage", "idx_hint_usage_user_session", "user_id, session_id", "INDEX"),
+        ("pattern_recognition_stats", "idx_pattern_stats_user", "user_id", "INDEX"),
+        ("learning_sessions", "idx_learning_sessions_user", "user_id", "INDEX"),
+        ("ai_tutor_interactions", "idx_ai_interactions_user", "user_id", "INDEX"),
+        ("daily_challenges", "idx_daily_challenges_date", "challenge_date", "INDEX"),
+        ("code_examples", "idx_code_examples_category", "category, difficulty_level", "INDEX"),
+        ("users", "idx_users_email", "email", "INDEX"),
+        ("users", "idx_users_last_activity", "last_activity", "INDEX"),
+        ("error_categories", "idx_error_categories_code", "category_code", "INDEX"),
+        ("error_categories", "idx_error_categories_active", "is_active", "INDEX"),
+        ("java_errors", "idx_java_errors_category", "category_id", "INDEX"),
+        ("java_errors", "idx_java_errors_code", "error_code", "INDEX"),
+        ("java_errors", "idx_java_errors_difficulty", "difficulty_level", "INDEX"),
+        ("java_errors", "idx_java_errors_active", "is_active", "INDEX"),
+        ("activity_log", "idx_activity_log_user", "user_id", "INDEX"),
+        ("activity_log", "idx_activity_log_type", "activity_type", "INDEX"),
+        ("activity_log", "idx_activity_log_created", "created_at", "INDEX"),
+        ("user_badges", "idx_user_badges_user", "user_id", "INDEX"),
+        ("user_badges", "idx_user_badges_badge", "badge_id", "INDEX"),
+        ("error_usage_stats", "idx_error_usage_user", "error_id, user_id", "INDEX"),
+        ("error_usage_stats", "idx_error_usage_session", "session_id", "INDEX"),
+        ("error_usage_stats", "idx_error_usage_type", "action_type", "INDEX")
+    ]
+    
+    for table_name, index_name, columns, index_type in indexes:
+        try:
+            # Check if index already exists
+            if _index_exists(db, table_name, index_name):
+                logger.debug(f"Index {index_name} already exists on {table_name}, skipping")
+                continue
+            
+            # Check if table exists before creating index
+            if not _table_exists(db, table_name):
+                logger.debug(f"Table {table_name} does not exist, skipping index {index_name}")
+                continue
+            
+            # Create the index
+            create_index_query = f"CREATE {index_type} {index_name} ON {table_name}({columns})"
+            db.execute_query(create_index_query)
+            logger.debug(f"Created index {index_name} on {table_name}")
+                
+        except Exception as e:
+            logger.warning(f"Error creating index {index_name} on {table_name}: {str(e)}")
+            continue
+    
+    logger.debug("Index creation process completed")
+
+def _index_exists(db, table_name, index_name):
+    """Check if an index already exists on a table."""
+    try:
+        check_query = """
+        SELECT COUNT(*) as index_count 
+        FROM information_schema.statistics 
+        WHERE table_schema = DATABASE() 
+        AND table_name = %s 
+        AND index_name = %s
+        """
+        result = db.execute_query(check_query, (table_name, index_name), fetch_one=True)
+        return result.get('index_count', 0) > 0 if result else False
+    except Exception as e:
+        logger.error(f"Error checking if index {index_name} exists: {str(e)}")
+        return False
+
+def _table_exists(db, table_name):
+    """Check if a table exists."""
+    try:
+        check_query = """
+        SELECT COUNT(*) as table_count 
+        FROM information_schema.tables 
+        WHERE table_schema = DATABASE() 
+        AND table_name = %s
+        """
+        result = db.execute_query(check_query, (table_name,), fetch_one=True)
+        return result.get('table_count', 0) > 0 if result else False
+    except Exception as e:
+        logger.error(f"Error checking if table {table_name} exists: {str(e)}")
+        return False
+
+# Keep all the existing table creation functions unchanged
 def create_core_tables(db):
     """Create core user and basic tracking tables."""
     
@@ -207,10 +358,10 @@ def create_learning_tables(db):
         path_name VARCHAR(100) NOT NULL,
         description_en TEXT,
         description_zh TEXT,
-        difficulty_level VARCHAR(20) NOT NULL, /* e.g., 'Beginner', 'Intermediate', 'Advanced' */
+        difficulty_level VARCHAR(20) NOT NULL,
         estimated_hours INT DEFAULT 0,
-        prerequisites JSON, /* e.g., {"completed_paths": [1, 2], "min_level": "intermediate"} */
-        skills_learned JSON, /* e.g., ["NULL_POINTER", "ARRAY_INDEX_OUT_OF_BOUNDS"] */
+        prerequisites JSON,
+        skills_learned JSON,
         path_order INT DEFAULT 0,
         is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -224,12 +375,9 @@ def create_learning_tables(db):
         path_id INT NOT NULL,
         step_order INT NOT NULL,
         title VARCHAR(255) NOT NULL,
-        description_md TEXT, /* General instructions or introductory text for the step */
-        step_type VARCHAR(50) NOT NULL, 
-            /* Examples: 'ERROR_DETAIL_STUDY', 'PATTERN_GAME', 'GUIDED_PRACTICE', 'QUIZ', 'VIDEO', 'EXTERNAL_LINK' */
-        content_reference VARCHAR(255) NULL, 
-            /* Links to specific content: error_code for ERROR_DETAIL_STUDY, 
-               error_type for PATTERN_GAME, exercise_id for GUIDED_PRACTICE, etc. */
+        description_md TEXT,
+        step_type VARCHAR(50) NOT NULL,
+        content_reference VARCHAR(255) NULL,
         estimated_time_minutes INT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -243,7 +391,7 @@ def create_learning_tables(db):
         user_id VARCHAR(36) NOT NULL,
         path_id INT NOT NULL,
         status VARCHAR(20) NOT NULL DEFAULT 'not_started',
-        current_step INT DEFAULT 0,  /* Add this line for backward compatibility */
+        current_step INT DEFAULT 0,
         current_step_id INT NULL,
         total_steps INT DEFAULT 0,
         progress_percentage FLOAT DEFAULT 0.0,
@@ -281,7 +429,7 @@ def create_learning_tables(db):
     db.execute_query(learning_sessions_table)
     db.execute_query(ai_tutor_interactions_table)
     db.execute_query(learning_paths_table)
-    db.execute_query(learning_path_steps_table) # New call
+    db.execute_query(learning_path_steps_table)
     db.execute_query(user_learning_paths_table)
     db.execute_query(user_learning_preferences_table)
     logger.debug("Learning tables created successfully")
@@ -445,7 +593,7 @@ def create_error_library_tables(db):
     CREATE TABLE IF NOT EXISTS error_details (
         id INT AUTO_INCREMENT PRIMARY KEY,
         error_code VARCHAR(50) NOT NULL UNIQUE,
-        language VARCHAR(20) NOT NULL DEFAULT 'Java', -- Represents programming_language
+        language VARCHAR(20) NOT NULL DEFAULT 'Java',
         title VARCHAR(255) NOT NULL,
         detailed_description_md TEXT,
         category VARCHAR(255) NOT NULL,
@@ -463,48 +611,6 @@ def create_error_library_tables(db):
     """
     db.execute_query(error_details_table)
     logger.debug("Error library tables created successfully")
-
-def create_indexes(db):
-    """Create indexes for performance optimization."""
-    
-    # Define indexes as (table_name, index_name, columns)
-    indexes = [
-        ("learning_progress", "idx_learning_progress_user", "user_id"),
-        ("learning_progress", "idx_learning_progress_category", "skill_category"),
-        ("hint_usage", "idx_hint_usage_user_session", "user_id, session_id"),
-        ("pattern_recognition_stats", "idx_pattern_stats_user", "user_id"),
-        ("learning_sessions", "idx_learning_sessions_user", "user_id"),
-        ("ai_tutor_interactions", "idx_ai_interactions_user", "user_id"),
-        ("daily_challenges", "idx_daily_challenges_date", "challenge_date"),
-        ("code_examples", "idx_code_examples_category", "category, difficulty_level")
-    ]
-    
-    for table_name, index_name, columns in indexes:
-        try:
-            # Check if index already exists
-            check_query = """
-            SELECT COUNT(*) as index_count 
-            FROM information_schema.statistics 
-            WHERE table_schema = DATABASE() 
-            AND table_name = %s 
-            AND index_name = %s
-            """
-            result = db.execute_query(check_query, (table_name, index_name), fetch_one=True)
-            index_exists = result.get('index_count', 0) > 0 if result else False
-            
-            if not index_exists:
-                # Create the index
-                create_index_query = f"CREATE INDEX {index_name} ON {table_name}({columns})"
-                db.execute_query(create_index_query)
-                logger.debug(f"Created index {index_name} on {table_name}")
-            else:
-                logger.debug(f"Index {index_name} already exists on {table_name}")
-                
-        except Exception as e:
-            logger.warning(f"Error creating index {index_name}: {str(e)}")
-            continue
-    
-    logger.debug("Indexes processed successfully")
 
 def insert_default_data(db):
     """Insert default achievement categories and badges."""

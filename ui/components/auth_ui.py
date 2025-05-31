@@ -110,10 +110,11 @@ class AuthUI:
             current_display = language_options.get(current_lang, "English")
             
             selected_lang = st.selectbox(
-                "",
+                t('select_language'),
                 options=list(language_options.values()),
                 index=list(language_options.values()).index(current_display),
-                key="language_selector"
+                key="language_selector",
+                label_visibility="collapsed"
             )
             
             # Find the language code for the selected display name
@@ -269,11 +270,12 @@ class AuthUI:
             }
             
             selected_level_display = st.selectbox(
-                "",
+                t('experience_level'),
                 options=level_options,
                 index=0,
                 key="reg_level",
-                help=t('level_selection_help')
+                help=t('level_selection_help'),
+                label_visibility="collapsed"
             )
             
             # Get the internal level value
