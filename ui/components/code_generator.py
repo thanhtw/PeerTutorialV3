@@ -280,15 +280,15 @@ class CodeGeneratorUI:
         
         with col1:
             if current_selected:
-                st.success(f"✅ {len(current_selected)} errors selected")
+                st.success(f"✅ {len(current_selected)} {t('errors_selected')}")
             else:
-                st.warning("⚠️ No specific errors selected")
+                st.warning(f"⚠️ {t('no_specific_errors_selected')}")
         
         with col2:
             if st.button(
-                "🎯 Select All",
-                key="select_all_advanced_errors",
-                help="Select all available errors",
+                f"🎯 {t('select')} {t('all')}",
+                key=f"{t('select_all_advanced_errors')}",
+                help=f"{t('select_all_available_errors')}",
                 use_container_width=True
             ):
                 # Select all errors from all categories
@@ -314,9 +314,9 @@ class CodeGeneratorUI:
         
         with col3:
             if st.button(
-                "🗑️ Clear All",
-                key="clear_all_advanced_errors",
-                help="Clear all selected errors",
+                f"🗑️ {t('clear_all')}",
+                key=f"{t('clear_all_advanced_errors')}",
+                help=f"{t('clear_all_selected_errors')}",
                 use_container_width=True,
                 disabled=len(current_selected) == 0
             ):
@@ -529,7 +529,7 @@ class CodeGeneratorUI:
                 if st.button(
                     f"🎯 {t('select')} {t('all')}",
                     key=f"select_all_categories_{st.session_state.error_selection_mode}",
-                    help="Select all available categories",
+                    help=f"{t('c')}",
                     use_container_width=True,
                     disabled=len(selected) == len(categories)
                 ):
@@ -540,7 +540,7 @@ class CodeGeneratorUI:
                 if st.button(
                     f"🗑️ {t('clear_all')}",
                     key=f"clear_all_categories_{st.session_state.error_selection_mode}", 
-                    help="Remove all selected categories",
+                    help=f"{t('remove_all_selected_categories')}",
                     use_container_width=True,
                     disabled=len(selected) == 0
                 ):

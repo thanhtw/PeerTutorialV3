@@ -69,6 +69,7 @@
     "no_errors_found": "在以下位置未發現錯誤",
     "no_process_details": "沒有可用的過程詳情。",
     "no_specific_issues": "未選擇特定問題。將根據類別使用隨機錯誤。",
+    "no_specific_errors_selected": "未選擇任何特定錯誤。",
     "params_based_on_level": "這些參數根據您的經驗水平自動設置",
     "partial_quality": "已生成程式碼，品質為",
     "process_details": "過程詳情",
@@ -339,6 +340,7 @@
     "categories_selected": "個類別已選擇",
     "quick_actions": "快速操作",
     "please_select_at_least_one_error_category": "請選擇至少一個錯誤類別以繼續生成程式碼",
+    "please_select_at_least_one_specific_error": "請選擇至少一個特定錯誤以繼續生成程式碼。",
     "domain": "領域",
     "selected_errors": "已選錯誤",
     "difficulty_level": "難度等級",
@@ -351,6 +353,13 @@
     "clear_all": "全部清除",
     "all": "全部",
     "no_leaderboard_data": "沒有排行榜資料",
-    "no_errors_found_in_library": "資料庫中未找到錯誤。"
+    "no_errors_found_in_library": "資料庫中未找到錯誤。",
+    "errors_selected": "個錯誤已選擇",
+    "Select_all_available errors": "選擇所有可用錯誤",
+    "select_all_advanced_errors": "全部選擇",
+    "clear_all_advanced_errors": "全部清除",
+    "clear_all_selected_errors": "清除所有已選錯誤",
+    "random_mode_all_selected_categories": "移除所有已選類別",
+    "select_all_available_categories": "選擇所有可用類別"
   }
 }

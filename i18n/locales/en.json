@@ -571,6 +571,7 @@
     "quick_actions": "Quick Actions",
     "categories_selected": "categories selected",
     "please_select_at_least_one_error_category": "Please select at least one error category to proceed with code generation",
+    "please_select_at_least_one_specific_error": "Please select at least one specific error to proceed with code generation.",
     "domain": "Domain",
     "selected_errors": "Selected Errors",
     "generating_java_code_with_provider": "Generating Java code with provider: {provider}",
@@ -581,6 +582,13 @@
     "clear_all": "Clear All",
     "all": "ALL",
     "no_leaderboard_data": "No leaderboard data available",
-    "no_errors_found_in_library": "No errors found in the library."
+    "no_errors_found_in_library": "No errors found in the library.",
+    "errors_selected": "errors selected",
+    "select_all_available_errors": "Select all available errors",
+    "select_all_advanced_errors": "Select All Advanced Errors",
+    "clear_all_advanced_errors": "Clear All",
+    "clear_all_selected_errors": "Clear all selected errors",
+    "remove_all_selected_categories": "Remove all selected categories",
+    "select_all_available_categories": "Select all available categories"
   }
 }
