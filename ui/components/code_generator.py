@@ -390,7 +390,7 @@ class CodeGeneratorUI:
             <div class="parameter-card">
                 <span class="parameter-icon">🐛</span>
                 <div class="parameter-label">{t('error_count')}</div>
-                <div class="parameter-value">{params['error_count']}</div>
+                <div class="parameter-value">{params['error_count_start']} - {params['error_count_end']}</div>
             </div>
             """, unsafe_allow_html=True)
         with cols[3]:
@@ -587,17 +587,20 @@ class CodeGeneratorUI:
             f"{t('basic').lower()}": {
                 "code_length": "short",
                 "difficulty": "easy",
-                "error_count": "1-2"
+                "error_count_start": "1",
+                "error_count_end": "2"
             },
             f"{t('medium').lower()}": {
                 "code_length": "medium", 
                 "difficulty": "medium",
-                "error_count": "2-3"
+                "error_count_start": "2",
+                "error_count_end": "3"
             },
             f"{t('senior').lower()}": {
                 "code_length": "long",
                 "difficulty": "hard", 
-                "error_count": "3-5"
+                "error_count_start": "3",
+                "error_count_end": "5"
             }
         }
         return level_configs.get(user_level.lower(), level_configs[f"{t('medium').lower()}"])
@@ -688,6 +691,8 @@ class CodeGeneratorUI:
             workflow_state = st.session_state.workflow_state
             workflow_state.code_length = params["code_length"]
             workflow_state.difficulty_level = params["difficulty"]
+            workflow_state.error_count_start = params["error_count_start"]
+            workflow_state.error_count_end = params["error_count_end"]  
             
             if mode == "random":
                 # Random mode: use selected categories

@@ -98,12 +98,14 @@ class WorkflowNodes:
                 if not selected_error_categories or not selected_error_categories.get("java_errors", []):
                     state.error = t("no_categories")
                     return state
-                            
-                logger.debug(f"Using category-based mode with categories: {selected_error_categories}")
-                
+                logger.info(f"Using category-based mode with categories: {selected_error_categories}")
                 # Get exact number based on difficulty
-                required_error_count = get_error_count_from_state(difficulty_level)
-    
+                error_count_start = int(getattr(state, "error_count_start", 1))
+                error_count_end = int(getattr(state, "error_count_end", 2))
+                required_error_count = random.randint(error_count_start, error_count_end)
+                print(f"Required error count for generation: {required_error_count}")
+                print(f"Selected error categories: {selected_error_categories}")
+                print(f"Difficulty level: {difficulty_level}")
                 selected_errors, _ = self.error_repository.get_errors_for_llm(
                     selected_categories=selected_error_categories,
                     count=required_error_count,

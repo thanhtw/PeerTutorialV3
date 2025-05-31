@@ -11,7 +11,7 @@ from typing import Dict, Any, List, Optional, Tuple
 from langgraph.graph import StateGraph
 from state_schema import WorkflowState, ReviewAttempt
 
-from data.json_error_repository import JsonErrorRepository
+from data.database_error_repository import DatabaseErrorRepository
 
 from core.code_generator import CodeGenerator
 from core.student_response_evaluator import StudentResponseEvaluator
@@ -45,7 +45,7 @@ class WorkflowManager:
         self.llm_logger = LLMInteractionLogger()
         
         # Initialize repositories
-        self.error_repository = JsonErrorRepository()
+        self.error_repository = DatabaseErrorRepository()
         
         # Initialize domain objects
         self._initialize_domain_objects()

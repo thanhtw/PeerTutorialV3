@@ -76,3 +76,5 @@ class WorkflowState(BaseModel):
     
     # Original requested errors count (for consistency throughout the workflow)
     original_error_count: int = Field(0, description="Original number of errors requested for generation")
+    error_count_start: int = Field(1, description="Minimum number of errors to generate")
+    error_count_end: int = Field(2, description="Maximum number of errors to generate")
