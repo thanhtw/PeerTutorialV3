@@ -36,14 +36,13 @@ class CodeGeneratorUI:
         """
         # Professional header section
         self._render_header()
-        
+    
         # Initialize session state properly
         self._initialize_session_state()
         
         # Main content in clean sections
         self._render_configuration_section(user_level)
         
-       
         # Generated code display section
         self._render_code_display_section()
 
@@ -326,14 +325,23 @@ class CodeGeneratorUI:
     
 
     def _render_parameters_display(self, user_level: str):
-        """Render the parameters display with visual cards."""
-
-        # Always use the canonical user_level key for lookup
+        """Render the parameters display with visual cards, supporting both English and Chinese."""
+        # Always use the canonical user_level key for lookup (internal: 'basic', 'medium', 'senior')
+        # Accept both English and localized user_level
+        internal_levels = ["basic", "medium", "senior"]
+        localized_levels = [t("basic"), t("medium"), t("senior")]
+        # Map user_level to internal if possible
         user_level_key = user_level.lower()
-        if user_level_key not in ["basic", "medium", "senior"]:
-            user_level_key = "medium"
-        params = self._get_level_parameters(user_level_key)
+        
+        if user_level_key in internal_levels:
+            internal_level = user_level_key
+        elif user_level_key in localized_levels:
+            internal_level = internal_levels[localized_levels.index(user_level_key)]
+        else:
+            internal_level = "medium"
 
+        params = self._get_level_parameters(user_level)
+        
         # Localize code_length and difficulty values
         code_length_localized = {
             "short": t("short"),
@@ -349,7 +357,6 @@ class CodeGeneratorUI:
 
         # Display parameters in a grid
         cols = st.columns(4)
-        
         with cols[0]:
             st.markdown(f"""
             <div class="parameter-card">
@@ -358,7 +365,6 @@ class CodeGeneratorUI:
                 <div class="parameter-value">{code_length_localized}</div>
             </div>
             """, unsafe_allow_html=True)
-        
         with cols[1]:
             st.markdown(f"""
             <div class="parameter-card">
@@ -367,7 +373,6 @@ class CodeGeneratorUI:
                 <div class="parameter-value">{difficulty_localized}</div>
             </div>
             """, unsafe_allow_html=True)
-        
         with cols[2]:
             st.markdown(f"""
             <div class="parameter-card">
@@ -376,16 +381,14 @@ class CodeGeneratorUI:
                 <div class="parameter-value">{params['error_count']}</div>
             </div>
             """, unsafe_allow_html=True)
-        
         with cols[3]:
             st.markdown(f"""
             <div class="parameter-card">
                 <span class="parameter-icon">👤</span>
                 <div class="parameter-label">{t('your_level')}</div>
-                <div class="parameter-value">{t(user_level_key)}</div>
+                <div class="parameter-value">{t(user_level_key) if user_level_key in localized_levels else t(internal_level)}</div>
             </div>
             """, unsafe_allow_html=True)
-
         st.markdown(f"""
         <div class="parameters-note">
             💡 {t('these_parameters_optimized')}
@@ -567,24 +570,25 @@ class CodeGeneratorUI:
 
     def _get_level_parameters(self, user_level: str) -> Dict[str, Any]:
         """Get parameters based on user level."""
+
         level_configs = {
-            "basic": {
+            f"{t('basic').lower()}": {
                 "code_length": "short",
                 "difficulty": "easy",
                 "error_count": "1-2"
             },
-            "medium": {
+            f"{t('medium').lower()}": {
                 "code_length": "medium", 
                 "difficulty": "medium",
                 "error_count": "2-3"
             },
-            "senior": {
+            f"{t('senior').lower()}": {
                 "code_length": "long",
                 "difficulty": "hard", 
                 "error_count": "3-5"
             }
         }
-        return level_configs.get(user_level, level_configs["medium"])
+        return level_configs.get(user_level.lower(), level_configs[f"{t('medium').lower()}"])
 
     def _render_header(self):
         """Render the professional header with branding and description."""

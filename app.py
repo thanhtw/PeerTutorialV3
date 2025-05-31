@@ -185,7 +185,7 @@ def main():
     
     # Get user level from auth_ui
     user_level = auth_ui.get_user_level()
-    
+
     # Tab content
     with tabs[0]:
         code_generator_ui.render(user_level)
