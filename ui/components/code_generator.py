@@ -2,7 +2,7 @@
 Code Generator UI component for Java Peer Review Training System.
 
 This module provides a professional UI for configuring and generating Java code snippets
-with intentional errors for review practice.
+with intentional errors for review practice. Revised to properly integrate with workflow manager.
 """
 
 import streamlit as st
@@ -19,14 +19,18 @@ logger = logging.getLogger(__name__)
 class CodeGeneratorUI:
     """
     Professional UI component for Java code generation with clean layout and intuitive workflow.
+    Now properly integrated with the workflow manager system.
     """
     
     def __init__(self, workflow, code_display_ui):
-        """Initialize the CodeGeneratorUI with database repository."""
+        """Initialize the CodeGeneratorUI with database repository and workflow."""
         self.db_repository = DatabaseErrorRepository()
         self.current_language = get_current_language()
-        self.workflow = workflow
+        self.workflow = workflow  # This is JavaCodeReviewGraph
         self.code_display_ui = code_display_ui
+        
+        # Get reference to the workflow manager for proper workflow execution
+        self.workflow_manager = getattr(workflow, 'workflow_manager', None)
         
     def render(self, user_level: str = "medium"):
         """
@@ -638,83 +642,171 @@ class CodeGeneratorUI:
             logger.error(f"Error updating usage stats: {str(e)}")
     
     def _handle_code_generation(self):
-        """Handle the code generation process with proper workflow integration."""
+        """
+        Handle the code generation process with proper workflow integration.
+        Now uses the workflow manager for proper workflow execution.
+        """
         with st.spinner("🔧 Generating your Java code challenge..."):
             try:
-                # Prepare generation parameters based on mode
-                mode = st.session_state.get("error_selection_mode", "random")
+                logger.debug("Starting code generation through workflow manager")
                 
-                # Initialize or get workflow state
-                if not hasattr(st.session_state, 'workflow_state') or st.session_state.workflow_state is None:
-                    st.session_state.workflow_state = WorkflowState()
-                
-                # Get user level from session state or use default
-                user_level = st.session_state.get("user_level", "medium")
-                params = self._get_level_parameters(user_level)
-                
-                # Update workflow state with parameters
-                st.session_state.workflow_state.code_length = params["code_length"]
-                st.session_state.workflow_state.difficulty_level = params["difficulty"]
-                
-                if mode == "random":
-                    # Random mode: use selected categories
-                    selected_categories = st.session_state.get("selected_categories", [])
-                    if not selected_categories:
-                        st.error("❌ Please select at least one category in Random mode")
-                        return
-                    
-                    # Format for workflow
-                    categories_dict = {"java_errors": selected_categories}
-                    st.session_state.workflow_state.selected_error_categories = categories_dict
-                    st.session_state.workflow_state.selected_specific_errors = []
-                    
-                    logger.debug(f"Random mode: Selected categories: {selected_categories}")
-                else:
-                    # Advanced mode: use specific errors
-                    selected_specific_errors = st.session_state.get("selected_specific_errors", [])
-                    if not selected_specific_errors:
-                        st.error("❌ Please select at least one specific error in Advanced mode")
-                        return
-                    
-                    # Update error usage tracking
-                    for error in selected_specific_errors:
-                        error_code = error.get("error_code", "")
-                        if error_code:
-                            self._update_error_usage(error_code, action_type='practiced')
-                    
-                    st.session_state.workflow_state.selected_error_categories = {"java_errors": []}
-                    st.session_state.workflow_state.selected_specific_errors = selected_specific_errors
-                    
-                    logger.debug(f"Advanced mode: Selected {len(selected_specific_errors)} specific errors")
-                
-                # Reset workflow state for fresh generation
-                st.session_state.workflow_state.current_step = "generate"
-                st.session_state.workflow_state.evaluation_attempts = 0
-                st.session_state.workflow_state.evaluation_result = None
-                st.session_state.workflow_state.error = None
-                
-                # Execute the workflow node directly
-                updated_state = self.workflow.generate_code_node(st.session_state.workflow_state)
-                
-                # Check for errors
-                if hasattr(updated_state, 'error') and updated_state.error:
-                    st.error(f"❌ Generation failed: {updated_state.error}")
+                # Prepare workflow state
+                workflow_state = self._prepare_workflow_state()
+                if not workflow_state:
                     return
                 
-                # Update session state with result
-                st.session_state.workflow_state = updated_state
+                # Execute code generation through the workflow system
+                updated_state = self._execute_code_generation_workflow(workflow_state)
                 
-                if hasattr(updated_state, 'code_snippet') and updated_state.code_snippet:
-                    st.success("✅ Code generated successfully! Proceed to the Review tab.")
-                    # Switch to review tab
-                    st.session_state.active_tab = 1
-                    st.rerun()
-                else:
-                    st.error("❌ Failed to generate code. Please try again.")
+                # Handle the result
+                self._handle_generation_result(updated_state)
                     
             except Exception as e:
                 logger.error(f"Code generation error: {str(e)}", exc_info=True)
                 st.error(f"❌ Generation failed: {str(e)}")
+
+    def _prepare_workflow_state(self) -> Optional[WorkflowState]:
+        """
+        Prepare the workflow state for code generation.
+        
+        Returns:
+            WorkflowState if preparation is successful, None otherwise
+        """
+        try:
+            # Prepare generation parameters based on mode
+            mode = st.session_state.get("error_selection_mode", "random")
+            
+            # Initialize or get workflow state
+            if not hasattr(st.session_state, 'workflow_state') or st.session_state.workflow_state is None:
+                st.session_state.workflow_state = WorkflowState()
+            
+            # Get user level from session state or use default
+            user_level = st.session_state.get("user_level", "medium")
+            params = self._get_level_parameters(user_level)
+            
+            # Update workflow state with parameters
+            workflow_state = st.session_state.workflow_state
+            workflow_state.code_length = params["code_length"]
+            workflow_state.difficulty_level = params["difficulty"]
+            
+            if mode == "random":
+                # Random mode: use selected categories
+                selected_categories = st.session_state.get("selected_categories", [])
+                if not selected_categories:
+                    st.error("❌ Please select at least one category in Random mode")
+                    return None
+                
+                # Format for workflow
+                categories_dict = {"java_errors": selected_categories}
+                workflow_state.selected_error_categories = categories_dict
+                workflow_state.selected_specific_errors = []
+                
+                logger.debug(f"Random mode: Selected categories: {selected_categories}")
+            else:
+                # Advanced mode: use specific errors
+                selected_specific_errors = st.session_state.get("selected_specific_errors", [])
+                if not selected_specific_errors:
+                    st.error("❌ Please select at least one specific error in Advanced mode")
+                    return None
+                
+                # Update error usage tracking
+                for error in selected_specific_errors:
+                    error_code = error.get("error_code", "")
+                    if error_code:
+                        self._update_error_usage(error_code, action_type='practiced')
+                
+                workflow_state.selected_error_categories = {"java_errors": []}
+                workflow_state.selected_specific_errors = selected_specific_errors
+                
+                logger.debug(f"Advanced mode: Selected {len(selected_specific_errors)} specific errors")
+            
+            # Reset workflow state for fresh generation
+            workflow_state.current_step = "generate"
+            workflow_state.evaluation_attempts = 0
+            workflow_state.evaluation_result = None
+            workflow_state.error = None
+            
+            return workflow_state
+            
+        except Exception as e:
+            logger.error(f"Error preparing workflow state: {str(e)}")
+            st.error(f"❌ Failed to prepare generation parameters: {str(e)}")
+            return None
+
+    def _execute_code_generation_workflow(self, workflow_state: WorkflowState) -> WorkflowState:
+        """
+        Execute the code generation through the workflow system.
+        
+        Args:
+            workflow_state: Prepared workflow state
+            
+        Returns:
+            Updated workflow state after execution
+        """
+        try:
+            logger.debug("Executing code generation through workflow manager")
+            
+            # Option 1: Use the workflow manager directly if available
+            if self.workflow_manager:
+                logger.debug("Using workflow manager for code generation")
+                # Execute the generation step through workflow nodes
+                updated_state = self.workflow_manager.workflow_nodes.generate_code_node(workflow_state)
+                return updated_state
+            
+            else:
+                raise Exception("No valid workflow execution method available")
+                
+        except Exception as e:
+            logger.error(f"Error executing workflow: {str(e)}")
+            workflow_state.error = f"Workflow execution failed: {str(e)}"
+            return workflow_state
+
+    def _handle_generation_result(self, updated_state: WorkflowState):
+        """
+        Handle the result of code generation.
+        
+        Args:
+            updated_state: The updated workflow state after generation
+        """
+        try:
+            # Check for errors
+            if hasattr(updated_state, 'error') and updated_state.error:
+                st.error(f"❌ Generation failed: {updated_state.error}")
+                return
+            
+            # Update session state with result
+            st.session_state.workflow_state = updated_state
+            
+            # Check if code was generated successfully
+            if hasattr(updated_state, 'code_snippet') and updated_state.code_snippet:
+                logger.debug("Code generation completed successfully")
+                st.success("✅ Code generated successfully! Proceed to the Review tab.")
+                
+                # Log successful generation
+                if self.workflow_manager and hasattr(self.workflow_manager, 'llm_logger'):
+                    self.workflow_manager.llm_logger.log_interaction(
+                        "code_generation_success",
+                        f"Generated code with {len(updated_state.selected_specific_errors)} specific errors" 
+                        if updated_state.selected_specific_errors 
+                        else f"Generated code from categories: {updated_state.selected_error_categories}",
+                        "Success",
+                        {
+                            "code_length": updated_state.code_length,
+                            "difficulty": updated_state.difficulty_level,
+                            "mode": st.session_state.get("error_selection_mode", "unknown")
+                        }
+                    )
+                
+                # Switch to review tab automatically
+                st.session_state.active_tab = 1
+                st.rerun()
+            else:
+                st.error("❌ Failed to generate code. Please try again.")
+                logger.warning("Code generation completed but no code snippet was created")
+                
+        except Exception as e:
+            logger.error(f"Error handling generation result: {str(e)}")
+            st.error(f"❌ Error processing generation result: {str(e)}")
 
     def _build_workflow_state(self, **kwargs):
         """Helper to build a WorkflowState object for code generation."""

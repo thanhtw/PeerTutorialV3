@@ -143,25 +143,3 @@ def get_prompt_template(template_name: str, lang_code: str = None) -> str:
     # Return empty string if template not found in any language
     return ""
 
-def invoke_llm_safely(llm, prompt, default_response="Error: Could not generate response"):
-    """
-    Safely invoke an LLM with proper error handling.
-    
-    Args:
-        llm: Language model to invoke
-        prompt: Prompt to send to the LLM
-        default_response: Default response if invocation fails
-        
-    Returns:
-        LLM response or default response if invocation fails
-    """
-    if not llm:
-        logger.warning("No LLM available for invocation")
-        return default_response
-        
-    try:
-        response = llm.invoke(prompt)
-        return response
-    except Exception as e:
-        logger.error(f"Error invoking LLM: {str(e)}")
-        return default_response

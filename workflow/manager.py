@@ -2,7 +2,7 @@
 Workflow Manager for Java Peer Review Training System.
 
 This module provides a central manager class that integrates
-all components of the workflow system.
+all components of the workflow system with enhanced code generation workflow.
 """
 
 import logging
@@ -32,7 +32,7 @@ class WorkflowManager:
     """
     Manager class for the Java Code Review workflow system.
     This class integrates all components of the workflow system and provides
-    a high-level API for interacting with the workflow.
+    a high-level API for interacting with the workflow with enhanced code generation.
     """
     def __init__(self, llm_manager):
         """
@@ -56,6 +56,9 @@ class WorkflowManager:
         
         # Build workflow graph
         self.workflow = self._build_workflow_graph()
+        
+        # Store the compiled workflow for execution
+        self._compiled_workflow = None
     
     def _initialize_domain_objects(self) -> None:
         """
@@ -161,6 +164,180 @@ class WorkflowManager:
         self.graph_builder = GraphBuilder(self.workflow_nodes)
         return self.graph_builder.build_graph()
     
+    def get_compiled_workflow(self):
+        """
+        Get the compiled workflow for execution.
+        Compiles the workflow if not already compiled.
+        
+        Returns:
+            Compiled LangGraph workflow
+        """
+        if self._compiled_workflow is None:
+            logger.debug("Compiling workflow for execution")
+            self._compiled_workflow = self.workflow.compile()
+        return self._compiled_workflow
+    
+    def execute_code_generation(self, workflow_state: WorkflowState) -> WorkflowState:
+        """
+        Execute the complete code generation workflow including evaluation.
+        This method provides a high-level interface for code generation.
+        
+        Args:
+            workflow_state: Initial workflow state with parameters
+            
+        Returns:
+            Updated workflow state after generation and evaluation
+        """
+        try:
+            logger.debug("Starting complete code generation workflow")
+            
+            # Step 1: Generate code
+            logger.debug("Step 1: Generating code")
+            updated_state = self.workflow_nodes.generate_code_node(workflow_state)
+            
+            if updated_state.error:
+                logger.error(f"Code generation failed: {updated_state.error}")
+                return updated_state
+            
+            # Step 2: Evaluate generated code
+            logger.debug("Step 2: Evaluating generated code")
+            evaluated_state = self.workflow_nodes.evaluate_code_node(updated_state)
+            
+            if evaluated_state.error:
+                logger.error(f"Code evaluation failed: {evaluated_state.error}")
+                return evaluated_state
+            
+            # Step 3: Check if regeneration is needed
+            max_attempts = getattr(evaluated_state, 'max_evaluation_attempts', 3)
+            current_attempts = getattr(evaluated_state, 'evaluation_attempts', 0)
+            
+            # If evaluation indicates regeneration is needed and we haven't exceeded max attempts
+            if (evaluated_state.current_step == "regenerate" and 
+                current_attempts < max_attempts and
+                evaluated_state.evaluation_result and
+                not evaluated_state.evaluation_result.get("valid", False)):
+                
+                logger.debug(f"Regeneration needed (attempt {current_attempts}/{max_attempts})")
+                return self._execute_regeneration_cycle(evaluated_state)
+            
+            # If we're good to proceed or have reached max attempts
+            logger.debug("Code generation workflow completed successfully")
+            evaluated_state.current_step = "review"
+            return evaluated_state
+            
+        except Exception as e:
+            logger.error(f"Error in code generation workflow: {str(e)}")
+            workflow_state.error = f"Code generation workflow failed: {str(e)}"
+            return workflow_state
+    
+    def _execute_regeneration_cycle(self, state: WorkflowState) -> WorkflowState:
+        """
+        Execute the regeneration cycle until code is valid or max attempts reached.
+        
+        Args:
+            state: Current workflow state requiring regeneration
+            
+        Returns:
+            Updated workflow state after regeneration cycle
+        """
+        max_attempts = getattr(state, 'max_evaluation_attempts', 3)
+        
+        while (state.evaluation_attempts < max_attempts and 
+               state.current_step == "regenerate" and
+               state.evaluation_result and
+               not state.evaluation_result.get("valid", False)):
+            
+            logger.debug(f"Regeneration cycle attempt {state.evaluation_attempts + 1}/{max_attempts}")
+            
+            # Regenerate code
+            regenerated_state = self.workflow_nodes.regenerate_code_node(state)
+            if regenerated_state.error:
+                logger.error(f"Regeneration failed: {regenerated_state.error}")
+                return regenerated_state
+            
+            # Evaluate regenerated code
+            evaluated_state = self.workflow_nodes.evaluate_code_node(regenerated_state)
+            if evaluated_state.error:
+                logger.error(f"Evaluation after regeneration failed: {evaluated_state.error}")
+                return evaluated_state
+            
+            # Update state for next iteration
+            state = evaluated_state
+            
+            # Check if we're now valid
+            if (state.evaluation_result and 
+                state.evaluation_result.get("valid", False)):
+                logger.debug("Regeneration successful - code is now valid")
+                state.current_step = "review"
+                break
+        
+        # If we've exhausted attempts, proceed to review anyway
+        if state.evaluation_attempts >= max_attempts:
+            logger.warning(f"Maximum regeneration attempts ({max_attempts}) reached. Proceeding to review.")
+            state.current_step = "review"
+        
+        return state
+    
+    def execute_workflow_step(self, workflow_state: WorkflowState, step_name: str) -> WorkflowState:
+        """
+        Execute a specific workflow step.
+        
+        Args:
+            workflow_state: Current workflow state
+            step_name: Name of the step to execute
+            
+        Returns:
+            Updated workflow state
+        """
+        try:
+            logger.debug(f"Executing workflow step: {step_name}")
+            
+            step_handlers = {
+                "generate_code": self.workflow_nodes.generate_code_node,
+                "evaluate_code": self.workflow_nodes.evaluate_code_node,
+                "regenerate_code": self.workflow_nodes.regenerate_code_node,
+                "review_code": self.workflow_nodes.review_code_node,
+                "analyze_review": self.workflow_nodes.analyze_review_node,
+                "generate_summary": self.workflow_nodes.generate_summary_node
+            }
+            
+            if step_name in step_handlers:
+                return step_handlers[step_name](workflow_state)
+            else:
+                raise ValueError(f"Unknown workflow step: {step_name}")
+                
+        except Exception as e:
+            logger.error(f"Error executing workflow step {step_name}: {str(e)}")
+            workflow_state.error = f"Step {step_name} failed: {str(e)}"
+            return workflow_state
+    
+    def execute_full_workflow(self, workflow_state: WorkflowState) -> WorkflowState:
+        """
+        Execute the full workflow using the LangGraph compiled workflow.
+        
+        Args:
+            workflow_state: Initial workflow state
+            
+        Returns:
+            Final workflow state after complete execution
+        """
+        try:
+            logger.debug("Executing full workflow using LangGraph")
+            
+            # Get compiled workflow
+            compiled_workflow = self.get_compiled_workflow()
+            
+            # Execute the workflow
+            result = compiled_workflow.invoke(workflow_state)
+            
+            logger.debug("Full workflow execution completed")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error executing full workflow: {str(e)}")
+            workflow_state.error = f"Full workflow execution failed: {str(e)}"
+            return workflow_state
+    
     def get_all_error_categories(self) -> Dict[str, List[str]]:
         """
         Get all available error categories.
@@ -204,6 +381,85 @@ class WorkflowManager:
             self._generate_review_feedback(updated_state)
         
         return updated_state
+    
+    def validate_workflow_state(self, state: WorkflowState) -> Tuple[bool, str]:
+        """
+        Validate that the workflow state is ready for execution.
+        
+        Args:
+            state: Workflow state to validate
+            
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        try:
+            # Check required parameters
+            if not hasattr(state, 'code_length') or not state.code_length:
+                return False, "Code length parameter is required"
+            
+            if not hasattr(state, 'difficulty_level') or not state.difficulty_level:
+                return False, "Difficulty level parameter is required"
+            
+            # Check error selection
+            has_categories = (hasattr(state, 'selected_error_categories') and 
+                            state.selected_error_categories and
+                            state.selected_error_categories.get("java_errors", []))
+            
+            has_specific_errors = (hasattr(state, 'selected_specific_errors') and 
+                                 state.selected_specific_errors)
+            
+            if not has_categories and not has_specific_errors:
+                return False, "Either error categories or specific errors must be selected"
+            
+            logger.debug("Workflow state validation passed")
+            return True, ""
+            
+        except Exception as e:
+            logger.error(f"Error validating workflow state: {str(e)}")
+            return False, f"Validation error: {str(e)}"
+    
+    def get_workflow_status(self, state: WorkflowState) -> Dict[str, Any]:
+        """
+        Get the current status of the workflow.
+        
+        Args:
+            state: Current workflow state
+            
+        Returns:
+            Dictionary with workflow status information
+        """
+        try:
+            status = {
+                "current_step": getattr(state, 'current_step', 'unknown'),
+                "has_code": hasattr(state, 'code_snippet') and state.code_snippet is not None,
+                "evaluation_attempts": getattr(state, 'evaluation_attempts', 0),
+                "max_evaluation_attempts": getattr(state, 'max_evaluation_attempts', 3),
+                "current_iteration": getattr(state, 'current_iteration', 1),
+                "max_iterations": getattr(state, 'max_iterations', 3),
+                "review_sufficient": getattr(state, 'review_sufficient', False),
+                "has_error": hasattr(state, 'error') and state.error is not None,
+                "error_message": getattr(state, 'error', None)
+            }
+            
+            # Add evaluation status if available
+            if hasattr(state, 'evaluation_result') and state.evaluation_result:
+                status["evaluation_valid"] = state.evaluation_result.get("valid", False)
+                status["found_errors_count"] = len(state.evaluation_result.get("found_errors", []))
+                status["missing_errors_count"] = len(state.evaluation_result.get("missing_errors", []))
+            
+            # Add review status if available
+            if hasattr(state, 'review_history') and state.review_history:
+                status["review_attempts"] = len(state.review_history)
+                latest_review = state.review_history[-1]
+                if hasattr(latest_review, 'analysis') and latest_review.analysis:
+                    status["identified_count"] = latest_review.analysis.get("identified_count", 0)
+                    status["identified_percentage"] = latest_review.analysis.get("identified_percentage", 0)
+            
+            return status
+            
+        except Exception as e:
+            logger.error(f"Error getting workflow status: {str(e)}")
+            return {"error": f"Status retrieval failed: {str(e)}"}
     
     def _generate_review_feedback(self, state: WorkflowState) -> None:
         """
