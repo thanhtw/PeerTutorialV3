@@ -148,8 +148,17 @@ class CodeGeneratorUI:
                     + "</div>",
                     unsafe_allow_html=True
                 )
+                # Show the generate button when at least one category is selected
+                st.markdown('<div class="generate-button-section">', unsafe_allow_html=True)
+                if st.button(f"🔧 {t('generate_code_problem')}", key="generate_code_main_random", type="primary", use_container_width=True):
+                    self._handle_code_generation()
+                st.markdown('</div>', unsafe_allow_html=True)
             else:
                 st.warning(f"⚠️ {t('please_select_at_least_one_error_category')}")
+                # Show disabled generate button for clarity
+                st.markdown('<div class="generate-button-section">', unsafe_allow_html=True)
+                st.button(f"🔧 {t('generate_code_problem')}", key="generate_code_disabled_random", disabled=True, use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
 
         with mode_tabs[1]:  # Advanced Mode Tab
             st.session_state.error_selection_mode = "advanced"
