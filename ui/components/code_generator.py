@@ -642,7 +642,7 @@ class CodeGeneratorUI:
             try:
                 # Prepare generation parameters based on mode
                 mode = st.session_state.get("error_selection_mode", "random")
-                print(f"Current mode: {mode}")
+                
                 if mode == "random":
                     # Random mode: use selected categories
                     selected_categories = st.session_state.get("selected_categories", [])
@@ -650,41 +650,43 @@ class CodeGeneratorUI:
                     # Ensure it's a list
                     if not isinstance(selected_categories, list):
                         selected_categories = []
-                    
                     # Format for workflow
                     categories_dict = {"java_errors": selected_categories} if selected_categories else None
-                    
-                    result = self.workflow.invoke({
-                        "selected_categories": categories_dict,
-                        "generation_mode": "random"
-                    })
+                    # FIX: Use generate_code_node instead of invoke
+                    result = self.workflow.generate_code_node(
+                        self._build_workflow_state(selected_categories=categories_dict, generation_mode="random")
+                    )
                 else:
                     # Advanced mode: use specific errors
                     selected_specific_errors = st.session_state.get("selected_specific_errors", [])
-                    
                     if not selected_specific_errors:
                         st.error("❌ Please select at least one specific error in Advanced mode")
                         return
-                    
                     # Update error usage tracking
                     for error in selected_specific_errors:
                         error_code = error.get("error_code", "")
                         if error_code:
                             self._update_error_usage(error_code, action_type='practiced')
-                    
-                    result = self.workflow.invoke({
-                        "selected_specific_errors": selected_specific_errors,
-                        "generation_mode": "advanced"
-                    })
-                
+                    # FIX: Use generate_code_node instead of invoke
+                    result = self.workflow.generate_code_node(
+                        self._build_workflow_state(selected_specific_errors=selected_specific_errors, generation_mode="advanced")
+                    )
                 if result and hasattr(result, 'code_snippet'):
                     st.success("✅ Code generated successfully! Proceed to the Review tab.")
                     # Switch to review tab
                     st.session_state.active_tab = 1
+                    print(result.code_snippet)
                     st.rerun()
                 else:
                     st.error("❌ Failed to generate code. Please try again.")
-                    
             except Exception as e:
                 logger.error(f"Code generation error: {str(e)}")
                 st.error(f"❌ Generation failed: {str(e)}")
+
+    def _build_workflow_state(self, **kwargs):
+        """Helper to build a WorkflowState object for code generation."""
+        from state_schema import WorkflowState
+        # Use current session state as base, update with kwargs
+        state_dict = dict(getattr(st.session_state, 'workflow_state', WorkflowState()).dict())
+        state_dict.update(kwargs)
+        return WorkflowState(**state_dict)
