@@ -125,7 +125,7 @@ class CodeGeneratorUI:
             st.session_state.codegen_active_tab = 0
         # Use radio with localized tab names
         tab_index = st.radio(
-            label="",
+            label="Code Generation Mode",  # Non-empty label for accessibility
             options=[0, 1],
             index=st.session_state.codegen_active_tab,
             key="codegen_tab_radio",
