@@ -135,7 +135,22 @@ class CodeGeneratorUI:
             
             # Category selection for random mode
             self._render_category_selection()
-        
+
+            # --- Show selected categories visually ---
+            selected_categories = st.session_state.get("selected_categories", [])
+            if selected_categories:
+                st.markdown(
+                    f"<div class='selected-categories'>"
+                    + "".join(
+                        f"<span class='selected-category-item'>{self._get_category_icon(cat)} {cat}</span>"
+                        for cat in selected_categories
+                    )
+                    + "</div>",
+                    unsafe_allow_html=True
+                )
+            else:
+                st.warning(f"⚠️ {t('please_select_at_least_one_error_category')}")
+
         with mode_tabs[1]:  # Advanced Mode Tab
             st.session_state.error_selection_mode = "advanced"
             
@@ -302,7 +317,6 @@ class CodeGeneratorUI:
             ):
                 self._handle_code_generation()
         else:
-            st.error(f"⚠️ {t('please_select_at_least_one_error_category')}")
             st.button(
                 f"🔧 {t('generate_code_problem')}",
                 key="generate_code_disabled",
@@ -459,6 +473,7 @@ class CodeGeneratorUI:
                 ]
         else:
             st.session_state.selected_categories.append(category_name)
+        st.rerun()
 
     def _render_category_grid(self, categories: List[str]):
         """Render categories in a compact three-column layout with parameter card styling."""
