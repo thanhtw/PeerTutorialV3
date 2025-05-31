@@ -10,6 +10,7 @@ import logging
 from typing import Dict, List, Any, Optional
 from data.database_error_repository import DatabaseErrorRepository
 from utils.language_utils import get_current_language, t
+from state_schema import WorkflowState
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -637,56 +638,94 @@ class CodeGeneratorUI:
             logger.error(f"Error updating usage stats: {str(e)}")
     
     def _handle_code_generation(self):
-        """Handle the code generation process."""
+        """Handle the code generation process with proper workflow integration."""
         with st.spinner("🔧 Generating your Java code challenge..."):
             try:
                 # Prepare generation parameters based on mode
                 mode = st.session_state.get("error_selection_mode", "random")
                 
+                # Initialize or get workflow state
+                if not hasattr(st.session_state, 'workflow_state') or st.session_state.workflow_state is None:
+                    st.session_state.workflow_state = WorkflowState()
+                
+                # Get user level from session state or use default
+                user_level = st.session_state.get("user_level", "medium")
+                params = self._get_level_parameters(user_level)
+                
+                # Update workflow state with parameters
+                st.session_state.workflow_state.code_length = params["code_length"]
+                st.session_state.workflow_state.difficulty_level = params["difficulty"]
+                
                 if mode == "random":
                     # Random mode: use selected categories
                     selected_categories = st.session_state.get("selected_categories", [])
-                    print(f"Selected categories: {selected_categories}")
-                    # Ensure it's a list
-                    if not isinstance(selected_categories, list):
-                        selected_categories = []
+                    if not selected_categories:
+                        st.error("❌ Please select at least one category in Random mode")
+                        return
+                    
                     # Format for workflow
-                    categories_dict = {"java_errors": selected_categories} if selected_categories else None
-                    # FIX: Use generate_code_node instead of invoke
-                    result = self.workflow.generate_code_node(
-                        self._build_workflow_state(selected_categories=categories_dict, generation_mode="random")
-                    )
+                    categories_dict = {"java_errors": selected_categories}
+                    st.session_state.workflow_state.selected_error_categories = categories_dict
+                    st.session_state.workflow_state.selected_specific_errors = []
+                    
+                    logger.debug(f"Random mode: Selected categories: {selected_categories}")
                 else:
                     # Advanced mode: use specific errors
                     selected_specific_errors = st.session_state.get("selected_specific_errors", [])
                     if not selected_specific_errors:
                         st.error("❌ Please select at least one specific error in Advanced mode")
                         return
+                    
                     # Update error usage tracking
                     for error in selected_specific_errors:
                         error_code = error.get("error_code", "")
                         if error_code:
                             self._update_error_usage(error_code, action_type='practiced')
-                    # FIX: Use generate_code_node instead of invoke
-                    result = self.workflow.generate_code_node(
-                        self._build_workflow_state(selected_specific_errors=selected_specific_errors, generation_mode="advanced")
-                    )
-                if result and hasattr(result, 'code_snippet'):
+                    
+                    st.session_state.workflow_state.selected_error_categories = {"java_errors": []}
+                    st.session_state.workflow_state.selected_specific_errors = selected_specific_errors
+                    
+                    logger.debug(f"Advanced mode: Selected {len(selected_specific_errors)} specific errors")
+                
+                # Reset workflow state for fresh generation
+                st.session_state.workflow_state.current_step = "generate"
+                st.session_state.workflow_state.evaluation_attempts = 0
+                st.session_state.workflow_state.evaluation_result = None
+                st.session_state.workflow_state.error = None
+                
+                # Execute the workflow node directly
+                updated_state = self.workflow.generate_code_node(st.session_state.workflow_state)
+                
+                # Check for errors
+                if hasattr(updated_state, 'error') and updated_state.error:
+                    st.error(f"❌ Generation failed: {updated_state.error}")
+                    return
+                
+                # Update session state with result
+                st.session_state.workflow_state = updated_state
+                
+                if hasattr(updated_state, 'code_snippet') and updated_state.code_snippet:
                     st.success("✅ Code generated successfully! Proceed to the Review tab.")
                     # Switch to review tab
                     st.session_state.active_tab = 1
-                    print(result.code_snippet)
                     st.rerun()
                 else:
                     st.error("❌ Failed to generate code. Please try again.")
+                    
             except Exception as e:
-                logger.error(f"Code generation error: {str(e)}")
+                logger.error(f"Code generation error: {str(e)}", exc_info=True)
                 st.error(f"❌ Generation failed: {str(e)}")
 
     def _build_workflow_state(self, **kwargs):
         """Helper to build a WorkflowState object for code generation."""
-        from state_schema import WorkflowState
-        # Use current session state as base, update with kwargs
-        state_dict = dict(getattr(st.session_state, 'workflow_state', WorkflowState()).dict())
+        # Use current session state as base if it exists, otherwise create new
+        if hasattr(st.session_state, 'workflow_state') and st.session_state.workflow_state:
+            state_dict = dict(st.session_state.workflow_state.dict())
+        else:
+            state_dict = {}
+        
+        # Update with provided kwargs
         state_dict.update(kwargs)
+        
+        # Create new WorkflowState with updated values
         return WorkflowState(**state_dict)
