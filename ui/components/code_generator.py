@@ -43,9 +43,7 @@ class CodeGeneratorUI:
         # Main content in clean sections
         self._render_configuration_section(user_level)
         
-        # Generation section
-        self._render_generation_section()
-        
+       
         # Generated code display section
         self._render_code_display_section()
 
@@ -136,7 +134,6 @@ class CodeGeneratorUI:
             # Category selection for random mode
             self._render_category_selection()
 
-            # --- Show selected categories visually ---
             selected_categories = st.session_state.get("selected_categories", [])
             if selected_categories:
                 st.markdown(
@@ -148,17 +145,19 @@ class CodeGeneratorUI:
                     + "</div>",
                     unsafe_allow_html=True
                 )
-                # Show the generate button when at least one category is selected
-                st.markdown('<div class="generate-button-section">', unsafe_allow_html=True)
-                if st.button(f"🔧 {t('generate_code_problem')}", key="generate_code_main_random", type="primary", use_container_width=True):
-                    self._handle_code_generation()
-                st.markdown('</div>', unsafe_allow_html=True)
-            else:
+            # Always show the generate button, but enable/disable based on _can_generate
+            st.markdown('<div class="generate-button-section">', unsafe_allow_html=True)
+            st.button(
+                f"🔧 {t('generate_code_problem')}",
+                key="generate_code_main_random",
+                type="primary",
+                use_container_width=True,
+                disabled=not self._can_generate(),
+                on_click=self._handle_code_generation if self._can_generate() else None
+            )
+            st.markdown('</div>', unsafe_allow_html=True)
+            if not selected_categories:
                 st.warning(f"⚠️ {t('please_select_at_least_one_error_category')}")
-                # Show disabled generate button for clarity
-                st.markdown('<div class="generate-button-section">', unsafe_allow_html=True)
-                st.button(f"🔧 {t('generate_code_problem')}", key="generate_code_disabled_random", disabled=True, use_container_width=True)
-                st.markdown('</div>', unsafe_allow_html=True)
 
         with mode_tabs[1]:  # Advanced Mode Tab
             st.session_state.error_selection_mode = "advanced"
@@ -171,6 +170,19 @@ class CodeGeneratorUI:
             
             # Load all categories and their errors for advanced mode
             self._render_advanced_error_selection()
+            # Always show the generate button, but enable/disable based on _can_generate
+            st.markdown('<div class="generate-button-section">', unsafe_allow_html=True)
+            st.button(
+                f"🔧 {t('generate_code_problem')}",
+                key="generate_code_main_advanced",
+                type="primary",
+                use_container_width=True,
+                disabled=not self._can_generate(),
+                on_click=self._handle_code_generation if self._can_generate() else None
+            )
+            st.markdown('</div>', unsafe_allow_html=True)
+            if not st.session_state.get("selected_specific_errors", []):
+                st.warning(f"⚠️ {t('please_select_at_least_one_specific_error')}")
 
     def _render_advanced_error_selection(self):
         """Render the advanced error selection interface with all categories and errors loaded."""
@@ -311,27 +323,7 @@ class CodeGeneratorUI:
                 st.session_state.selected_specific_errors = []
                 st.rerun()
 
-    def _render_generation_section(self):
-        """Render the generation button and controls."""
-        
-        # Check if we can generate
-        can_generate = self._can_generate()
-        
-        if can_generate:
-            if st.button(
-                f"🔧 {t('generate_code_problem')}",
-                key="generate_code_main",
-                type="primary",
-                use_container_width=True
-            ):
-                self._handle_code_generation()
-        else:
-            st.button(
-                f"🔧 {t('generate_code_problem')}",
-                key="generate_code_disabled",
-                disabled=True,
-                use_container_width=True
-            )
+    
 
     def _render_parameters_display(self, user_level: str):
         """Render the parameters display with visual cards."""
