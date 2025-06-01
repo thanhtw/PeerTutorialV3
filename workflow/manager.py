@@ -3,6 +3,7 @@ Workflow Manager for Java Peer Review Training System.
 
 This module provides a central manager class that integrates
 all components of the workflow system using LangGraph execution.
+FIXED: Re-enabled actual LangGraph workflow execution.
 """
 
 import logging
@@ -32,6 +33,7 @@ class WorkflowManager:
     """
     Manager class for the Java Code Review workflow system.
     This class integrates all components and provides LangGraph execution.
+    FIXED: Re-enabled actual LangGraph workflow execution.
     """
     def __init__(self, llm_manager):
         """
@@ -53,15 +55,13 @@ class WorkflowManager:
         self.workflow_nodes = self._create_workflow_nodes()
         self.conditions = WorkflowConditions()
         
-        # DISABLED: Build workflow graph - using simplified execution instead
-        # self.workflow = self._build_workflow_graph()
-        self.workflow = None
+        # FIXED: Re-enable workflow graph building
+        self.workflow = self._build_workflow_graph()
         
-        # DISABLED: Store the compiled workflow for execution
-        # self._compiled_workflow = None
+        # FIXED: Store the compiled workflow for execution
         self._compiled_workflow = None
         
-        logger.debug("WorkflowManager initialized with simplified execution mode")
+        logger.debug("WorkflowManager initialized with LangGraph execution enabled")
     
     def _initialize_domain_objects(self) -> None:
         """Initialize domain objects with appropriate LLMs."""
@@ -123,7 +123,8 @@ class WorkflowManager:
     
     def execute_code_generation_workflow(self, workflow_state: WorkflowState) -> WorkflowState:
         """
-        Execute code generation workflow - COMPLETELY REWRITTEN to avoid recursion issues.
+        Execute code generation workflow using actual LangGraph execution.
+        FIXED: Now uses compiled LangGraph workflow instead of simplified execution.
         
         Args:
             workflow_state: Initial workflow state with parameters
@@ -132,57 +133,29 @@ class WorkflowManager:
             Updated workflow state after generation and evaluation
         """
         try:
-            logger.debug("Starting SIMPLIFIED code generation workflow")
+            logger.debug("Starting LangGraph code generation workflow")
             
-            # STEP 1: Generate Code
-            logger.debug("Step 1: Generating code")
-            workflow_state = self.workflow_nodes.generate_code_node(workflow_state)
-            if workflow_state.error:
-                return workflow_state
+            # Get the compiled workflow
+            compiled_workflow = self.get_compiled_workflow()
             
-            # STEP 2-4: Evaluation Loop with Hard Limits
-            max_attempts = getattr(workflow_state, "max_evaluation_attempts", 3)
+            # Set initial step
+            workflow_state.current_step = "generate"
             
-            for attempt in range(max_attempts):
-                logger.debug(f"Step {attempt + 2}: Evaluating code (attempt {attempt + 1}/{max_attempts})")
-                
-                # Evaluate code
-                workflow_state = self.workflow_nodes.evaluate_code_node(workflow_state)
-                if workflow_state.error:
-                    return workflow_state
-                
-                evaluation_result = getattr(workflow_state, "evaluation_result", {})
-                is_valid = evaluation_result.get("valid", False)
-                missing_errors = evaluation_result.get("missing_errors", [])
-                
-                logger.debug(f"Evaluation result: valid={is_valid}, missing_errors={len(missing_errors)}")
-                
-                # If valid or last attempt, break
-                if is_valid or attempt >= max_attempts - 1:
-                    logger.debug(f"Breaking evaluation loop: valid={is_valid}, last_attempt={attempt >= max_attempts - 1}")
-                    break
-                
-                # Regenerate if not valid and not last attempt
-                if not is_valid and len(missing_errors) > 0:
-                    logger.debug(f"Step {attempt + 2}.5: Regenerating code")
-                    workflow_state = self.workflow_nodes.regenerate_code_node(workflow_state)
-                    if workflow_state.error:
-                        return workflow_state
+            # Execute until we reach review step or error occurs
+            result = self._execute_until_step(compiled_workflow, workflow_state, "review")
             
-            # STEP FINAL: Set to review state
-            workflow_state.current_step = "review"
-            logger.debug("Code generation workflow completed successfully")
-            
-            return workflow_state
+            logger.debug("LangGraph code generation workflow completed")
+            return result
             
         except Exception as e:
-            logger.error(f"Error in simplified code generation workflow: {str(e)}")
+            logger.error(f"Error in LangGraph code generation workflow: {str(e)}")
             workflow_state.error = f"Code generation workflow failed: {str(e)}"
             return workflow_state
 
     def execute_review_workflow(self, workflow_state: WorkflowState, student_review: str) -> WorkflowState:
         """
-        Execute review analysis workflow - COMPLETELY REWRITTEN to avoid recursion issues.
+        Execute review analysis workflow using actual LangGraph execution.
+        FIXED: Now uses compiled LangGraph workflow instead of simplified execution.
         
         Args:
             workflow_state: Current workflow state
@@ -192,62 +165,32 @@ class WorkflowManager:
             Updated workflow state after review analysis
         """
         try:
-            logger.debug("Starting SIMPLIFIED review workflow")
+            logger.debug("Starting LangGraph review workflow")
             
             # Set pending review
             workflow_state.pending_review = student_review
             
-            # STEP 1: Process the review
-            logger.debug("Step 1: Processing review")
-            workflow_state = self.workflow_nodes.review_code_node(workflow_state)
-            if workflow_state.error:
-                return workflow_state
+            # Get the compiled workflow
+            compiled_workflow = self.get_compiled_workflow()
             
-            # STEP 2: Analyze the review
-            logger.debug("Step 2: Analyzing review")
-            workflow_state = self.workflow_nodes.analyze_review_node(workflow_state)
-            if workflow_state.error:
-                return workflow_state
+            # Set current step to review
+            workflow_state.current_step = "review"
             
-            # STEP 3: Check if we should continue or complete
-            max_iterations = getattr(workflow_state, "max_iterations", 3)
-            current_iteration = getattr(workflow_state, "current_iteration", 1)
-            review_sufficient = getattr(workflow_state, "review_sufficient", False)
+            # Execute the workflow from the review step
+            result = compiled_workflow.invoke(workflow_state)
             
-            # Check if all errors were found
-            if workflow_state.review_history:
-                latest_review = workflow_state.review_history[-1]
-                if hasattr(latest_review, "analysis"):
-                    analysis = latest_review.analysis
-                    identified_count = analysis.get("identified_count", 0)
-                    total_problems = analysis.get("total_problems", 0)
-                    if identified_count == total_problems and total_problems > 0:
-                        review_sufficient = True
-                        workflow_state.review_sufficient = True
-            
-            logger.debug(f"Review decision: iteration={current_iteration}/{max_iterations}, sufficient={review_sufficient}")
-            
-            # If review is sufficient or max iterations reached, generate comparison report
-            if review_sufficient or current_iteration > max_iterations:
-                logger.debug("Step 3: Generating comparison report")
-                workflow_state = self.workflow_nodes.comparison_report_node(workflow_state)
-                if workflow_state.error:
-                    return workflow_state
-                
-                logger.debug("Step 4: Generating summary")
-                workflow_state = self.workflow_nodes.generate_summary_node(workflow_state)
-            
-            logger.debug("Review workflow completed successfully")
-            return workflow_state
+            logger.debug("LangGraph review workflow completed")
+            return result
             
         except Exception as e:
-            logger.error(f"Error in simplified review workflow: {str(e)}")
+            logger.error(f"Error in LangGraph review workflow: {str(e)}")
             workflow_state.error = f"Review workflow failed: {str(e)}"
             return workflow_state
 
     def execute_full_workflow(self, workflow_state: WorkflowState) -> WorkflowState:
         """
-        Execute the complete workflow - SIMPLIFIED VERSION.
+        Execute the complete workflow using actual LangGraph execution.
+        FIXED: Now uses compiled LangGraph workflow instead of simplified execution.
         
         Args:
             workflow_state: Initial workflow state
@@ -256,34 +199,66 @@ class WorkflowManager:
             Final workflow state after complete execution
         """
         try:
-            logger.debug("Executing SIMPLIFIED full workflow")
+            logger.debug("Executing LangGraph full workflow")
             
-            # Step 1: Code Generation
-            workflow_state = self.execute_code_generation_workflow(workflow_state)
-            if workflow_state.error:
-                return workflow_state
+            # Get the compiled workflow
+            compiled_workflow = self.get_compiled_workflow()
             
-            # The full workflow stops here - review submission happens separately
-            logger.debug("Full workflow (code generation phase) completed")
-            return workflow_state
+            # Execute the full workflow
+            result = compiled_workflow.invoke(workflow_state)
+            
+            logger.debug("LangGraph full workflow completed")
+            return result
             
         except Exception as e:
-            logger.error(f"Error executing simplified full workflow: {str(e)}")
+            logger.error(f"Error executing LangGraph full workflow: {str(e)}")
             workflow_state.error = f"Full workflow execution failed: {str(e)}"
             return workflow_state
 
     def get_compiled_workflow(self):
-        """Get the compiled workflow - COMPLETELY DISABLED for simplified execution."""
+        """
+        Get the compiled workflow.
+        FIXED: Now actually compiles and returns the LangGraph workflow.
+        """
         if self._compiled_workflow is None:
-            logger.debug("LangGraph compilation disabled - using simplified execution")
-            # Return a dummy object that won't be used
-            class DummyWorkflow:
-                def invoke(self, state, config=None):
-                    raise NotImplementedError("Use simplified execution methods instead")
-            
-            self._compiled_workflow = DummyWorkflow()
+            logger.debug("Compiling LangGraph workflow")
+            self._compiled_workflow = self.workflow.compile()
+            logger.debug("LangGraph workflow compiled successfully")
         
         return self._compiled_workflow
+
+    def _execute_until_step(self, compiled_workflow, state: WorkflowState, target_step: str) -> WorkflowState:
+        """
+        Execute workflow until reaching a specific step.
+        
+        Args:
+            compiled_workflow: The compiled LangGraph workflow
+            state: Current workflow state
+            target_step: Target step to stop at
+            
+        Returns:
+            Updated workflow state
+        """
+        current_state = state
+        max_iterations = 10  # Prevent infinite loops
+        iteration = 0
+        
+        while (current_state.current_step != target_step and 
+               current_state.current_step != "complete" and 
+               not current_state.error and
+               iteration < max_iterations):
+            
+            # Execute one step
+            current_state = compiled_workflow.invoke(current_state)
+            iteration += 1
+            
+            logger.debug(f"Workflow step {iteration}: {current_state.current_step}")
+            
+            # Stop if we've reached the target step
+            if current_state.current_step == target_step:
+                break
+        
+        return current_state
 
     def get_all_error_categories(self) -> Dict[str, List[str]]:
         """Get all available error categories."""

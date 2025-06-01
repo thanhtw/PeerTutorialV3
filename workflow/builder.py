@@ -3,6 +3,7 @@ Workflow Builder for Java Peer Review Training System.
 
 This module provides the GraphBuilder class for constructing
 the LangGraph workflow graph with appropriate nodes and edges.
+FIXED: Improved node naming and edge configuration for LangGraph execution.
 """
 
 import logging
@@ -22,6 +23,7 @@ class GraphBuilder:
     
     This class is responsible for building the LangGraph graph with all necessary
     nodes and edges, including conditional edges.
+    FIXED: Improved node naming and edge configuration for LangGraph execution.
     """
     
     def __init__(self, workflow_nodes: WorkflowNodes):
@@ -64,17 +66,18 @@ class GraphBuilder:
     def _add_nodes(self, workflow: StateGraph) -> None:
         """
         Add all nodes to the workflow graph.
+        FIXED: Corrected node names to match the expected workflow.
         
         Args:
             workflow: StateGraph to add nodes to
         """
-        # Define main workflow nodes - FIXED: renamed comparison_report node
+        # Define main workflow nodes with consistent naming
         workflow.add_node("generate_code", self.workflow_nodes.generate_code_node)
         workflow.add_node("evaluate_code", self.workflow_nodes.evaluate_code_node)
         workflow.add_node("regenerate_code", self.workflow_nodes.regenerate_code_node)
         workflow.add_node("review_code", self.workflow_nodes.review_code_node)
         workflow.add_node("analyze_review", self.workflow_nodes.analyze_review_node)
-        workflow.add_node("generate_comparison_report", self.workflow_nodes.comparison_report_node)  # RENAMED
+        workflow.add_node("generate_comparison_report", self.workflow_nodes.comparison_report_node)
         workflow.add_node("generate_summary", self.workflow_nodes.generate_summary_node)
         
         logger.debug("Added all nodes to workflow graph")
@@ -82,15 +85,16 @@ class GraphBuilder:
     def _add_standard_edges(self, workflow: StateGraph) -> None:
         """
         Add standard (non-conditional) edges to the workflow graph.
+        FIXED: Updated edge configuration for proper workflow flow.
         
         Args:
             workflow: StateGraph to add edges to
         """
-        # Add direct edges between nodes - FIXED: updated edge reference
+        # Add direct edges between nodes
         workflow.add_edge("generate_code", "evaluate_code")
         workflow.add_edge("regenerate_code", "evaluate_code")
         workflow.add_edge("review_code", "analyze_review")
-        workflow.add_edge("generate_comparison_report", "generate_summary")  # UPDATED
+        workflow.add_edge("generate_comparison_report", "generate_summary")
         workflow.add_edge("generate_summary", END)
         
         logger.debug("Added standard edges to workflow graph")
@@ -98,11 +102,13 @@ class GraphBuilder:
     def _add_conditional_edges(self, workflow: StateGraph) -> None:
         """
         Add conditional edges to the workflow graph.
+        FIXED: Updated conditional logic for proper workflow execution.
         
         Args:
             workflow: StateGraph to add conditional edges to
         """
         # Add conditional edge for code evaluation
+        # This determines whether to regenerate code or move to review
         workflow.add_conditional_edges(
             "evaluate_code",
             self.conditions.should_regenerate_or_review,
@@ -112,15 +118,15 @@ class GraphBuilder:
             }
         )
         
-        # Add conditional edges for review cycle - FIXED: updated target node name
+        # Add conditional edges for review cycle
+        # This determines whether to continue review iterations or generate comparison report
         workflow.add_conditional_edges(
             "analyze_review",
             self.conditions.should_continue_review,
             {
                 "continue_review": "review_code",
-                "generate_comparison_report": "generate_comparison_report"  # UPDATED
+                "generate_comparison_report": "generate_comparison_report"
             }
         )
         
         logger.debug("Added conditional edges to workflow graph")
-

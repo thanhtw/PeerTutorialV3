@@ -3,6 +3,7 @@ Workflow Conditions for Java Peer Review Training System.
 
 This module contains the conditional logic for determining
 which paths to take in the LangGraph workflow with proper termination conditions.
+FIXED: Improved conditional logic for LangGraph execution.
 """
 
 import logging
@@ -19,12 +20,14 @@ class WorkflowConditions:
     
     This class contains all the conditional functions used to determine
     the next step in the workflow based on the current state.
+    FIXED: Improved conditional logic for LangGraph execution.
     """
     
     @staticmethod
     def should_regenerate_or_review(state: WorkflowState) -> str:
         """
-        Determine if we should regenerate code or move to review - FIXED to prevent infinite loops.
+        Determine if we should regenerate code or move to review.
+        FIXED: Improved logic to prevent infinite loops and ensure proper termination.
         
         Args:
             state: Current workflow state
@@ -39,7 +42,7 @@ class WorkflowConditions:
         max_evaluation_attempts = getattr(state, "max_evaluation_attempts", 3)
         
         logger.debug(f"Deciding workflow path with state: "
-                     f"valid={evaluation_result.get('valid', False) if evaluation_result else False}, "
+                     f"valid={evaluation_result.get(t('valid'), False) if evaluation_result else False}, "
                      f"attempts={evaluation_attempts}/{max_evaluation_attempts}")
         
         # CRITICAL FIX: Always check max attempts FIRST and return immediately
@@ -48,13 +51,13 @@ class WorkflowConditions:
             return "review_code"
         
         # Check if evaluation result is valid
-        if evaluation_result and evaluation_result.get("valid", False):
+        if evaluation_result and evaluation_result.get(t("valid"), False):
             logger.debug(f"Evaluation passed. Moving to review.")
             return "review_code"
 
         # Check if we have missing errors and are under max attempts
         if evaluation_result:
-            missing_errors = evaluation_result.get("missing_errors", [])
+            missing_errors = evaluation_result.get(t("missing_errors"), [])
             if len(missing_errors) > 0 and evaluation_attempts < max_evaluation_attempts:
                 logger.debug(f"Found {len(missing_errors)} missing errors. Regenerating (attempt {evaluation_attempts + 1}/{max_evaluation_attempts})")
                 return "regenerate_code"
@@ -66,7 +69,8 @@ class WorkflowConditions:
     @staticmethod
     def should_continue_review(state: WorkflowState) -> str:
         """
-        Determine if we should continue with another review iteration or generate comparison report - FIXED.
+        Determine if we should continue with another review iteration or generate comparison report.
+        FIXED: Improved logic to handle all termination conditions properly.
         
         This is used for the conditional edge from the analyze_review node.
         
@@ -101,8 +105,8 @@ class WorkflowConditions:
 
         if latest_review and hasattr(latest_review, "analysis"):
             analysis = latest_review.analysis
-            identified_count = analysis.get("identified_count", 0)
-            total_problems = analysis.get("total_problems", 0)
+            identified_count = analysis.get(t("identified_count"), 0)
+            total_problems = analysis.get(t("total_problems"), 0)
             
             # Check if all issues have been identified
             if identified_count == total_problems and total_problems > 0:              

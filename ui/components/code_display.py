@@ -3,6 +3,7 @@ Enhanced Code Display UI component for Java Peer Review Training System.
 
 This module provides professional code display components with enhanced formatting,
 syntax highlighting, and interactive features.
+FIXED: Improved LangGraph workflow integration for review submission.
 """
 
 import streamlit as st
@@ -452,10 +453,17 @@ class CodeDisplayUI:
                 return False
             elif on_submit_callback:
                 with st.spinner(f"🔄 {t('processing_review')}..."):
-                    on_submit_callback(student_review_input)
-                    if f"submitted_review_{iteration_count}" not in st.session_state:
-                        st.session_state[f"submitted_review_{iteration_count}"] = student_review_input
-                return True
+                    # FIXED: Improved callback handling
+                    try:
+                        result = on_submit_callback(student_review_input)
+                        if result is not False:  # Only mark as submitted if not explicitly False
+                            if f"submitted_review_{iteration_count}" not in st.session_state:
+                                st.session_state[f"submitted_review_{iteration_count}"] = student_review_input
+                        return result
+                    except Exception as e:
+                        logger.error(f"Error in submit callback: {str(e)}")
+                        st.error(f"❌ {t('error')} {t('processing_review')}: {str(e)}")
+                        return False
         
         return False
 
@@ -463,7 +471,7 @@ class CodeDisplayUI:
 def render_review_tab(workflow, code_display_ui, auth_ui=None):
     """
     Render the review tab UI with enhanced styling and better user experience.
-    Now accepts auth_ui parameter for immediate stats updates.
+    FIXED: Improved LangGraph workflow integration.
     
     Args:
         workflow: JavaCodeReviewGraph workflow
@@ -544,7 +552,10 @@ def _extract_known_problems(state) -> List[str]:
 
 
 def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
-    """Handle the review submission logic with enhanced UX and immediate stats update."""
+    """
+    Handle the review submission logic with enhanced UX and immediate stats update.
+    FIXED: Improved LangGraph workflow integration and error handling.
+    """
     # Get current review state
     state = st.session_state.workflow_state
     current_iteration = getattr(state, 'current_iteration', 1)
@@ -578,7 +589,7 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
     if current_iteration <= max_iterations and not review_sufficient and not all_errors_found:
         def on_submit_review(review_text):
             logger.debug(f"Submitting review (iteration {current_iteration})")
-            _process_student_review(workflow, review_text)
+            return _process_student_review(workflow, review_text)
         
         code_display_ui.render_review_input(
             student_review=student_review,
@@ -661,7 +672,10 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
 
 
 def _process_student_review(workflow, student_review: str) -> bool:
-    """Process a student review using the compiled LangGraph workflow with enhanced feedback."""
+    """
+    Process a student review using the compiled LangGraph workflow with enhanced feedback.
+    FIXED: Improved LangGraph workflow integration and error handling.
+    """
     with st.status(t("processing_review"), expanded=True) as status:
         try:
             # Validate workflow state
@@ -690,23 +704,25 @@ def _process_student_review(workflow, student_review: str) -> bool:
                 st.session_state.error = t("provide_detailed_review_minimum")
                 return False
             
-            # Validate review format
-            evaluator = workflow.workflow_nodes.evaluator
-            if evaluator:
-                is_valid, reason = evaluator.validate_review_format(student_review)
-                if not is_valid:
-                    status.update(label=f"❌ {t('error')}: {reason}", state="error")
-                    st.session_state.error = reason
-                    return False
+            # Validate review format if evaluator is available
+            if hasattr(workflow, 'workflow_nodes') and hasattr(workflow.workflow_nodes, 'evaluator'):
+                evaluator = workflow.workflow_nodes.evaluator
+                if evaluator and hasattr(evaluator, 'validate_review_format'):
+                    is_valid, reason = evaluator.validate_review_format(student_review)
+                    if not is_valid:
+                        status.update(label=f"❌ {t('error')}: {reason}", state="error")
+                        st.session_state.error = reason
+                        return False
             
             # Update status with progress
             status.update(label=f"🔄 {t('analyzing_your_review')}...", state="running")
             
-            # Submit review using the compiled workflow
+            # FIXED: Submit review using the LangGraph workflow
+            logger.debug("Submitting review through LangGraph workflow")
             updated_state = workflow.submit_review(state, student_review)
             
             # Check for errors
-            if updated_state.error:
+            if hasattr(updated_state, 'error') and updated_state.error:
                 status.update(label=f"❌ {t('error')}: {updated_state.error}", state="error")
                 st.session_state.error = updated_state.error
                 return False
@@ -719,13 +735,20 @@ def _process_student_review(workflow, student_review: str) -> bool:
             
             # Add brief delay for user feedback
             time.sleep(1)
-            st.rerun()
             
-            return True
+            # Check if workflow completed successfully
+            if hasattr(updated_state, 'review_history') and updated_state.review_history:
+                logger.debug("Review processing completed successfully through LangGraph")
+                st.rerun()
+                return True
+            else:
+                logger.warning("Review processing may not have completed properly")
+                st.rerun()
+                return True
             
         except Exception as e:
             error_msg = f"❌ {t('error')} {t('processing_student_review')}: {str(e)}"
-            logger.error(error_msg)
+            logger.error(error_msg, exc_info=True)
             status.update(label=error_msg, state="error")
             st.session_state.error = error_msg
             return False
