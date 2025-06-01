@@ -185,7 +185,7 @@ class CodeDisplayUI:
         """, unsafe_allow_html=True)
         
         # Main code container with header
-        st.markdown("""
+        st.markdown(f"""
         <div class="code-container">
             <div class="code-header">
                 <span>📄 Main.java</span>
@@ -319,7 +319,7 @@ class CodeDisplayUI:
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
                 <div>
                     <h3 style="margin: 0 0 0.5rem 0; font-size: 1.8rem; font-weight: 700;">
-                        📝 {t("submit_review")}
+                        📝 {t("submit_review_section")}
                     </h3>
                     <p style="margin: 0; opacity: 0.9; font-size: 1.1rem;">
                         {t('provide_detailed_review')}
@@ -440,89 +440,76 @@ class CodeDisplayUI:
         """Render enhanced review guidelines with better presentation."""
         
         with st.expander(f"📋 {t('review_guidelines')}", expanded=False):
+            # Use individual st.markdown calls instead of one large HTML block
             st.markdown(f"""
-            <div style="padding: 1rem 0;">
-                <div style="
-                    background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
-                    border-radius: 8px;
-                    padding: 1.5rem;
-                    margin-bottom: 2rem;
-                ">
-                    <h4 style="margin: 0 0 1rem 0; color: #2e7d32;">
-                        ✨ {t('how_to_write')}
-                    </h4>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
-                        <div>
-                            <strong style="color: #2e7d32;">🎯 {t('be_specific')}</strong>
-                            <p style="margin: 0.5rem 0 0 0; color: #4a5568; font-size: 0.9rem;">
-                                Point out exact lines and explain the issue clearly
-                            </p>
-                        </div>
-                        <div>
-                            <strong style="color: #2e7d32;">🔍 {t('be_comprehensive')}</strong>
-                            <p style="margin: 0.5rem 0 0 0; color: #4a5568; font-size: 0.9rem;">
-                                Check all aspects: syntax, logic, style, security
-                            </p>
-                        </div>
-                        <div>
-                            <strong style="color: #2e7d32;">💡 {t('be_constructive')}</strong>
-                            <p style="margin: 0.5rem 0 0 0; color: #4a5568; font-size: 0.9rem;">
-                                Suggest improvements and explain why
-                            </p>
-                        </div>
-                    </div>
-                </div>
-                
-                <div style="margin-bottom: 2rem;">
-                    <h4 style="color: #495057; margin-bottom: 1rem;">🔍 {t('check_for')}</h4>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-                        <div style="background: #f8f9fa; padding: 1rem; border-radius: 6px; border-left: 3px solid #0066cc;">
-                            <strong>🔤 Syntax & Compilation</strong>
-                            <ul style="margin: 0.5rem 0 0 0; padding-left: 1rem; color: #6c757d; font-size: 0.9rem;">
-                                <li>Missing semicolons</li>
-                                <li>Bracket mismatches</li>
-                                <li>Type errors</li>
-                            </ul>
-                        </div>
-                        <div style="background: #f8f9fa; padding: 1rem; border-radius: 6px; border-left: 3px solid #dc3545;">
-                            <strong>🐛 Logic & Bugs</strong>
-                            <ul style="margin: 0.5rem 0 0 0; padding-left: 1rem; color: #6c757d; font-size: 0.9rem;">
-                                <li>Array bounds</li>
-                                <li>Null pointers</li>
-                                <li>Loop conditions</li>
-                            </ul>
-                        </div>
-                        <div style="background: #f8f9fa; padding: 1rem; border-radius: 6px; border-left: 3px solid #28a745;">
-                            <strong>⭐ Code Quality</strong>
-                            <ul style="margin: 0.5rem 0 0 0; padding-left: 1rem; color: #6c757d; font-size: 0.9rem;">
-                                <li>Naming conventions</li>
-                                <li>Code formatting</li>
-                                <li>Documentation</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-                
-                <div style="
-                    background: #e7f3ff;
-                    border: 1px solid #b3d9ff;
-                    border-radius: 8px;
-                    padding: 1.5rem;
-                ">
-                    <h4 style="margin: 0 0 1rem 0; color: #0066cc;">📝 {t('format_your_review')}</h4>
-                    <pre style="
-                        background: white;
-                        border: 1px solid #d1ecf1;
-                        border-radius: 4px;
-                        padding: 1rem;
-                        margin: 0;
-                        color: #495057;
-                        font-size: 0.85rem;
-                        overflow-x: auto;
-                    ">{t('review_format_example')}</pre>
-                </div>
+            <div style="
+                background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
+                border-radius: 8px;
+                padding: 1.5rem;
+                margin-bottom: 2rem;
+            ">
+                <h4 style="margin: 0 0 1rem 0; color: #2e7d32;">
+                    ✨ {t('how_to_write_good_review')}
+                </h4>
             </div>
             """, unsafe_allow_html=True)
+            
+            # Use columns for better layout
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.markdown(f"""
+                **🎯 {t('be_specific')}**
+                
+                {t('point_out_exact_lines')}
+                """)
+                
+            with col2:
+                st.markdown(f"""
+                **🔍 {t('be_comprehensive')}**
+                
+                {t('check_all_aspects')}
+                """)
+                
+            with col3:
+                st.markdown(f"""
+                **💡 {t('be_constructive')}**
+                
+                {t('suggest_improvements')}
+                """)
+            
+            st.markdown(f"### 🔍 {t('what_to_check_for')}")
+            
+            # Use columns for check items
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.markdown(f"""
+                **🔤 {t('syntax_compilation')}**
+                - {t('missing_semicolons')}
+                - {t('bracket_mismatches')}
+                - {t('type_errors')}
+                """)
+                
+            with col2:
+                st.markdown(f"""
+                **🐛 {t('logic_bugs')}**
+                - {t('array_bounds_issues')}
+                - {t('null_pointers')}
+                - {t('loop_conditions')}
+                """)
+                
+            with col3:
+                st.markdown(f"""
+                **⭐ {t('code_quality')}**
+                - {t('naming_conventions')}
+                - {t('code_formatting')}
+                - {t('documentation')}
+                """)
+            
+            # Example format
+            st.markdown(f"### 📝 {t('review_format_example')}")
+            st.code(t('example_review_format'), language="text")
     
     def _render_enhanced_review_form(self, iteration_count: int, on_submit_callback: Callable) -> bool:
         """Render enhanced review form with better UX."""
@@ -556,7 +543,7 @@ class CodeDisplayUI:
         
         # Enhanced review input with better styling
         student_review_input = st.text_area(
-            t("enter_review"),
+            t("enter_your_review"),
             value=initial_value, 
             height=350,
             key=text_area_key,
@@ -568,7 +555,7 @@ class CodeDisplayUI:
         # Enhanced buttons with better layout
         st.markdown('<div style="margin-top: 1.5rem;">', unsafe_allow_html=True)
         
-        col1, col2, col3 = st.columns([6, 2, 2])
+        col1, col2 = st.columns([8,2])
         
         with col1:
             submit_text = t("submit_review_button") if iteration_count == 1 else f"{t('submit_review_button')} ({t('attempt')} {iteration_count})"
@@ -586,9 +573,6 @@ class CodeDisplayUI:
                 help=t("clear_review_help"),
                 key=self._get_unique_key(f"clear_review_{iteration_count}")
             )
-        with col3:
-            char_count = len(student_review_input)
-            st.metric(t("characters"), char_count, help=t("character_count_help"))
         
         st.markdown('</div></div>', unsafe_allow_html=True)
         
@@ -642,7 +626,7 @@ def render_review_tab(workflow, code_display_ui, auth_ui=None):
     
     # Check workflow state
     if not hasattr(st.session_state, 'workflow_state') or not st.session_state.workflow_state:
-        st.markdown("""
+        st.markdown(f"""
         <div style="
             text-align: center; 
             padding: 3rem; 
@@ -672,7 +656,7 @@ def render_review_tab(workflow, code_display_ui, auth_ui=None):
         
     # Check code snippet
     if not hasattr(st.session_state.workflow_state, 'code_snippet') or not st.session_state.workflow_state.code_snippet:
-        st.markdown("""
+        st.markdown(f"""
         <div style="
             text-align: center; 
             padding: 3rem; 
@@ -885,8 +869,8 @@ def _process_student_review(workflow, student_review: str) -> bool:
             
             # Enhanced validation
             if len(student_review.strip()) < 10:
-                status.update(label="❌ Error: Review too short", state="error")
-                st.session_state.error = "Please provide a more detailed review (at least 10 characters)"
+                status.update(label=f"❌ {t('error')}: {t('review_too_short')}", state="error")
+                st.session_state.error = t("provide_detailed_review_minimum")
                 return False
             
             # Validate review format
@@ -899,7 +883,7 @@ def _process_student_review(workflow, student_review: str) -> bool:
                     return False
             
             # Update status with progress
-            status.update(label="🔄 Analyzing your review...", state="running")
+            status.update(label=f"🔄 {t('analyzing_your_review')}...", state="running")
             
             # Submit review using the compiled workflow
             updated_state = workflow.submit_review(state, student_review)
@@ -914,7 +898,7 @@ def _process_student_review(workflow, student_review: str) -> bool:
             st.session_state.workflow_state = updated_state
             
             # Enhanced completion message
-            status.update(label="✅ Analysis complete! Review processed successfully.", state="complete")
+            status.update(label=f"✅ {t('analysis_complete_processed')}", state="complete")
             
             # Add brief delay for user feedback
             time.sleep(1)
