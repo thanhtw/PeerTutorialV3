@@ -3,7 +3,7 @@ Workflow Manager for Java Peer Review Training System.
 
 This module provides a central manager class that integrates
 all components of the workflow system using LangGraph execution.
-FIXED: Re-enabled actual LangGraph workflow execution.
+FIXED: Proper LangGraph workflow execution without manual stepping.
 """
 
 import logging
@@ -32,8 +32,8 @@ logger = logging.getLogger(__name__)
 class WorkflowManager:
     """
     Manager class for the Java Code Review workflow system.
-    This class integrates all components and provides LangGraph execution.
-    FIXED: Re-enabled actual LangGraph workflow execution.
+    This class integrates all components and provides proper LangGraph execution.
+    FIXED: Proper LangGraph workflow execution without manual stepping.
     """
     def __init__(self, llm_manager):
         """
@@ -55,13 +55,11 @@ class WorkflowManager:
         self.workflow_nodes = self._create_workflow_nodes()
         self.conditions = WorkflowConditions()
         
-        # FIXED: Re-enable workflow graph building
+        # Build and compile the workflow graph
         self.workflow = self._build_workflow_graph()
-        
-        # FIXED: Store the compiled workflow for execution
         self._compiled_workflow = None
         
-        logger.debug("WorkflowManager initialized with LangGraph execution enabled")
+        logger.debug("WorkflowManager initialized with proper LangGraph execution")
     
     def _initialize_domain_objects(self) -> None:
         """Initialize domain objects with appropriate LLMs."""
@@ -123,8 +121,8 @@ class WorkflowManager:
     
     def execute_code_generation_workflow(self, workflow_state: WorkflowState) -> WorkflowState:
         """
-        Execute code generation workflow using actual LangGraph execution.
-        FIXED: Now uses compiled LangGraph workflow instead of simplified execution.
+        Execute code generation workflow using proper LangGraph execution.
+        FIXED: Now uses single invoke call with proper recursion limit and workflow phase control.
         
         Args:
             workflow_state: Initial workflow state with parameters
@@ -135,14 +133,20 @@ class WorkflowManager:
         try:
             logger.debug("Starting LangGraph code generation workflow")
             
+            # Set workflow phase to generation only
+            workflow_state.workflow_phase = "generation"
+            workflow_state.current_step = "generate"
+            
+            # Ensure max attempts are set to prevent infinite loops
+            if not hasattr(workflow_state, 'max_evaluation_attempts'):
+                workflow_state.max_evaluation_attempts = 3
+            
             # Get the compiled workflow
             compiled_workflow = self.get_compiled_workflow()
             
-            # Set initial step
-            workflow_state.current_step = "generate"
-            
-            # Execute until we reach review step or error occurs
-            result = self._execute_until_step(compiled_workflow, workflow_state, "review")
+            # Execute the workflow with increased recursion limit
+            config = {"recursion_limit": 50}
+            result = compiled_workflow.invoke(workflow_state, config)
             
             logger.debug("LangGraph code generation workflow completed")
             return result
@@ -154,8 +158,8 @@ class WorkflowManager:
 
     def execute_review_workflow(self, workflow_state: WorkflowState, student_review: str) -> WorkflowState:
         """
-        Execute review analysis workflow using actual LangGraph execution.
-        FIXED: Now uses compiled LangGraph workflow instead of simplified execution.
+        Execute review analysis workflow using proper LangGraph execution.
+        FIXED: Now uses single invoke call with proper workflow phase control.
         
         Args:
             workflow_state: Current workflow state
@@ -167,17 +171,21 @@ class WorkflowManager:
         try:
             logger.debug("Starting LangGraph review workflow")
             
-            # Set pending review
+            # Set workflow phase to review
+            workflow_state.workflow_phase = "review"
             workflow_state.pending_review = student_review
+            workflow_state.current_step = "review"
+            
+            # Ensure max iterations are set
+            if not hasattr(workflow_state, 'max_iterations'):
+                workflow_state.max_iterations = 3
             
             # Get the compiled workflow
             compiled_workflow = self.get_compiled_workflow()
             
-            # Set current step to review
-            workflow_state.current_step = "review"
-            
-            # Execute the workflow from the review step
-            result = compiled_workflow.invoke(workflow_state)
+            # Execute the workflow with increased recursion limit
+            config = {"recursion_limit": 50}
+            result = compiled_workflow.invoke(workflow_state, config)
             
             logger.debug("LangGraph review workflow completed")
             return result
@@ -189,8 +197,8 @@ class WorkflowManager:
 
     def execute_full_workflow(self, workflow_state: WorkflowState) -> WorkflowState:
         """
-        Execute the complete workflow using actual LangGraph execution.
-        FIXED: Now uses compiled LangGraph workflow instead of simplified execution.
+        Execute the complete workflow using proper LangGraph execution.
+        FIXED: Now uses single invoke call with proper recursion limit.
         
         Args:
             workflow_state: Initial workflow state
@@ -201,11 +209,21 @@ class WorkflowManager:
         try:
             logger.debug("Executing LangGraph full workflow")
             
+            # Set workflow phase to full
+            workflow_state.workflow_phase = "full"
+            
+            # Ensure all limits are set
+            if not hasattr(workflow_state, 'max_evaluation_attempts'):
+                workflow_state.max_evaluation_attempts = 3
+            if not hasattr(workflow_state, 'max_iterations'):
+                workflow_state.max_iterations = 3
+            
             # Get the compiled workflow
             compiled_workflow = self.get_compiled_workflow()
             
-            # Execute the full workflow
-            result = compiled_workflow.invoke(workflow_state)
+            # Execute the workflow with increased recursion limit
+            config = {"recursion_limit": 100}  # Higher limit for full workflow
+            result = compiled_workflow.invoke(workflow_state, config)
             
             logger.debug("LangGraph full workflow completed")
             return result
@@ -218,7 +236,7 @@ class WorkflowManager:
     def get_compiled_workflow(self):
         """
         Get the compiled workflow.
-        FIXED: Now actually compiles and returns the LangGraph workflow.
+        FIXED: Now properly compiles and returns the LangGraph workflow.
         """
         if self._compiled_workflow is None:
             logger.debug("Compiling LangGraph workflow")
@@ -226,39 +244,6 @@ class WorkflowManager:
             logger.debug("LangGraph workflow compiled successfully")
         
         return self._compiled_workflow
-
-    def _execute_until_step(self, compiled_workflow, state: WorkflowState, target_step: str) -> WorkflowState:
-        """
-        Execute workflow until reaching a specific step.
-        
-        Args:
-            compiled_workflow: The compiled LangGraph workflow
-            state: Current workflow state
-            target_step: Target step to stop at
-            
-        Returns:
-            Updated workflow state
-        """
-        current_state = state
-        max_iterations = 10  # Prevent infinite loops
-        iteration = 0
-        
-        while (current_state.current_step != target_step and 
-               current_state.current_step != "complete" and 
-               not current_state.error and
-               iteration < max_iterations):
-            
-            # Execute one step
-            current_state = compiled_workflow.invoke(current_state)
-            iteration += 1
-            
-            logger.debug(f"Workflow step {iteration}: {current_state.current_step}")
-            
-            # Stop if we've reached the target step
-            if current_state.current_step == target_step:
-                break
-        
-        return current_state
 
     def get_all_error_categories(self) -> Dict[str, List[str]]:
         """Get all available error categories."""
@@ -297,6 +282,7 @@ class WorkflowManager:
         try:
             status = {
                 "current_step": getattr(state, 'current_step', 'unknown'),
+                "workflow_phase": getattr(state, 'workflow_phase', 'unknown'),
                 "has_code": hasattr(state, 'code_snippet') and state.code_snippet is not None,
                 "evaluation_attempts": getattr(state, 'evaluation_attempts', 0),
                 "max_evaluation_attempts": getattr(state, 'max_evaluation_attempts', 3),

@@ -45,15 +45,17 @@ class WorkflowNodes:
     def review_code_node(self, state: WorkflowState) -> WorkflowState:
         """
         Review code node - processes student review submission.
-        FIXED: Improved handling of review submission for LangGraph execution.
-        
-        Args:
-            state: Current workflow state
-            
-        Returns:
-            Updated workflow state
+        FIXED: Enhanced workflow phase awareness and proper state handling.
         """
         try:
+            workflow_phase = getattr(state, 'workflow_phase', 'full')
+            
+            # If we're in generation-only phase, skip to comparison report
+            if workflow_phase == "generation":
+                logger.debug("Generation-only phase, skipping review and moving to comparison report")
+                state.current_step = "generate_comparison_report"
+                return state
+            
             # Check if there's a pending review to process
             if hasattr(state, 'pending_review') and state.pending_review:
                 # Process the pending review
@@ -95,6 +97,117 @@ class WorkflowNodes:
             state.error = f"Error processing review: {str(e)}"
             return state
     
+    def evaluate_code_node(self, state: WorkflowState) -> WorkflowState:
+        """
+        Evaluate generated code for LangGraph execution.
+        FIXED: Enhanced robustness and proper attempt tracking.
+        """
+        try:
+            logger.debug("Starting code evaluation")
+            
+            # Validate code snippet
+            if not hasattr(state, 'code_snippet') or state.code_snippet is None:
+                state.error = "No code snippet available for evaluation"
+                return state
+                    
+            # Get the code with annotations
+            code = state.code_snippet.code
+            
+            # Get requested errors from state
+            requested_errors = self._extract_requested_errors(state)
+            
+            # Ensure we have errors to evaluate against
+            if not requested_errors:
+                logger.warning("No requested errors found, marking evaluation as valid")
+                state.evaluation_result = {
+                    t("found_errors"): [],
+                    t("missing_errors"): [],
+                    t("valid"): True,
+                    t("feedback"): "No errors to evaluate against"
+                }
+                return state
+            
+            # Get original error count and ensure max attempts are set
+            original_error_count = getattr(state, "original_error_count", len(requested_errors))
+            if original_error_count == 0:
+                original_error_count = len(requested_errors)
+                state.original_error_count = original_error_count
+            
+            # Ensure max_evaluation_attempts is set
+            if not hasattr(state, 'max_evaluation_attempts'):
+                state.max_evaluation_attempts = 3
+                
+            logger.debug(f"Evaluating code for {original_error_count} expected errors")
+            
+            # Initialize and increment attempts
+            if not hasattr(state, 'evaluation_attempts'):
+                state.evaluation_attempts = 0
+            state.evaluation_attempts += 1
+            
+            logger.debug(f"Evaluation attempt {state.evaluation_attempts}/{state.max_evaluation_attempts}")
+            
+            # Evaluate the code
+            try:
+                raw_evaluation_result = self.code_evaluation.evaluate_code(code, requested_errors)
+            except Exception as eval_error:
+                logger.error(f"Code evaluation failed: {str(eval_error)}")
+                # Create a fallback evaluation result that will trigger max attempts
+                raw_evaluation_result = {
+                    t("found_errors"): [],
+                    t("missing_errors"): [f"EVALUATION_ERROR - {str(eval_error)}"],
+                    t("valid"): False,
+                    t("feedback"): f"Evaluation failed: {str(eval_error)}"
+                }
+            
+            # Process and validate evaluation result
+            evaluation_result = self._process_evaluation_result(
+                raw_evaluation_result, requested_errors, original_error_count
+            )
+            
+            # Update state with evaluation results
+            state.evaluation_result = evaluation_result
+            
+            # Generate feedback for potential regeneration only if under max attempts
+            missing_count = len(evaluation_result.get(t('missing_errors'), []))
+            
+            if missing_count > 0 and state.evaluation_attempts < state.max_evaluation_attempts:
+                logger.debug(f"Missing {missing_count} out of {original_error_count} requested errors")
+                
+                try:
+                    if hasattr(self.code_evaluation, 'generate_improved_prompt'):
+                        feedback = self.code_evaluation.generate_improved_prompt(
+                            code, requested_errors, evaluation_result
+                        )
+                    else:
+                        from utils.code_utils import create_regeneration_prompt
+                        feedback = create_regeneration_prompt(
+                            code=code,
+                            domain=getattr(state, "domain", ""),
+                            missing_errors=evaluation_result.get(t('missing_errors'), []),
+                            found_errors=evaluation_result.get(t('found_errors'), []), 
+                            requested_errors=requested_errors
+                        )
+                    state.code_generation_feedback = feedback
+                except Exception as feedback_error:
+                    logger.error(f"Failed to generate feedback: {str(feedback_error)}")
+                    state.code_generation_feedback = None
+            else:
+                if missing_count > 0:
+                    logger.warning(f"Still missing {missing_count} errors but reached max attempts")
+                else:
+                    logger.debug(f"All {original_error_count} requested errors implemented correctly")
+                state.code_generation_feedback = None
+
+            logger.debug(f"Evaluation complete. Attempts: {state.evaluation_attempts}/{state.max_evaluation_attempts}, "
+                        f"Valid: {evaluation_result.get(t('valid'), False)}")
+            
+            return state
+            
+        except Exception as e:
+            logger.error(f"Error in evaluation: {str(e)}", exc_info=True)
+            state.error = f"Error evaluating code: {str(e)}"
+            return state
+
     def analyze_review_node(self, state: WorkflowState) -> WorkflowState:
         """
         Analyze student review using the evaluator.
@@ -444,116 +557,6 @@ class WorkflowNodes:
             state.error = f"Error generating Java code: {str(e)}"
             return state
 
-    def evaluate_code_node(self, state: WorkflowState) -> WorkflowState:
-        """Evaluate generated code for LangGraph execution."""
-        try:
-            logger.debug("Starting code evaluation")
-            
-            # Validate code snippet
-            if not hasattr(state, 'code_snippet') or state.code_snippet is None:
-                state.error = "No code snippet available for evaluation"
-                return state
-                    
-            # Get the code with annotations
-            code = state.code_snippet.code
-            
-            # Get requested errors from state
-            requested_errors = self._extract_requested_errors(state)
-            
-            # Get original error count
-            original_error_count = getattr(state, "original_error_count", len(requested_errors))
-            if original_error_count == 0:
-                original_error_count = len(requested_errors)
-                state.original_error_count = original_error_count
-                
-            logger.debug(f"Evaluating code for {original_error_count} expected errors")
-            
-            # Increment attempts
-            if not hasattr(state, 'evaluation_attempts'):
-                state.evaluation_attempts = 0
-            state.evaluation_attempts += 1
-            
-            logger.debug(f"Evaluation attempt {state.evaluation_attempts}")
-            
-            # Evaluate the code
-            try:
-                raw_evaluation_result = self.code_evaluation.evaluate_code(code, requested_errors)
-            except Exception as eval_error:
-                logger.error(f"Code evaluation failed: {str(eval_error)}")
-                raw_evaluation_result = {
-                    t("found_errors"): [],
-                    t("missing_errors"): [f"{error.get('type', '').upper()} - {error.get('name', '')}" 
-                                    for error in requested_errors],
-                    t("valid"): False,
-                    t("feedback"): f"Evaluation failed: {str(eval_error)}"
-                }
-            
-            # Process evaluation result
-            if not isinstance(raw_evaluation_result, dict):
-                logger.error(f"Expected dict for evaluation_result, got {type(raw_evaluation_result)}")
-                evaluation_result = {
-                    t("found_errors"): [],
-                    t("missing_errors"): [f"{error.get('type', '').upper()} - {error.get('name', '')}" 
-                                    for error in requested_errors],
-                    t("valid"): False,
-                    t("feedback"): f"Invalid evaluation result type: {type(raw_evaluation_result)}",
-                    t("original_error_count"): original_error_count
-                }
-            else:
-                evaluation_result = raw_evaluation_result.copy()
-                evaluation_result[t("original_error_count")] = original_error_count
-
-                # Set validity based on missing errors
-                missing_errors = evaluation_result.get(t('missing_errors'), [])
-                evaluation_result[t('valid')] = len(missing_errors) == 0
-                
-                logger.debug(f"Code validation: valid={evaluation_result.get(t('valid'), False)}, " +
-                        f"missing={len(missing_errors)}")
-                
-            # Update state with evaluation results
-            state.evaluation_result = evaluation_result
-            
-            # Generate feedback for potential regeneration
-            missing_count = len(evaluation_result.get(t('missing_errors'), []))
-            max_attempts = getattr(state, "max_evaluation_attempts", 3)
-            
-            if missing_count > 0 and state.evaluation_attempts < max_attempts:
-                logger.debug(f"Missing {missing_count} out of {original_error_count} requested errors")
-                
-                try:
-                    if hasattr(self.code_evaluation, 'generate_improved_prompt'):
-                        feedback = self.code_evaluation.generate_improved_prompt(
-                            code, requested_errors, evaluation_result
-                        )
-                    else:
-                        from utils.code_utils import create_regeneration_prompt
-                        feedback = create_regeneration_prompt(
-                            code=code,
-                            domain=getattr(state, "domain", ""),
-                            missing_errors=evaluation_result.get(t('missing_errors'), []),
-                            found_errors=evaluation_result.get(t('found_errors'), []), 
-                            requested_errors=requested_errors
-                        )
-                    state.code_generation_feedback = feedback
-                except Exception as feedback_error:
-                    logger.error(f"Failed to generate feedback: {str(feedback_error)}")
-                    state.code_generation_feedback = None
-            else:
-                if missing_count > 0:
-                    logger.warning(f"Still missing {missing_count} errors but reached max attempts ({max_attempts})")
-                else:
-                    logger.debug(f"All {original_error_count} requested errors implemented correctly")
-                state.code_generation_feedback = None
-
-            logger.debug(f"Evaluation complete. Attempts: {state.evaluation_attempts}/{max_attempts}, Valid: {evaluation_result.get(t('valid'), False)}")
-            
-            return state
-            
-        except Exception as e:
-            logger.error(f"Error in evaluation: {str(e)}", exc_info=True)
-            state.error = f"Error evaluating code: {str(e)}"
-            return state
-
     def regenerate_code_node(self, state: WorkflowState) -> WorkflowState:
         """Regenerate code based on evaluation feedback."""
         try:
@@ -618,6 +621,58 @@ class WorkflowNodes:
             # Don't set state.error for regeneration failures
             logger.warning("Regeneration failed, continuing with existing code")
             return state
+
+    def _process_evaluation_result(self, raw_result, requested_errors, original_error_count):
+        """
+        Process and validate evaluation result to ensure it's in the correct format.
+        FIXED: Enhanced validation and error handling.
+        """
+        try:
+            if not isinstance(raw_result, dict):
+                logger.error(f"Expected dict for evaluation_result, got {type(raw_result)}")
+                evaluation_result = {
+                    t("found_errors"): [],
+                    t("missing_errors"): [f"{error.get('type', '').upper()} - {error.get('name', '')}" 
+                                    for error in requested_errors],
+                    t("valid"): False,
+                    t("feedback"): f"Invalid evaluation result type: {type(raw_result)}",
+                    t("original_error_count"): original_error_count
+                }
+            else:
+                evaluation_result = raw_result.copy()
+                evaluation_result[t("original_error_count")] = original_error_count
+
+                # Ensure required fields exist
+                if t("found_errors") not in evaluation_result:
+                    evaluation_result[t("found_errors")] = []
+                if t("missing_errors") not in evaluation_result:
+                    evaluation_result[t("missing_errors")] = []
+                
+                # Ensure fields are lists
+                if not isinstance(evaluation_result.get(t("found_errors")), list):
+                    evaluation_result[t("found_errors")] = []
+                if not isinstance(evaluation_result.get(t("missing_errors")), list):
+                    evaluation_result[t("missing_errors")] = []
+                
+                # Set validity based on missing errors
+                missing_errors = evaluation_result.get(t('missing_errors'), [])
+                evaluation_result[t('valid')] = len(missing_errors) == 0
+                
+                logger.debug(f"Processed evaluation: found={len(evaluation_result.get(t('found_errors'), []))}, "
+                            f"missing={len(missing_errors)}, valid={evaluation_result[t('valid')]}")
+                
+            return evaluation_result
+            
+        except Exception as e:
+            logger.error(f"Error processing evaluation result: {str(e)}")
+            # Return a safe fallback
+            return {
+                t("found_errors"): [],
+                t("missing_errors"): [f"PROCESSING_ERROR - {str(e)}"],
+                t("valid"): False,
+                t("feedback"): f"Error processing evaluation: {str(e)}",
+                t("original_error_count"): original_error_count
+            }
 
     def _extract_requested_errors(self, state: WorkflowState) -> List[Dict[str, Any]]:
         """Extract requested errors from the state."""
