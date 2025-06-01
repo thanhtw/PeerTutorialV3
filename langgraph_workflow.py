@@ -3,7 +3,7 @@ LangGraph Workflow for Java Peer Review Training System.
 
 This module implements the code review workflow as a LangGraph graph
 by leveraging the modular components from the workflow package.
-Enhanced to provide better integration with the workflow manager.
+Enhanced to use proper LangGraph execution instead of direct node calls.
 """
 
 __all__ = ['JavaCodeReviewGraph']
@@ -29,9 +29,8 @@ class JavaCodeReviewGraph:
     """
     LangGraph implementation of the Java Code Review workflow.
     
-    This class serves as a facade to the modular workflow system,
-    maintaining backward compatibility with the existing API while
-    delegating actual implementation to the enhanced workflow manager.
+    This class now properly uses the compiled LangGraph workflow
+    instead of calling nodes directly.
     """
     
     def __init__(self, llm_manager=None):
@@ -45,27 +44,26 @@ class JavaCodeReviewGraph:
         self.llm_manager = llm_manager
         self.workflow_manager = WorkflowManager(llm_manager)
         
-        # Set up references to workflow components for backward compatibility
-        self.workflow = self.workflow_manager.workflow
+        # Get references to workflow components
         self.error_repository = self.workflow_manager.error_repository
-        
-        # Get references to workflow nodes and conditions
         self.workflow_nodes = self.workflow_manager.workflow_nodes
         self.conditions = WorkflowConditions()
+        
+        # Get the compiled workflow
+        self._compiled_workflow = self.workflow_manager.get_compiled_workflow()
     
-    def generate_code_node(self, state: WorkflowState) -> WorkflowState:
+    def execute_code_generation(self, state: WorkflowState) -> WorkflowState:
         """
-        Generate Java code with errors node.
-        Enhanced to use the workflow manager's complete code generation process.
+        Execute code generation using the compiled LangGraph workflow.
         
         Args:
             state: Current workflow state
             
         Returns:
-            Updated workflow state with generated code
+            Updated workflow state after code generation and evaluation
         """
         try:
-            logger.debug("JavaCodeReviewGraph: Starting code generation")
+            logger.debug("Executing code generation through compiled workflow")
             
             # Validate the workflow state before proceeding
             is_valid, error_message = self.workflow_manager.validate_workflow_state(state)
@@ -74,125 +72,26 @@ class JavaCodeReviewGraph:
                 state.error = error_message
                 return state
             
-            # Use the workflow manager's enhanced code generation method
-            # This includes generation, evaluation, and potential regeneration
-            updated_state = self.workflow_manager.execute_code_generation(state)
+            # Set initial step
+            state.current_step = "generate"
+            
+            # Execute the workflow until we reach the review step
+            result = self._execute_until_step(state, target_step="review")
             
             # Log the workflow status
-            status = self.workflow_manager.get_workflow_status(updated_state)
+            status = self.workflow_manager.get_workflow_status(result)
             logger.debug(f"Code generation completed with status: {status}")
             
-            return updated_state
+            return result
             
         except Exception as e:
-            logger.error(f"Error in JavaCodeReviewGraph.generate_code_node: {str(e)}")
+            logger.error(f"Error in code generation workflow: {str(e)}")
             state.error = f"Code generation failed: {str(e)}"
             return state
     
-    def regenerate_code_node(self, state: WorkflowState) -> WorkflowState:
-        """
-        Regenerate code based on evaluation feedback.
-        
-        Args:
-            state: Current workflow state
-            
-        Returns:
-            Updated workflow state with regenerated code
-        """
-        # Delegate to workflow manager for step execution
-        return self.workflow_manager.execute_workflow_step(state, "regenerate_code")
-    
-    def evaluate_code_node(self, state: WorkflowState) -> WorkflowState:
-        """
-        Evaluate generated code to ensure it contains the requested errors.
-        
-        Args:
-            state: Current workflow state
-            
-        Returns:
-            Updated workflow state with evaluation results
-        """
-        # Delegate to workflow manager for step execution
-        return self.workflow_manager.execute_workflow_step(state, "evaluate_code")
-    
-    def review_code_node(self, state: WorkflowState) -> WorkflowState:
-        """
-        Review code node - placeholder since user input happens in the UI.
-        
-        Args:
-            state: Current workflow state
-            
-        Returns:
-            Updated workflow state
-        """
-        # Delegate to workflow manager for step execution
-        return self.workflow_manager.execute_workflow_step(state, "review_code")
-    
-    def analyze_review_node(self, state: WorkflowState) -> WorkflowState:
-        """
-        Analyze student review node.
-        
-        Args:
-            state: Current workflow state
-            
-        Returns:
-            Updated workflow state with review analysis
-        """
-        # Delegate to workflow manager for step execution
-        return self.workflow_manager.execute_workflow_step(state, "analyze_review")
-    
-    def generate_summary_node(self, state: WorkflowState) -> WorkflowState:
-        """
-        Generate summary node.
-        
-        Args:
-            state: Current workflow state
-            
-        Returns:
-            Updated workflow state with summary
-        """
-        # Delegate to workflow manager for step execution
-        return self.workflow_manager.execute_workflow_step(state, "generate_summary")
-    
-    def should_regenerate_or_review(self, state: WorkflowState) -> str:
-        """
-        Determine if we should regenerate code or move to review.
-        
-        Args:
-            state: Current workflow state
-            
-        Returns:
-            Next step name
-        """
-        # Delegate to workflow conditions implementation
-        return self.conditions.should_regenerate_or_review(state)
-    
-    def should_continue_review(self, state: WorkflowState) -> str:
-        """
-        Determine if we should continue with another review iteration or generate summary.
-        
-        Args:
-            state: Current workflow state
-            
-        Returns:
-            Next step name
-        """
-        # Delegate to workflow conditions implementation
-        return self.conditions.should_continue_review(state)
-    
-    def get_all_error_categories(self) -> Dict[str, List[str]]:
-        """
-        Get all available error categories.
-        
-        Returns:
-            Dictionary with error categories
-        """
-        # Delegate to workflow manager
-        return self.workflow_manager.get_all_error_categories()
-    
     def submit_review(self, state: WorkflowState, student_review: str) -> WorkflowState:
         """
-        Submit a student review and update the state.
+        Submit a student review using the compiled LangGraph workflow with safety limits.
         
         Args:
             state: Current workflow state
@@ -201,13 +100,22 @@ class JavaCodeReviewGraph:
         Returns:
             Updated workflow state with analysis
         """
-        # Delegate to workflow manager implementation
-        return self.workflow_manager.submit_review(state, student_review)
-    
+        try:
+            logger.debug(f"Submitting review through compiled workflow with safety limits")
+            
+            # FIXED: Use the workflow manager's improved execution method
+            result = self.workflow_manager.execute_review_workflow(state, student_review)
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error submitting review: {str(e)}")
+            state.error = f"Review submission failed: {str(e)}"
+            return state
+
     def execute_full_workflow(self, state: WorkflowState) -> WorkflowState:
         """
-        Execute the complete workflow from start to finish.
-        This method provides access to the full LangGraph workflow execution.
+        Execute the complete workflow using the compiled LangGraph workflow with safety limits.
         
         Args:
             state: Initial workflow state
@@ -215,51 +123,38 @@ class JavaCodeReviewGraph:
         Returns:
             Final workflow state after complete execution
         """
-        return self.workflow_manager.execute_full_workflow(state)
-    
-    def get_workflow_status(self, state: WorkflowState) -> Dict[str, Any]:
-        """
-        Get the current status of the workflow.
-        
-        Args:
-            state: Current workflow state
+        try:
+            logger.debug("Executing full workflow using compiled LangGraph with safety limits")
             
-        Returns:
-            Dictionary with workflow status information
-        """
-        return self.workflow_manager.get_workflow_status(state)
+            # FIXED: Use the workflow manager's improved execution method
+            result = self.workflow_manager.execute_full_workflow(state)
+            
+            logger.debug("Full workflow execution completed")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error executing full workflow: {str(e)}")
+            state.error = f"Full workflow execution failed: {str(e)}"
+            return state
+    
+    def get_all_error_categories(self) -> Dict[str, List[str]]:
+        """Get all available error categories."""
+        return self.workflow_manager.get_all_error_categories()
     
     def validate_state(self, state: WorkflowState) -> tuple[bool, str]:
-        """
-        Validate the workflow state.
-        
-        Args:
-            state: Workflow state to validate
-            
-        Returns:
-            Tuple of (is_valid, error_message)
-        """
+        """Validate the workflow state."""
         return self.workflow_manager.validate_workflow_state(state)
     
+    def get_workflow_status(self, state: WorkflowState) -> Dict[str, Any]:
+        """Get the current status of the workflow."""
+        return self.workflow_manager.get_workflow_status(state)
+    
     def get_compiled_workflow(self):
-        """
-        Get the compiled LangGraph workflow for direct execution.
-        
-        Returns:
-            Compiled LangGraph workflow
-        """
-        return self.workflow_manager.get_compiled_workflow()
+        """Get the compiled LangGraph workflow for direct execution."""
+        return self._compiled_workflow
     
     def reset_workflow_state(self, state: WorkflowState) -> WorkflowState:
-        """
-        Reset the workflow state for a fresh start.
-        
-        Args:
-            state: Current workflow state
-            
-        Returns:
-            Reset workflow state
-        """
+        """Reset the workflow state for a fresh start."""
         try:
             # Preserve configuration but reset execution state
             state.current_step = "generate"
@@ -271,6 +166,7 @@ class JavaCodeReviewGraph:
             state.current_iteration = 1
             state.review_sufficient = False
             state.comparison_report = None
+            state.pending_review = None
             state.error = None
             
             logger.debug("Workflow state reset successfully")
@@ -280,3 +176,60 @@ class JavaCodeReviewGraph:
             logger.error(f"Error resetting workflow state: {str(e)}")
             state.error = f"Failed to reset workflow state: {str(e)}"
             return state
+
+    def _execute_until_step(self, state: WorkflowState, target_step: str) -> WorkflowState:
+        """
+        Execute workflow until reaching a specific step.
+        
+        Args:
+            state: Current workflow state
+            target_step: Target step to stop at
+            
+        Returns:
+            Updated workflow state
+        """
+        current_state = state
+        max_iterations = 10  # Prevent infinite loops
+        iteration = 0
+        
+        while (current_state.current_step != target_step and 
+               current_state.current_step != "complete" and 
+               not current_state.error and
+               iteration < max_iterations):
+            
+            # Execute one step
+            current_state = self._compiled_workflow.invoke(current_state)
+            iteration += 1
+            
+            logger.debug(f"Workflow step {iteration}: {current_state.current_step}")
+            
+            # Stop if we've reached the target step
+            if current_state.current_step == target_step:
+                break
+        
+        return current_state
+    
+    def _execute_from_step(self, state: WorkflowState, current_step: str) -> WorkflowState:
+        """
+        Execute workflow from a specific step.
+        
+        Args:
+            state: Current workflow state
+            current_step: Current step to start from
+            
+        Returns:
+            Updated workflow state
+        """
+        # Set the current step
+        state.current_step = current_step
+        
+        # Execute the workflow
+        return self._compiled_workflow.invoke(state)
+    
+    
+    
+    
+    
+    
+    
+    

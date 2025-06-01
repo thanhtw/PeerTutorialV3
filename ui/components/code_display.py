@@ -374,7 +374,7 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
             st.warning(t("iterations_completed").format(max_iterations=max_iterations))
 
 def _process_student_review(workflow, student_review: str) -> bool:
-    """Process a student review with progress indicator."""
+    """Process a student review using the compiled LangGraph workflow."""
     with st.status(t("processing_review"), expanded=True) as status:
         try:
             # Validate workflow state
@@ -406,14 +406,10 @@ def _process_student_review(workflow, student_review: str) -> bool:
                     st.session_state.error = reason
                     return False
             
-            # Store current review
-            current_iteration = getattr(state, "current_iteration", 1)
-            st.session_state[f"submitted_review_{current_iteration}"] = student_review
-            
             # Update status
             status.update(label=t("analyzing_review"), state="running")
             
-            # Submit review
+            # Submit review using the compiled workflow
             updated_state = workflow.submit_review(state, student_review)
             
             # Check for errors
@@ -428,7 +424,6 @@ def _process_student_review(workflow, student_review: str) -> bool:
             # Complete
             status.update(label=t("analysis_complete"), state="complete")
             st.rerun()
-            
             
             return True
             

@@ -740,7 +740,7 @@ class CodeGeneratorUI:
 
     def _execute_code_generation_workflow(self, workflow_state: WorkflowState) -> WorkflowState:
         """
-        Execute the code generation through the workflow system.
+        Execute the code generation through the LangGraph workflow system.
         
         Args:
             workflow_state: Prepared workflow state
@@ -749,17 +749,11 @@ class CodeGeneratorUI:
             Updated workflow state after execution
         """
         try:
-            logger.debug("Executing code generation through workflow manager")
+            logger.debug("Executing code generation through compiled LangGraph workflow")
             
-            # Option 1: Use the workflow manager directly if available
-            if self.workflow_manager:
-                logger.debug("Using workflow manager for code generation")
-                # Execute the generation step through workflow nodes
-                updated_state = self.workflow_manager.workflow_nodes.generate_code_node(workflow_state)
-                return updated_state
-            
-            else:
-                raise Exception("No valid workflow execution method available")
+            # Use the workflow manager to execute code generation
+            updated_state = self.workflow_manager.execute_code_generation_workflow(workflow_state)
+            return updated_state
                 
         except Exception as e:
             logger.error(f"Error executing workflow: {str(e)}")

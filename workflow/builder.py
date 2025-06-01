@@ -68,12 +68,13 @@ class GraphBuilder:
         Args:
             workflow: StateGraph to add nodes to
         """
-        # Define main workflow nodes
+        # Define main workflow nodes - FIXED: renamed comparison_report node
         workflow.add_node("generate_code", self.workflow_nodes.generate_code_node)
         workflow.add_node("evaluate_code", self.workflow_nodes.evaluate_code_node)
         workflow.add_node("regenerate_code", self.workflow_nodes.regenerate_code_node)
         workflow.add_node("review_code", self.workflow_nodes.review_code_node)
         workflow.add_node("analyze_review", self.workflow_nodes.analyze_review_node)
+        workflow.add_node("generate_comparison_report", self.workflow_nodes.comparison_report_node)  # RENAMED
         workflow.add_node("generate_summary", self.workflow_nodes.generate_summary_node)
         
         logger.debug("Added all nodes to workflow graph")
@@ -85,10 +86,11 @@ class GraphBuilder:
         Args:
             workflow: StateGraph to add edges to
         """
-        # Add direct edges between nodes
+        # Add direct edges between nodes - FIXED: updated edge reference
         workflow.add_edge("generate_code", "evaluate_code")
         workflow.add_edge("regenerate_code", "evaluate_code")
         workflow.add_edge("review_code", "analyze_review")
+        workflow.add_edge("generate_comparison_report", "generate_summary")  # UPDATED
         workflow.add_edge("generate_summary", END)
         
         logger.debug("Added standard edges to workflow graph")
@@ -110,13 +112,13 @@ class GraphBuilder:
             }
         )
         
-        # Add conditional edges for review cycle
+        # Add conditional edges for review cycle - FIXED: updated target node name
         workflow.add_conditional_edges(
             "analyze_review",
             self.conditions.should_continue_review,
             {
                 "continue_review": "review_code",
-                "generate_summary": "generate_summary"
+                "generate_comparison_report": "generate_comparison_report"  # UPDATED
             }
         )
         

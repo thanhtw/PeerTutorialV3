@@ -26,26 +26,21 @@ class ReviewAttempt(BaseModel):
 
 class WorkflowState(BaseModel):
     """The state for the Java Code Review workflow"""
-    # Current workflow step
-    current_step: Literal["generate", "evaluate", "regenerate", "review", "analyze", "summarize", "complete"] = Field(
+    # Current workflow step - FIXED: Updated step names to match nodes
+    current_step: Literal["generate", "evaluate", "regenerate", "review", "analyze", "generate_comparison_report", "complete"] = Field(
         "generate", description="Current step in the workflow"
     )
     
     # Code generation parameters
     code_length: str = Field("medium", description="Length of code (short, medium, long)")
     difficulty_level: str = Field("medium", description="Difficulty level (easy, medium, hard)")
-
-    # Add domain field for consistent use across workflow steps
     domain: Optional[str] = Field(None, description="Domain context for the generated code")
     
-    # IMPORTANT: Replace underscore field with properly named field
-    # Use a single field with a clear name
+    # Error selection parameters
     selected_error_categories: Dict[str, List[str]] = Field(
         default_factory=lambda: {"java_errors": []}, 
         description="Selected error categories"
     )
-    
-    # Add selected specific errors field that was missing
     selected_specific_errors: List[Dict[str, Any]] = Field(
         default_factory=list,
         description="Specifically selected errors (when using specific mode)"
@@ -63,15 +58,14 @@ class WorkflowState(BaseModel):
     review_sufficient: bool = Field(False, description="Whether the review is sufficient")    
     comparison_report: Optional[str] = Field(None, description="Comparison report")
     
+    # NEW: Student review submission for workflow processing
+    pending_review: Optional[str] = Field(None, description="Student review waiting to be processed")
+    
     # Error handling
     error: Optional[str] = Field(None, description="Error message if any")
-
     evaluation_result: Optional[Dict[str, Any]] = Field(None, description="Results from code evaluation")
-
     evaluation_attempts: int = Field(0, description="Number of attempts to generate code")
-
     max_evaluation_attempts: int = Field(5, description="Maximum number of code generation attempts")
-
     code_generation_feedback: Optional[str] = Field(None, description="Feedback for code generation")
     
     # Original requested errors count (for consistency throughout the workflow)
