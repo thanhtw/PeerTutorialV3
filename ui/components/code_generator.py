@@ -509,15 +509,13 @@ class CodeGeneratorUI:
                 selection_indicator = f"✓ {t('selected')}" if is_selected else f"{t('click_to_select')}"
 
                 st.markdown(f"""
-                <div class="parameter-card category-card {selected_class}" style="{
-                    'border: 2px solid #28a745; background: rgba(40, 167, 69, 0.1);' if is_selected 
-                    else 'border: 1px solid #dee2e6; background: #f8f9fa;'
-                }">
+                <div class="parameter-card category-card {selected_class}">
                     <span class="parameter-icon">{icon}</span>
                     <div class="parameter-label">{category_name}</div>
                 </div>
                 """, unsafe_allow_html=True)
-                
+               
+
                 # Hidden button for interaction (maintains functionality)
                 if st.button(
                     selection_indicator,
@@ -771,7 +769,7 @@ class CodeGeneratorUI:
             # Check if code was generated successfully
             if hasattr(updated_state, 'code_snippet') and updated_state.code_snippet:
                 logger.debug("Code generation completed successfully")
-                st.success("✅ Code generated successfully! Proceed to the Review tab.")
+                #st.success("✅ Code generated successfully! Proceed to the Review tab.")
                 
                 # Log successful generation
                 if self.workflow_manager and hasattr(self.workflow_manager, 'llm_logger'):

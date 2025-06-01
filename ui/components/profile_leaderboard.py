@@ -203,11 +203,6 @@ class ProfileLeaderboardSidebar:
                     escaped_name = html.escape(name)
                     badge_icons_html += f'<span class="badge-icon-fixed" title="{escaped_name}">{icon}</span>'
                 
-                # Ensure badge_icons_html is a string before escaping (it already is)
-                # No, we are injecting HTML, so we don't escape badge_icons_html itself.
-                # The individual names *within* it are already escaped.
-                # escaped_badge_icons = html.escape(str(badge_icons_html)) # This would double-escape and show raw HTML
-                # Instead, use badge_icons_html directly
                 
                 # Current user styling
                 current_class = "current-user-enhanced" if is_current else ""

@@ -85,19 +85,10 @@ class CodeDisplayUI:
     def _render_no_code_message(self):
         """Render a professional no-code message."""
         st.markdown(f"""
-        <div style="
-            text-align: center; 
-            padding: 3rem 2rem; 
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-            border-radius: 12px;
-            border: 2px dashed #dee2e6;
-            margin: 2rem 0;
-        ">
-            <div style="font-size: 4rem; margin-bottom: 1rem; opacity: 0.6;">⚙️</div>
-            <h3 style="color: #6c757d; margin-bottom: 0.5rem;">{t('no_code_generated_yet')}</h3>
-            <p style="color: #6c757d; margin: 0;">
-                {t('generate_code_snippet_instruction')}
-            </p>
+        <div class="no-code-message">
+            <div class="icon">⚙️</div>
+            <h3>{t('no_code_generated_yet')}</h3>
+            <p>{t('generate_code_snippet_instruction')}</p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -120,31 +111,20 @@ class CodeDisplayUI:
     def _render_code_header(self, line_count: int, char_count: int, known_problems: List[str], instructor_mode: bool):
         """Render professional code header with metadata and controls."""
         st.markdown(f"""
-        <div style="
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 1.5rem 2rem;
-            border-radius: 12px 12px 0 0;
-            margin-bottom: 0;
-            border-bottom: 3px solid rgba(255,255,255,0.2);
-        ">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div class="professional-code-header">
+            <div class="header-content">
                 <div>
-                    <h3 style="margin: 0 0 0.5rem 0; font-size: 1.5rem; font-weight: 600;">
-                        ☕ {t('java_code_review_challenge')}
-                    </h3>
-                    <p style="margin: 0; opacity: 0.9; font-size: 1rem;">
-                        {t('review_code_below_instruction')}
-                    </p>
+                    <h3>☕ {t('java_code_review_challenge')}</h3>
+                    <p>{t('review_code_below_instruction')}</p>
                 </div>
-                <div style="display: flex; gap: 1rem; align-items: center;">
-                    <div style="text-align: center;">
-                        <div style="font-size: 1.2rem; font-weight: bold;">{line_count}</div>
-                        <div style="font-size: 0.8rem; opacity: 0.8;">{t('lines')}</div>
+                <div class="stats">
+                    <div class="stat-item">
+                        <div class="stat-value">{line_count}</div>
+                        <div class="stat-label">{t('lines')}</div>
                     </div>
-                    <div style="text-align: center;">
-                        <div style="font-size: 1.2rem; font-weight: bold;">{char_count}</div>
-                        <div style="font-size: 0.8rem; opacity: 0.8;">{t('characters')}</div>
+                    <div class="stat-item">
+                        <div class="stat-value">{char_count}</div>
+                        <div class="stat-label">{t('characters')}</div>
                     </div>
                 </div>
             </div>
@@ -153,36 +133,6 @@ class CodeDisplayUI:
     
     def _render_code_container(self, code: str, lines: List[str], known_problems: List[str] = None):
         """Render the main code container with enhanced styling."""
-        
-        # Add custom CSS for code styling
-        st.markdown("""
-        <style>
-        .code-container {
-            background: #f8f9fa;
-            border: 1px solid #e9ecef;
-            border-radius: 0 0 12px 12px;
-            margin-top: 0;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-        }
-        .code-header {
-            background: #ffffff;
-            border-bottom: 1px solid #e9ecef;
-            padding: 0.5rem 1rem;
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-            font-size: 0.8rem;
-            color: #6c757d;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .stCode {
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
-            font-size: 14px !important;
-            line-height: 1.5 !important;
-        }
-        </style>
-        """, unsafe_allow_html=True)
         
         # Main code container with header
         st.markdown(f"""
@@ -268,16 +218,7 @@ class CodeDisplayUI:
             review_analysis: Optional analysis of previous review attempt
         """
         # Enhanced review container
-        st.markdown("""
-        <div style="
-            background: linear-gradient(135deg, #ffffff 0%, #f8fafe 100%);
-            border-radius: 12px;
-            padding: 0;
-            margin: 2rem 0;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-            border: 1px solid #e1e8f0;
-        ">
-        """, unsafe_allow_html=True)
+        st.markdown('<div class="enhanced-review-container">', unsafe_allow_html=True)
         
         # Enhanced review header
         self._render_enhanced_review_header(iteration_count, max_iterations)
@@ -298,54 +239,22 @@ class CodeDisplayUI:
     def _render_enhanced_review_header(self, iteration_count: int, max_iterations: int) -> None:
         """Render enhanced review header with better styling."""
         progress_percentage = ((iteration_count - 1) / max_iterations) * 100
-        header_html = f"""
-        <div style="
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 2rem;
-            border-radius: 12px 12px 0 0;
-            position: relative;
-            overflow: hidden;
-        ">
-            <div style="
-                position: absolute;
-                top: 0;
-                left: 0;
-                height: 4px;
-                width: {progress_percentage}%;
-                background: rgba(255, 255, 255, 0.3);
-                transition: width 0.5s ease;
-            "></div>
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        
+        st.markdown(f"""
+        <div class="enhanced-review-header">
+            <div class="progress-bar" style="width: {progress_percentage}%;"></div>
+            <div class="header-content">
                 <div>
-                    <h3 style="margin: 0 0 0.5rem 0; font-size: 1.8rem; font-weight: 700;">
-                        📝 {t("submit_review_section")}
-                    </h3>
-                    <p style="margin: 0; opacity: 0.9; font-size: 1.1rem;">
-                        {t('provide_detailed_review')}
-                    </p>
+                    <h3>📝 {t("submit_review_section")}</h3>
+                    <p>{t('provide_detailed_review')}</p>
                 </div>
-                <div style="text-align: center;">
-                    <div style="
-                        background: rgba(255, 255, 255, 0.2);
-                        border-radius: 50%;
-                        width: 80px;
-                        height: 80px;
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
-                        justify-content: center;
-                        backdrop-filter: blur(10px);
-                    ">
-                        <div style="font-size: 1.5rem; font-weight: bold;">{iteration_count}</div>
-                        <div style="font-size: 0.8rem; opacity: 0.8;">{t('of')} {max_iterations}</div>
-                    </div>
+                <div class="iteration-indicator">
+                    <div class="iteration-number">{iteration_count}</div>
+                    <div class="iteration-text">{t('of')} {max_iterations}</div>
                 </div>
             </div>
         </div>
-        """
-        
-        st.markdown(header_html, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
     
     def _render_enhanced_guidance_section(self, targeted_guidance: str, review_analysis: Dict[str, Any], student_review: str, iteration_count: int) -> None:
         """Render enhanced guidance and history section."""
@@ -355,20 +264,12 @@ class CodeDisplayUI:
         with col1:
             if targeted_guidance and iteration_count > 1:
                 st.markdown(f"""
-                <div style="
-                    background: linear-gradient(135deg, #e7f3ff 0%, #f1f8ff 100%);
-                    border-left: 4px solid #0066cc;
-                    border-radius: 8px;
-                    padding: 1.5rem;
-                    margin: 1.5rem;
-                ">
-                    <div style="display: flex; align-items: center; margin-bottom: 1rem;">
-                        <span style="font-size: 1.5rem; margin-right: 0.5rem;">🎯</span>
-                        <h4 style="margin: 0; color: #0066cc; font-weight: 600;">
-                            {t("review_guidance")}
-                        </h4>
+                <div class="enhanced-guidance-section">
+                    <div class="guidance-header">
+                        <span class="guidance-icon">🎯</span>
+                        <h4>{t("review_guidance")}</h4>
                     </div>
-                    <div style="color: #495057; line-height: 1.6;">
+                    <div class="guidance-content">
                         {targeted_guidance}
                     </div>
                 </div>
@@ -380,25 +281,17 @@ class CodeDisplayUI:
                     percentage = review_analysis.get(t("identified_percentage"), 0)
                     
                     st.markdown(f"""
-                    <div style="
-                        background: linear-gradient(135deg, #fff3cd 0%, #fef8e1 100%);
-                        border-left: 4px solid #ffc107;
-                        border-radius: 8px;
-                        padding: 1.5rem;
-                        margin: 1.5rem;
-                    ">
-                        <div style="display: flex; align-items: center; margin-bottom: 1rem;">
-                            <span style="font-size: 1.5rem; margin-right: 0.5rem;">📊</span>
-                            <h4 style="margin: 0; color: #856404; font-weight: 600;">
-                                {t("previous_results")}
-                            </h4>
+                    <div class="analysis-section">
+                        <div class="analysis-header">
+                            <span class="analysis-icon">📊</span>
+                            <h4>{t("previous_results")}</h4>
                         </div>
-                        <div style="color: #856404;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <div class="analysis-stats">
+                            <div class="stat-row">
                                 <span>{t("issues_found")}:</span>
                                 <strong>{identified_count} / {total_problems}</strong>
                             </div>
-                            <div style="display: flex; justify-content: space-between;">
+                            <div class="stat-row">
                                 <span>{t("accuracy")}:</span>
                                 <strong>{percentage:.1f}%</strong>
                             </div>
@@ -409,28 +302,12 @@ class CodeDisplayUI:
         with col2:
             if student_review and iteration_count > 1:
                 st.markdown(f"""
-                <div style="margin: 1.5rem;">
-                    <h4 style="
-                        color: #495057; 
-                        margin-bottom: 1rem;
-                        display: flex;
-                        align-items: center;
-                    ">
-                        <span style="margin-right: 0.5rem;">📝</span>
+                <div class="previous-review-section">
+                    <h4>
+                        <span class="review-icon">📝</span>
                         {t("previous_review")}
                     </h4>
-                    <div style="
-                        background: #f8f9fa;
-                        border: 1px solid #e9ecef;
-                        border-radius: 8px;
-                        padding: 1rem;
-                        max-height: 200px;
-                        overflow-y: auto;
-                        font-family: 'Monaco', 'Menlo', monospace;
-                        font-size: 0.85rem;
-                        line-height: 1.4;
-                        color: #495057;
-                    ">
+                    <div class="previous-review-content">
                         {student_review.replace(chr(10), '<br>')}
                     </div>
                 </div>
@@ -442,15 +319,8 @@ class CodeDisplayUI:
         with st.expander(f"📋 {t('review_guidelines')}", expanded=False):
             # Use individual st.markdown calls instead of one large HTML block
             st.markdown(f"""
-            <div style="
-                background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
-                border-radius: 8px;
-                padding: 1.5rem;
-                margin-bottom: 2rem;
-            ">
-                <h4 style="margin: 0 0 1rem 0; color: #2e7d32;">
-                    ✨ {t('how_to_write_good_review')}
-                </h4>
+            <div class="guidelines-section">
+                <h4>✨ {t('how_to_write_good_review')}</h4>
             </div>
             """, unsafe_allow_html=True)
             
@@ -513,23 +383,15 @@ class CodeDisplayUI:
     
     def _render_enhanced_review_form(self, iteration_count: int, on_submit_callback: Callable) -> bool:
         """Render enhanced review form with better UX."""
-        #st.markdown('<div style="padding: 2rem;">', unsafe_allow_html=True)
         
         # Enhanced form header
         st.markdown(f"""
-        <div style="margin-bottom: 1.5rem;">
-            <h4 style="
-                color: #495057;
-                margin-bottom: 0.5rem;
-                display: flex;
-                align-items: center;
-            ">
-                <span style="margin-right: 0.5rem;">✍️</span>
+        <div class="enhanced-input-section-header">
+            <h4>
+                <span class="input-icon">✍️</span>
                 {t('your_review')}
             </h4>
-            <p style="color: #6c757d; margin: 0; font-size: 0.9rem;">
-                {t('write_comprehensive_review')}
-            </p>
+            <p>{t('write_comprehensive_review')}</p>
         </div>
         """, unsafe_allow_html=True)
         
@@ -553,7 +415,7 @@ class CodeDisplayUI:
         )
         
         # Enhanced buttons with better layout
-        st.markdown('<div style="margin-top: 1.5rem;">', unsafe_allow_html=True)
+        st.markdown('<div class="enhanced-button-container">', unsafe_allow_html=True)
         
         col1, col2 = st.columns([8,2])
         
@@ -627,29 +489,11 @@ def render_review_tab(workflow, code_display_ui, auth_ui=None):
     # Check workflow state
     if not hasattr(st.session_state, 'workflow_state') or not st.session_state.workflow_state:
         st.markdown(f"""
-        <div style="
-            text-align: center; 
-            padding: 3rem; 
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-            border-radius: 12px;
-            border: 2px dashed #dee2e6;
-            margin: 2rem 0;
-        ">
-            <div style="font-size: 4rem; margin-bottom: 1rem; opacity: 0.6;">⚙️</div>
-            <h3 style="color: #6c757d; margin-bottom: 1rem;">{t('no_code_available')}</h3>
-            <p style="color: #6c757d; margin-bottom: 1.5rem;">
-                {t('generate_code_snippet_first')}
-            </p>
-            <div style="
-                display: inline-block;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                padding: 0.75rem 1.5rem;
-                border-radius: 25px;
-                font-weight: 600;
-            ">
-                👈 {t('go_to_generate_tab')}
-            </div>
+        <div class="unavailable-state">
+            <div class="state-icon">⚙️</div>
+            <h3>{t('no_code_available')}</h3>
+            <p>{t('generate_code_snippet_first')}</p>
+            <div class="action-hint">👈 {t('go_to_generate_tab')}</div>
         </div>
         """, unsafe_allow_html=True)
         return
@@ -657,19 +501,10 @@ def render_review_tab(workflow, code_display_ui, auth_ui=None):
     # Check code snippet
     if not hasattr(st.session_state.workflow_state, 'code_snippet') or not st.session_state.workflow_state.code_snippet:
         st.markdown(f"""
-        <div style="
-            text-align: center; 
-            padding: 3rem; 
-            background: linear-gradient(135deg, #fff3cd 0%, #fef8e1 100%);
-            border-radius: 12px;
-            border: 2px solid #ffc107;
-            margin: 2rem 0;
-        ">
-            <div style="font-size: 4rem; margin-bottom: 1rem;">⚠️</div>
-            <h3 style="color: #856404; margin-bottom: 1rem;">{t('code_generation_incomplete')}</h3>
-            <p style="color: #856404; margin: 0;">
-                {t('complete_code_generation_before_review')}
-            </p>
+        <div class="incomplete-state">
+            <div class="state-icon">⚠️</div>
+            <h3>{t('code_generation_incomplete')}</h3>
+            <p>{t('complete_code_generation_before_review')}</p>
         </div>
         """, unsafe_allow_html=True)
         return
@@ -757,19 +592,10 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
         if review_sufficient or all_errors_found:
             # Enhanced success message
             st.markdown(f"""
-            <div style="
-                background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-                border: 2px solid #28a745;
-                border-radius: 12px;
-                padding: 2rem;
-                text-align: center;
-                margin: 2rem 0;
-            ">
-                <div style="font-size: 3rem; margin-bottom: 1rem;">🎉</div>
-                <h3 style="color: #155724; margin-bottom: 1rem; font-weight: 700;">
-                    {t('excellent_work')}
-                </h3>
-                <p style="color: #155724; margin: 0; font-size: 1.1rem;">
+            <div class="success-message">
+                <div class="success-icon">🎉</div>
+                <h3>{t('excellent_work')}</h3>
+                <p>
                     {t('successfully_identified_issues')}
                     <br>
                     {t('check_feedback_tab')}
@@ -822,19 +648,10 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
         else:
             # Enhanced iterations completed message
             st.markdown(f"""
-            <div style="
-                background: linear-gradient(135deg, #fff3cd 0%, #fef8e1 100%);
-                border: 2px solid #ffc107;
-                border-radius: 12px;
-                padding: 2rem;
-                text-align: center;
-                margin: 2rem 0;
-            ">
-                <div style="font-size: 3rem; margin-bottom: 1rem;">⏰</div>
-                <h3 style="color: #856404; margin-bottom: 1rem; font-weight: 700;">
-                    {t('review_session_complete')}
-                </h3>
-                <p style="color: #856404; margin: 0; font-size: 1.1rem;">
+            <div class="warning-message">
+                <div class="warning-icon">⏰</div>
+                <h3>{t('review_session_complete')}</h3>
+                <p>
                     {t('completed_review_attempts', max_iterations=max_iterations)}
                     <br>
                     {t('check_feedback_tab_results')}
