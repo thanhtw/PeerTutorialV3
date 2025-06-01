@@ -24,7 +24,7 @@ class WorkflowConditions:
     @staticmethod
     def should_regenerate_or_review(state: WorkflowState) -> str:
         """
-        Determine if we should regenerate code or move to review - FIXED with proper termination.
+        Determine if we should regenerate code or move to review - FIXED to prevent infinite loops.
         
         Args:
             state: Current workflow state
@@ -34,40 +34,33 @@ class WorkflowConditions:
             "review_code" if the code is valid or we've reached max attempts
         """
         # Extract state attributes for clearer code
-        current_step = getattr(state, "current_step", None)
         evaluation_result = getattr(state, "evaluation_result", None)
         evaluation_attempts = getattr(state, "evaluation_attempts", 0)
         max_evaluation_attempts = getattr(state, "max_evaluation_attempts", 3)
         
-        logger.debug(f"Deciding workflow path with state: step={current_step}, "
+        logger.debug(f"Deciding workflow path with state: "
                      f"valid={evaluation_result.get('valid', False) if evaluation_result else False}, "
                      f"attempts={evaluation_attempts}/{max_evaluation_attempts}")
         
-        # FIXED: Always check max attempts first to prevent infinite loops
+        # CRITICAL FIX: Always check max attempts FIRST and return immediately
         if evaluation_attempts >= max_evaluation_attempts:
-            logger.debug(f"Max evaluation attempts ({max_evaluation_attempts}) reached. Moving to review.")
+            logger.debug(f"Max evaluation attempts ({max_evaluation_attempts}) reached. FORCING move to review.")
             return "review_code"
         
-        # Check if current step is explicitly set to regenerate
-        if current_step == "regenerate":
-            logger.debug(f"{t('path_decision')}: regenerate_code ({t('explicit_current_step')})")
-            return "regenerate_code"
-        
-        # Check validity flag
+        # Check if evaluation result is valid
         if evaluation_result and evaluation_result.get("valid", False):
-            logger.debug(f"{t('path_decision')}: review_code ({t('evaluation_passed')})")
+            logger.debug(f"Evaluation passed. Moving to review.")
             return "review_code"
 
-        # Check if we have missing errors and haven't reached max attempts
-        has_missing_errors = evaluation_result and len(evaluation_result.get("missing_errors", [])) > 0
+        # Check if we have missing errors and are under max attempts
+        if evaluation_result:
+            missing_errors = evaluation_result.get("missing_errors", [])
+            if len(missing_errors) > 0 and evaluation_attempts < max_evaluation_attempts:
+                logger.debug(f"Found {len(missing_errors)} missing errors. Regenerating (attempt {evaluation_attempts + 1}/{max_evaluation_attempts})")
+                return "regenerate_code"
         
-        # FIXED: Only regenerate if we have missing errors AND haven't reached max attempts
-        if has_missing_errors and evaluation_attempts < max_evaluation_attempts:
-            logger.debug(f"{t('path_decision')}: regenerate_code (missing errors, attempt {evaluation_attempts + 1}/{max_evaluation_attempts})")
-            return "regenerate_code"
-        
-        # Default to review if no regeneration is needed or max attempts reached
-        logger.debug(f"{t('path_decision')}: review_code (no regeneration needed or max attempts reached)")
+        # Default to review (safety fallback)
+        logger.debug(f"Defaulting to review (no regeneration needed or conditions not met)")
         return "review_code"
     
     @staticmethod
@@ -93,11 +86,16 @@ class WorkflowConditions:
         logger.debug(f"Deciding review path with state: iteration={current_iteration}/{max_iterations}, "
                      f"sufficient={review_sufficient}")
      
-        # FIXED: Always check max iterations first to prevent infinite loops
+        # CRITICAL FIX: Always check max iterations FIRST and return immediately
         if current_iteration > max_iterations:
-            logger.debug(f"Max review iterations ({max_iterations}) reached. Moving to comparison report.")
+            logger.debug(f"Max review iterations ({max_iterations}) reached. FORCING move to comparison report.")
             return "generate_comparison_report"
      
+        # Check if review is marked as sufficient
+        if review_sufficient:
+            logger.debug("Review marked as sufficient. Moving to comparison report.")
+            return "generate_comparison_report"
+        
         # Get the latest review analysis
         latest_review = review_history[-1] if review_history else None
 
@@ -109,19 +107,14 @@ class WorkflowConditions:
             # Check if all issues have been identified
             if identified_count == total_problems and total_problems > 0:              
                 state.review_sufficient = True
-                logger.debug(f"Review path decision: generate_comparison_report (all {total_problems} issues identified)")
+                logger.debug(f"All {total_problems} issues identified. Moving to comparison report.")
                 return "generate_comparison_report"
         
-        # Check if review is marked as sufficient
-        if review_sufficient:
-            logger.debug("Review path decision: generate_comparison_report (review marked sufficient)")
-            return "generate_comparison_report"
-        
-        # FIXED: Only continue if we haven't reached max iterations
+        # Only continue if we haven't reached max iterations
         if current_iteration <= max_iterations:
-            logger.debug(f"Review path decision: continue_review (iteration {current_iteration}/{max_iterations})")
+            logger.debug(f"Continuing review (iteration {current_iteration}/{max_iterations})")
             return "continue_review"
         else:
-            # Fallback to comparison report if something goes wrong
-            logger.debug("Review path decision: generate_comparison_report (fallback)")
+            # Fallback to comparison report (should not reach here due to first check)
+            logger.debug("Fallback to comparison report")
             return "generate_comparison_report"

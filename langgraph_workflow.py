@@ -54,7 +54,7 @@ class JavaCodeReviewGraph:
     
     def execute_code_generation(self, state: WorkflowState) -> WorkflowState:
         """
-        Execute code generation using the compiled LangGraph workflow.
+        Execute code generation using simplified workflow execution.
         
         Args:
             state: Current workflow state
@@ -63,7 +63,7 @@ class JavaCodeReviewGraph:
             Updated workflow state after code generation and evaluation
         """
         try:
-            logger.debug("Executing code generation through compiled workflow")
+            logger.debug("Executing code generation through simplified workflow")
             
             # Validate the workflow state before proceeding
             is_valid, error_message = self.workflow_manager.validate_workflow_state(state)
@@ -75,12 +75,14 @@ class JavaCodeReviewGraph:
             # Set initial step
             state.current_step = "generate"
             
-            # Execute the workflow until we reach the review step
-            result = self._execute_until_step(state, target_step="review")
+            # Execute using the simplified workflow manager
+            result = self.workflow_manager.execute_code_generation_workflow(state)
             
             # Log the workflow status
-            status = self.workflow_manager.get_workflow_status(result)
-            logger.debug(f"Code generation completed with status: {status}")
+            if not result.error:
+                logger.debug("Code generation completed successfully")
+            else:
+                logger.error(f"Code generation failed: {result.error}")
             
             return result
             
@@ -91,7 +93,7 @@ class JavaCodeReviewGraph:
     
     def submit_review(self, state: WorkflowState, student_review: str) -> WorkflowState:
         """
-        Submit a student review using the compiled LangGraph workflow with safety limits.
+        Submit a student review using simplified workflow execution.
         
         Args:
             state: Current workflow state
@@ -101,10 +103,15 @@ class JavaCodeReviewGraph:
             Updated workflow state with analysis
         """
         try:
-            logger.debug(f"Submitting review through compiled workflow with safety limits")
+            logger.debug("Submitting review through simplified workflow")
             
-            # FIXED: Use the workflow manager's improved execution method
+            # Use the simplified workflow manager execution method
             result = self.workflow_manager.execute_review_workflow(state, student_review)
+            
+            if not result.error:
+                logger.debug("Review submission completed successfully")
+            else:
+                logger.error(f"Review submission failed: {result.error}")
             
             return result
             
@@ -115,7 +122,7 @@ class JavaCodeReviewGraph:
 
     def execute_full_workflow(self, state: WorkflowState) -> WorkflowState:
         """
-        Execute the complete workflow using the compiled LangGraph workflow with safety limits.
+        Execute the complete workflow using simplified execution.
         
         Args:
             state: Initial workflow state
@@ -124,9 +131,9 @@ class JavaCodeReviewGraph:
             Final workflow state after complete execution
         """
         try:
-            logger.debug("Executing full workflow using compiled LangGraph with safety limits")
+            logger.debug("Executing full workflow using simplified execution")
             
-            # FIXED: Use the workflow manager's improved execution method
+            # Use the simplified workflow manager execution method
             result = self.workflow_manager.execute_full_workflow(state)
             
             logger.debug("Full workflow execution completed")
@@ -150,8 +157,9 @@ class JavaCodeReviewGraph:
         return self.workflow_manager.get_workflow_status(state)
     
     def get_compiled_workflow(self):
-        """Get the compiled LangGraph workflow for direct execution."""
-        return self._compiled_workflow
+        """Get the compiled LangGraph workflow - DISABLED in simplified mode."""
+        logger.debug("Compiled workflow not used in simplified execution mode")
+        return None
     
     def reset_workflow_state(self, state: WorkflowState) -> WorkflowState:
         """Reset the workflow state for a fresh start."""

@@ -262,7 +262,6 @@ def render_review_tab(workflow, code_display_ui, auth_ui=None):
     # Handle review submission logic
     _handle_review_submission(workflow, code_display_ui, auth_ui)
 
-
 def _extract_known_problems(state) -> List[str]:
     """Extract known problems from workflow state."""
     known_problems = []
