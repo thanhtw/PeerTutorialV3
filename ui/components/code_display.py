@@ -508,12 +508,12 @@ class CodeDisplayUI:
                 """)
             
             # Example format
-            st.markdown(f"### 📝 {t('review_format_example')}")
-            st.code(t('example_review_format'), language="text")
+            st.markdown(f"### 📝 {t('example_review_format')}")
+            st.code(t('review_format_example'), language="text")
     
     def _render_enhanced_review_form(self, iteration_count: int, on_submit_callback: Callable) -> bool:
         """Render enhanced review form with better UX."""
-        st.markdown('<div style="padding: 2rem;">', unsafe_allow_html=True)
+        #st.markdown('<div style="padding: 2rem;">', unsafe_allow_html=True)
         
         # Enhanced form header
         st.markdown(f"""
@@ -574,7 +574,7 @@ class CodeDisplayUI:
                 key=self._get_unique_key(f"clear_review_{iteration_count}")
             )
         
-        st.markdown('</div></div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
         
         # Handle buttons
         if clear_button:
