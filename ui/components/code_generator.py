@@ -72,14 +72,6 @@ class CodeGeneratorUI:
             state = st.session_state.workflow_state
             
             if hasattr(state, 'code_snippet') and state.code_snippet:
-                st.markdown("""
-                <div class="generated-code-section">
-                    <div class="code-preview-header">
-                        <span class="section-icon">☕</span>
-                        <h3 class="code-preview-title">Generated Java Code</h3>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
                 
                 # Display the code
                 self.code_display_ui.render_code_display(state.code_snippet)
