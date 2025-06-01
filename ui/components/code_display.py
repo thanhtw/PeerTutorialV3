@@ -84,7 +84,7 @@ class CodeDisplayUI:
     
     def _render_no_code_message(self):
         """Render a professional no-code message."""
-        st.markdown("""
+        st.markdown(f"""
         <div style="
             text-align: center; 
             padding: 3rem 2rem; 
@@ -94,9 +94,9 @@ class CodeDisplayUI:
             margin: 2rem 0;
         ">
             <div style="font-size: 4rem; margin-bottom: 1rem; opacity: 0.6;">⚙️</div>
-            <h3 style="color: #6c757d; margin-bottom: 0.5rem;">No Code Generated Yet</h3>
+            <h3 style="color: #6c757d; margin-bottom: 0.5rem;">{t('no_code_generated_yet')}</h3>
             <p style="color: #6c757d; margin: 0;">
-                Generate a Java code snippet using the <strong>Generate</strong> tab to begin your review practice.
+                {t('generate_code_snippet_instruction')}
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -119,9 +119,7 @@ class CodeDisplayUI:
     
     def _render_code_header(self, line_count: int, char_count: int, known_problems: List[str], instructor_mode: bool):
         """Render professional code header with metadata and controls."""
-        
-        # Header container
-        st.markdown("""
+        st.markdown(f"""
         <div style="
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -133,20 +131,20 @@ class CodeDisplayUI:
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
                 <div>
                     <h3 style="margin: 0 0 0.5rem 0; font-size: 1.5rem; font-weight: 600;">
-                        ☕ Java Code Review Challenge
+                        ☕ {t('java_code_review_challenge')}
                     </h3>
                     <p style="margin: 0; opacity: 0.9; font-size: 1rem;">
-                        Review the code below and identify any issues or improvements
+                        {t('review_code_below_instruction')}
                     </p>
                 </div>
                 <div style="display: flex; gap: 1rem; align-items: center;">
                     <div style="text-align: center;">
-                        <div style="font-size: 1.2rem; font-weight: bold;">""" + str(line_count) + """</div>
-                        <div style="font-size: 0.8rem; opacity: 0.8;">Lines</div>
+                        <div style="font-size: 1.2rem; font-weight: bold;">{line_count}</div>
+                        <div style="font-size: 0.8rem; opacity: 0.8;">{t('lines')}</div>
                     </div>
                     <div style="text-align: center;">
-                        <div style="font-size: 1.2rem; font-weight: bold;">""" + str(char_count) + """</div>
-                        <div style="font-size: 0.8rem; opacity: 0.8;">Characters</div>
+                        <div style="font-size: 1.2rem; font-weight: bold;">{char_count}</div>
+                        <div style="font-size: 0.8rem; opacity: 0.8;">{t('characters')}</div>
                     </div>
                 </div>
             </div>
@@ -299,9 +297,7 @@ class CodeDisplayUI:
     
     def _render_enhanced_review_header(self, iteration_count: int, max_iterations: int) -> None:
         """Render enhanced review header with better styling."""
-        
         progress_percentage = ((iteration_count - 1) / max_iterations) * 100
-        
         header_html = f"""
         <div style="
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -326,7 +322,7 @@ class CodeDisplayUI:
                         📝 {t("submit_review")}
                     </h3>
                     <p style="margin: 0; opacity: 0.9; font-size: 1.1rem;">
-                        Provide your detailed code review and analysis
+                        {t('provide_detailed_review')}
                     </p>
                 </div>
                 <div style="text-align: center;">
@@ -342,7 +338,7 @@ class CodeDisplayUI:
                         backdrop-filter: blur(10px);
                     ">
                         <div style="font-size: 1.5rem; font-weight: bold;">{iteration_count}</div>
-                        <div style="font-size: 0.8rem; opacity: 0.8;">of {max_iterations}</div>
+                        <div style="font-size: 0.8rem; opacity: 0.8;">{t('of')} {max_iterations}</div>
                     </div>
                 </div>
             </div>
@@ -530,7 +526,6 @@ class CodeDisplayUI:
     
     def _render_enhanced_review_form(self, iteration_count: int, on_submit_callback: Callable) -> bool:
         """Render enhanced review form with better UX."""
-        
         st.markdown('<div style="padding: 2rem;">', unsafe_allow_html=True)
         
         # Enhanced form header
@@ -546,7 +541,7 @@ class CodeDisplayUI:
                 {t('your_review')}
             </h4>
             <p style="color: #6c757d; margin: 0; font-size: 0.9rem;">
-                Write a comprehensive review identifying all issues and suggesting improvements
+                {t('write_comprehensive_review')}
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -581,22 +576,19 @@ class CodeDisplayUI:
                 f"🚀 {submit_text}", 
                 type="primary", 
                 use_container_width=True,
-                help="Submit your review for analysis",
+                help=t("submit_review_help"),
                 key=self._get_unique_key(f"submit_review_{iteration_count}")
             )
-        
         with col2:
             clear_button = st.button(
                 f"🗑️ {t('clear')}", 
                 use_container_width=True,
-                help="Clear the review text",
+                help=t("clear_review_help"),
                 key=self._get_unique_key(f"clear_review_{iteration_count}")
             )
-        
         with col3:
-            # Character count display
             char_count = len(student_review_input)
-            st.metric("Characters", char_count, help="Number of characters in your review")
+            st.metric(t("characters"), char_count, help=t("character_count_help"))
         
         st.markdown('</div></div>', unsafe_allow_html=True)
         
@@ -610,7 +602,7 @@ class CodeDisplayUI:
                 st.error(f"❌ {t('please_enter_review')}")
                 return False
             elif len(student_review_input.strip()) < 20:
-                st.warning("⚠️ Your review seems quite short. Consider adding more detail.")
+                st.warning(t("review_too_short_warning"))
                 return False
             elif on_submit_callback:
                 with st.spinner(f"🔄 {t('processing_review')}..."):
@@ -643,7 +635,7 @@ def render_review_tab(workflow, code_display_ui, auth_ui=None):
             📋 {t('review_java_code')}
         </h2>
         <p style="color: #6c757d; margin: 0; font-size: 1.1rem;">
-            Carefully examine the code below and provide a comprehensive review
+            {t('carefully_examine_code')}
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -660,9 +652,9 @@ def render_review_tab(workflow, code_display_ui, auth_ui=None):
             margin: 2rem 0;
         ">
             <div style="font-size: 4rem; margin-bottom: 1rem; opacity: 0.6;">⚙️</div>
-            <h3 style="color: #6c757d; margin-bottom: 1rem;">No Code Available</h3>
+            <h3 style="color: #6c757d; margin-bottom: 1rem;">{t('no_code_available')}</h3>
             <p style="color: #6c757d; margin-bottom: 1.5rem;">
-                Generate a Java code snippet first using the <strong>Generate</strong> tab.
+                {t('generate_code_snippet_first')}
             </p>
             <div style="
                 display: inline-block;
@@ -672,7 +664,7 @@ def render_review_tab(workflow, code_display_ui, auth_ui=None):
                 border-radius: 25px;
                 font-weight: 600;
             ">
-                👈 Go to Generate Tab
+                👈 {t('go_to_generate_tab')}
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -690,9 +682,9 @@ def render_review_tab(workflow, code_display_ui, auth_ui=None):
             margin: 2rem 0;
         ">
             <div style="font-size: 4rem; margin-bottom: 1rem;">⚠️</div>
-            <h3 style="color: #856404; margin-bottom: 1rem;">Code Generation Incomplete</h3>
+            <h3 style="color: #856404; margin-bottom: 1rem;">{t('code_generation_incomplete')}</h3>
             <p style="color: #856404; margin: 0;">
-                Please complete the code generation process before proceeding with the review.
+                {t('complete_code_generation_before_review')}
             </p>
         </div>
         """, unsafe_allow_html=True)
@@ -791,11 +783,12 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
             ">
                 <div style="font-size: 3rem; margin-bottom: 1rem;">🎉</div>
                 <h3 style="color: #155724; margin-bottom: 1rem; font-weight: 700;">
-                    Excellent Work!
+                    {t('excellent_work')}
                 </h3>
                 <p style="color: #155724; margin: 0; font-size: 1.1rem;">
-                    You've successfully identified all the issues in the code. 
-                    Check the <strong>Feedback</strong> tab for detailed results.
+                    {t('successfully_identified_issues')}
+                    <br>
+                    {t('check_feedback_tab')}
                 </p>
             </div>
             """, unsafe_allow_html=True)
@@ -855,11 +848,12 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
             ">
                 <div style="font-size: 3rem; margin-bottom: 1rem;">⏰</div>
                 <h3 style="color: #856404; margin-bottom: 1rem; font-weight: 700;">
-                    Review Session Complete
+                    {t('review_session_complete')}
                 </h3>
                 <p style="color: #856404; margin: 0; font-size: 1.1rem;">
-                    You've completed {max_iterations} review attempts. 
-                    Check the <strong>Feedback</strong> tab to see your results and areas for improvement.
+                    {t('completed_review_attempts', max_iterations=max_iterations)}
+                    <br>
+                    {t('check_feedback_tab_results')}
                 </p>
             </div>
             """, unsafe_allow_html=True)
