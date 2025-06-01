@@ -534,6 +534,13 @@ class WorkflowNodes:
 
             # Extract both annotated and clean versions
             annotated_code, clean_code = extract_both_code_versions(response)
+           
+            # Check for empty code extraction
+            if not annotated_code.strip() or not clean_code.strip():
+                logger.error("Code generation failed: No code extracted from LLM response.")
+                state.error = "Failed to generate code. Please try again."
+                state.code_snippet = None
+                return state
 
             # Create code snippet object
             code_snippet = CodeSnippet(
@@ -543,7 +550,7 @@ class WorkflowNodes:
                     "java_errors": selected_errors
                 },
                 expected_error_count=original_error_count
-            )                   
+            )                  
             
             # Update state
             state.original_error_count = original_error_count
