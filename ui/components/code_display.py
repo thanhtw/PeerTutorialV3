@@ -3,7 +3,7 @@ Enhanced Code Display UI component for Java Peer Review Training System.
 
 This module provides professional code display components with enhanced formatting,
 syntax highlighting, and interactive features.
-FIXED: Submit button key generation issue that prevented button clicks from being detected.
+FIXED: Simplified code display logic since CodeSnippet already has clean_code field.
 """
 
 import streamlit as st
@@ -25,7 +25,7 @@ class CodeDisplayUI:
     
     This class handles displaying Java code snippets with enhanced syntax highlighting,
     professional layout, interactive features, and proper formatting.
-    FIXED: Stable key generation to ensure button clicks are properly detected.
+    FIXED: Simplified code handling since CodeSnippet already provides clean_code.
     """
     
     def __init__(self):
@@ -59,11 +59,14 @@ class CodeDisplayUI:
         )
     
     def _extract_code_content(self, code_snippet) -> str:
-        """Extract code content from snippet object or string."""
+        """
+        Extract code content from snippet object or string.
+        FIXED: Prioritize clean_code field from CodeSnippet for better display.
+        """
         if isinstance(code_snippet, str):
             return code_snippet
         else:
-            # Try multiple possible attributes
+            # FIXED: Use clean_code first if available (since it's specifically for display)
             if hasattr(code_snippet, 'clean_code') and code_snippet.clean_code:
                 return code_snippet.clean_code
             elif hasattr(code_snippet, 'code') and code_snippet.code:
@@ -87,19 +90,21 @@ class CodeDisplayUI:
         """, unsafe_allow_html=True)
     
     def _render_professional_code_display(self, code: str, known_problems: List[str] = None, instructor_mode: bool = False):
-        """Render code with professional styling and enhanced features."""
+        """
+        Render code with professional styling and enhanced features.
+        FIXED: Simplified since code is already clean from CodeSnippet.clean_code.
+        """
         
-        # Clean the code first to ensure proper formatting
-        clean_code = self._clean_code_for_display(code)
-        lines = clean_code.split('\n')
+        # FIXED: No need to clean code since it comes from CodeSnippet.clean_code
+        lines = code.split('\n')
         line_count = len(lines)
-        char_count = len(clean_code)
+        char_count = len(code)
         
         # Enhanced code header
         self._render_code_header(line_count, char_count, known_problems, instructor_mode)
         
-        # Code container with professional styling - pass the cleaned code
-        self._render_code_container(clean_code, lines, known_problems)
+        # Code container with professional styling
+        self._render_code_container(code, lines, known_problems)
          
     def _render_code_header(self, line_count: int, char_count: int, known_problems: List[str], instructor_mode: bool):
         """Render professional code header with metadata and controls."""
@@ -125,7 +130,10 @@ class CodeDisplayUI:
         """, unsafe_allow_html=True)
     
     def _render_code_container(self, code: str, lines: List[str], known_problems: List[str] = None):
-        """Render the main code container with enhanced styling."""
+        """
+        Render the main code container with enhanced styling.
+        FIXED: Simplified code processing since input is already clean.
+        """
         
         # Main code container with header
         st.markdown(f"""
@@ -137,44 +145,42 @@ class CodeDisplayUI:
         </div>
         """, unsafe_allow_html=True)
         
-        # Clean the code and ensure proper line breaks
-        clean_code = self._clean_code_for_display(code)
+        # FIXED: Code is already clean from CodeSnippet.clean_code, just ensure proper format
+        display_code = self._ensure_proper_line_breaks(code)
         
         # Use Streamlit's native code display
-        st.code(add_line_numbers(clean_code), language="java")
+        st.code(add_line_numbers(display_code), language="java")
     
-    def _clean_code_for_display(self, code: str) -> str:
-        """Clean and format code for proper display."""
+    def _ensure_proper_line_breaks(self, code: str) -> str:
+        """
+        Ensure proper line breaks in code without heavy cleaning.
+        FIXED: Minimal processing since code should already be clean.
+        
+        Args:
+            code: Code string that should already be clean
+            
+        Returns:
+            Code with ensured proper line breaks
+        """
         if not code:
             return ""
             
         # Convert to string if it's not already
         code_str = str(code)
         
-        # Handle different types of line break representations
-        # Replace literal \n with actual newlines
-        code_str = code_str.replace('\\n', '\n')
+        # Handle different types of line break representations (minimal processing)
+        # Replace literal \n with actual newlines if needed
+        if '\\n' in code_str and '\n' not in code_str:
+            code_str = code_str.replace('\\n', '\n')
         
         # Handle \r\n (Windows) and \r (Mac) line endings
         code_str = code_str.replace('\r\n', '\n').replace('\r', '\n')
         
-        # Split into lines and clean each line
-        lines = code_str.split('\n')
-        cleaned_lines = []
-        
-        for line in lines:
-            # Strip trailing whitespace but preserve leading indentation
-            cleaned_line = line.rstrip()
-            cleaned_lines.append(cleaned_line)
-        
-        # Join lines back together
-        result = '\n'.join(cleaned_lines)
-        
         # Remove excessive empty lines (more than 2 consecutive)
         import re
-        result = re.sub(r'\n{3,}', '\n\n', result)
+        code_str = re.sub(r'\n{3,}', '\n\n', code_str)
         
-        return result
+        return code_str.strip()
     
     def render_review_input(self, 
                           student_review: str = "", 
@@ -459,22 +465,22 @@ class CodeDisplayUI:
                 
                 # Show processing indicator
                 with st.spinner(f"🔄 {t('processing_review')}..."):
-                    logger.debug(f"Processing review submission for iteration {iteration_count}")
-                    logger.debug(f"Review text length: {len(review_text)} characters")
+                    logger.info(f"Processing review submission for iteration {iteration_count}")
+                    logger.info(f"Review text length: {len(review_text)} characters")
                     
                     # Call the submit callback
                     if on_submit_callback:
                         try:
                             # FIXED: Better error handling and state management
                             result = on_submit_callback(review_text)
-                            
+                            print(f"Submit callback result: {result}")
                             if result is not False:
                                 # Mark as submitted
-                                submit_key = f"submitted_review_{iteration_count}"
+                                submit_key = f"submitted_review_key"
                                 if submit_key not in st.session_state:
                                     st.session_state[submit_key] = review_text
                                     
-                                logger.debug(f"Review successfully submitted for iteration {iteration_count}")
+                                logger.info(f"Review successfully submitted for iteration {iteration_count}")
                                 
                                 # Show success message briefly
                                 success_placeholder = st.empty()
