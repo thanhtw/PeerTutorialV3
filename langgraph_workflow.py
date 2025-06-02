@@ -1,9 +1,8 @@
 """
-LangGraph Workflow for Java Peer Review Training System.
+Simplified LangGraph Workflow for Java Peer Review Training System.
 
 This module implements the code review workflow as a LangGraph graph
 by leveraging the modular components from the workflow package.
-Enhanced to use proper LangGraph execution instead of direct node calls.
 """
 
 __all__ = ['JavaCodeReviewGraph']
@@ -27,10 +26,10 @@ logger = logging.getLogger(__name__)
 
 class JavaCodeReviewGraph:
     """
-    LangGraph implementation of the Java Code Review workflow.
+    Simplified LangGraph implementation of the Java Code Review workflow.
     
-    This class now properly uses the compiled LangGraph workflow
-    instead of calling nodes directly.
+    This class provides a clean interface to the LangGraph workflow
+    with straightforward execution methods.
     """
     
     def __init__(self, llm_manager=None):
@@ -51,10 +50,12 @@ class JavaCodeReviewGraph:
         
         # Get the compiled workflow
         self._compiled_workflow = self.workflow_manager.get_compiled_workflow()
+        
+        logger.debug("JavaCodeReviewGraph initialized successfully")
     
     def execute_code_generation(self, state: WorkflowState) -> WorkflowState:
         """
-        Execute code generation using simplified workflow execution.
+        Execute code generation workflow.
         
         Args:
             state: Current workflow state
@@ -63,7 +64,7 @@ class JavaCodeReviewGraph:
             Updated workflow state after code generation and evaluation
         """
         try:
-            logger.debug("Executing code generation through simplified workflow")
+            logger.debug("Executing code generation")
             
             # Validate the workflow state before proceeding
             is_valid, error_message = self.workflow_manager.validate_workflow_state(state)
@@ -75,7 +76,7 @@ class JavaCodeReviewGraph:
             # Set initial step
             state.current_step = "generate"
             
-            # Execute using the simplified workflow manager
+            # Execute using the workflow manager
             result = self.workflow_manager.execute_code_generation_workflow(state)
             
             # Log the workflow status
@@ -87,13 +88,13 @@ class JavaCodeReviewGraph:
             return result
             
         except Exception as e:
-            logger.error(f"Error in code generation workflow: {str(e)}")
+            logger.error(f"Error in code generation: {str(e)}")
             state.error = f"Code generation failed: {str(e)}"
             return state
     
     def submit_review(self, state: WorkflowState, student_review: str) -> WorkflowState:
         """
-        Submit a student review using simplified workflow execution.
+        Submit a student review for analysis.
         
         Args:
             state: Current workflow state
@@ -103,9 +104,9 @@ class JavaCodeReviewGraph:
             Updated workflow state with analysis
         """
         try:
-            logger.debug("Submitting review through simplified workflow")
+            logger.debug("Submitting review for analysis")
             
-            # Use the simplified workflow manager execution method
+            # Use the workflow manager execution method
             result = self.workflow_manager.execute_review_workflow(state, student_review)
             
             if not result.error:
@@ -122,7 +123,7 @@ class JavaCodeReviewGraph:
 
     def execute_full_workflow(self, state: WorkflowState) -> WorkflowState:
         """
-        Execute the complete workflow using simplified execution.
+        Execute the complete workflow from start to finish.
         
         Args:
             state: Initial workflow state
@@ -131,9 +132,9 @@ class JavaCodeReviewGraph:
             Final workflow state after complete execution
         """
         try:
-            logger.debug("Executing full workflow using simplified execution")
+            logger.debug("Executing full workflow")
             
-            # Use the simplified workflow manager execution method
+            # Use the workflow manager execution method
             result = self.workflow_manager.execute_full_workflow(state)
             
             logger.debug("Full workflow execution completed")
@@ -157,14 +158,13 @@ class JavaCodeReviewGraph:
         return self.workflow_manager.get_workflow_status(state)
     
     def get_compiled_workflow(self):
-        """Get the compiled LangGraph workflow - DISABLED in simplified mode."""
-        logger.debug("Compiled workflow not used in simplified execution mode")
-        return None
+        """Get the compiled LangGraph workflow."""
+        return self._compiled_workflow
     
     def reset_workflow_state(self, state: WorkflowState) -> WorkflowState:
         """Reset the workflow state for a fresh start."""
         try:
-            # Preserve configuration but reset execution state
+            # Reset execution state while preserving configuration
             state.current_step = "generate"
             state.evaluation_attempts = 0
             state.evaluation_result = None
@@ -176,6 +176,7 @@ class JavaCodeReviewGraph:
             state.comparison_report = None
             state.pending_review = None
             state.error = None
+            state.final_summary = None
             
             logger.debug("Workflow state reset successfully")
             return state
@@ -184,60 +185,3 @@ class JavaCodeReviewGraph:
             logger.error(f"Error resetting workflow state: {str(e)}")
             state.error = f"Failed to reset workflow state: {str(e)}"
             return state
-
-    def _execute_until_step(self, state: WorkflowState, target_step: str) -> WorkflowState:
-        """
-        Execute workflow until reaching a specific step.
-        
-        Args:
-            state: Current workflow state
-            target_step: Target step to stop at
-            
-        Returns:
-            Updated workflow state
-        """
-        current_state = state
-        max_iterations = 10  # Prevent infinite loops
-        iteration = 0
-        
-        while (current_state.current_step != target_step and 
-               current_state.current_step != "complete" and 
-               not current_state.error and
-               iteration < max_iterations):
-            
-            # Execute one step
-            current_state = self._compiled_workflow.invoke(current_state)
-            iteration += 1
-            
-            logger.debug(f"Workflow step {iteration}: {current_state.current_step}")
-            
-            # Stop if we've reached the target step
-            if current_state.current_step == target_step:
-                break
-        
-        return current_state
-    
-    def _execute_from_step(self, state: WorkflowState, current_step: str) -> WorkflowState:
-        """
-        Execute workflow from a specific step.
-        
-        Args:
-            state: Current workflow state
-            current_step: Current step to start from
-            
-        Returns:
-            Updated workflow state
-        """
-        # Set the current step
-        state.current_step = current_step
-        
-        # Execute the workflow
-        return self._compiled_workflow.invoke(state)
-    
-    
-    
-    
-    
-    
-    
-    

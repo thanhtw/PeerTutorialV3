@@ -1,9 +1,8 @@
 """
-Workflow Conditions for Java Peer Review Training System.
+Simplified Workflow Conditions for Java Peer Review Training System.
 
 This module contains the conditional logic for determining
-which paths to take in the LangGraph workflow with proper termination conditions.
-FIXED: Improved conditional logic with workflow phase awareness and robust termination.
+which paths to take in the LangGraph workflow.
 """
 
 import logging
@@ -20,40 +19,31 @@ class WorkflowConditions:
     
     This class contains all the conditional functions used to determine
     the next step in the workflow based on the current state.
-    FIXED: Improved conditional logic with workflow phase awareness and robust termination.
     """
     
     @staticmethod
     def should_regenerate_or_review(state: WorkflowState) -> str:
         """
         Determine if we should regenerate code or move to review.
-        FIXED: Enhanced logic with workflow phase awareness and robust termination conditions.
         
         Args:
             state: Current workflow state
             
         Returns:
             "regenerate_code" if we need to regenerate code based on evaluation feedback
-            "review_code" if the code is valid or we've reached max attempts or in generation-only phase
+            "review_code" if the code is valid or we've reached max attempts
         """
-        # Extract state attributes for clearer code
         evaluation_result = getattr(state, "evaluation_result", None)
         evaluation_attempts = getattr(state, "evaluation_attempts", 0)
         max_evaluation_attempts = getattr(state, "max_evaluation_attempts", 3)
-        workflow_phase = getattr(state, "workflow_phase", "full")
         
-        logger.debug(f"Deciding workflow path: phase={workflow_phase}, "
+        logger.debug(f"Deciding workflow path: "
                     f"valid={evaluation_result.get(t('valid'), False) if evaluation_result else False}, "
                     f"attempts={evaluation_attempts}/{max_evaluation_attempts}")
         
-        # CRITICAL: For generation-only phase, always move to review regardless of evaluation
-        if workflow_phase == "generation":
-            logger.debug("Generation-only phase, forcing move to review to complete workflow.")
-            return "review_code"
-        
-        # CRITICAL: Always check max attempts FIRST to prevent infinite loops
+        # Check max attempts FIRST to prevent infinite loops
         if evaluation_attempts >= max_evaluation_attempts:
-            logger.debug(f"Max evaluation attempts ({max_evaluation_attempts}) reached. FORCING move to review.")
+            logger.debug(f"Max evaluation attempts ({max_evaluation_attempts}) reached. Moving to review.")
             return "review_code"
         
         # Check if evaluation result is valid (no missing errors)
@@ -69,36 +59,33 @@ class WorkflowConditions:
                         f"Regenerating (attempt {evaluation_attempts + 1}/{max_evaluation_attempts})")
                 return "regenerate_code"
         
-        # Safety fallback - always go to review if conditions aren't met
-        logger.debug("Defaulting to review (safety fallback)")
+        # Default to review
+        logger.debug("Defaulting to review")
         return "review_code"
     
     @staticmethod
     def should_continue_review(state: WorkflowState) -> str:
         """
         Determine if we should continue with another review iteration or generate comparison report.
-        FIXED: Enhanced logic with workflow phase awareness and robust termination conditions.
         
         Args:
             state: Current workflow state
             
         Returns:
             "continue_review" if more review iterations are needed
-            "generate_comparison_report" if the review is sufficient or max iterations reached or all issues identified
+            "generate_comparison_report" if the review is sufficient or max iterations reached
         """
-        # Extract state attributes for clearer code
         current_iteration = getattr(state, "current_iteration", 1)
         max_iterations = getattr(state, "max_iterations", 3)
         review_sufficient = getattr(state, "review_sufficient", False)
         review_history = getattr(state, "review_history", [])
-        workflow_phase = getattr(state, "workflow_phase", "full")
         
-        logger.debug(f"Deciding review path: phase={workflow_phase}, "
+        logger.debug(f"Deciding review path: "
                      f"iteration={current_iteration}/{max_iterations}, sufficient={review_sufficient}")
      
-        # CRITICAL: Always check max iterations FIRST to prevent infinite loops
+        # Check max iterations FIRST to prevent infinite loops
         if current_iteration > max_iterations:
-            logger.debug(f"Max review iterations ({max_iterations}) reached. FORCING move to comparison report.")
+            logger.debug(f"Max review iterations ({max_iterations}) reached. Moving to comparison report.")
             return "generate_comparison_report"
      
         # Check if review is marked as sufficient
@@ -106,12 +93,7 @@ class WorkflowConditions:
             logger.debug("Review marked as sufficient. Moving to comparison report.")
             return "generate_comparison_report"
         
-        # If we're in generation-only phase, skip review iterations
-        if workflow_phase == "generation":
-            logger.debug("Generation-only phase, skipping review iterations.")
-            return "generate_comparison_report"
-        
-        # Get the latest review analysis
+        # Get the latest review analysis to check if all issues are identified
         latest_review = review_history[-1] if review_history else None
 
         if latest_review and hasattr(latest_review, "analysis"):
@@ -125,25 +107,11 @@ class WorkflowConditions:
                 logger.debug(f"All {total_problems} issues identified. Moving to comparison report.")
                 return "generate_comparison_report"
         
-        # Only continue if we haven't reached max iterations and we're in a review phase
-        if current_iteration <= max_iterations and workflow_phase in ["review", "full"]:
+        # Continue review if we haven't reached max iterations
+        if current_iteration <= max_iterations:
             logger.debug(f"Continuing review (iteration {current_iteration}/{max_iterations})")
             return "continue_review"
         else:
-            # Safety fallback to comparison report
-            logger.debug("Fallback to comparison report (safety)")
+            # Fallback to comparison report
+            logger.debug("Fallback to comparison report")
             return "generate_comparison_report"
-    
-    @staticmethod
-    def should_skip_review_in_generation_phase(state: WorkflowState) -> bool:
-        """
-        Helper method to determine if review should be skipped in generation-only phase.
-        
-        Args:
-            state: Current workflow state
-            
-        Returns:
-            True if review should be skipped, False otherwise
-        """
-        workflow_phase = getattr(state, "workflow_phase", "full")
-        return workflow_phase == "generation"

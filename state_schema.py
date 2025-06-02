@@ -1,7 +1,7 @@
 """
 State Schema for Java Code Review Training System.
 
-This module defines the state schema for the LangGraph-based workflow.
+This module defines the simplified state schema for the LangGraph-based workflow.
 """
 
 __all__ = ['WorkflowState', 'CodeSnippet', 'ReviewAttempt']
@@ -27,13 +27,11 @@ class ReviewAttempt(BaseModel):
 
 # --- Workflow State ---
 class WorkflowState(BaseModel):
-    """The state for the Java Code Review workflow"""
+    """The simplified state for the Java Code Review workflow"""
     # Current workflow step
     current_step: Literal[
-        "generate", "evaluate", "regenerate", "review", "generate_summary", "analyze", "generate_comparison_report", "complete"
+        "generate", "evaluate", "regenerate", "review", "analyze", "generate_comparison_report", "complete"
     ] = Field("generate", description="Current step in the workflow")
-
-    workflow_phase: str = Field("generation", description="Current phase of the workflow")
 
     # Code generation parameters
     code_length: str = Field("medium", description="Length of code (short, medium, long)")

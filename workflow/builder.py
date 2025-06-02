@@ -1,9 +1,8 @@
 """
-Workflow Builder for Java Peer Review Training System.
+Simplified Workflow Builder for Java Peer Review Training System.
 
 This module provides the GraphBuilder class for constructing
 the LangGraph workflow graph with appropriate nodes and edges.
-FIXED: Improved node naming and edge configuration for LangGraph execution.
 """
 
 import logging
@@ -19,11 +18,10 @@ logger = logging.getLogger(__name__)
 
 class GraphBuilder:
     """
-    Builder for the Java Code Review workflow graph.
+    Builder for the simplified Java Code Review workflow graph.
     
     This class is responsible for building the LangGraph graph with all necessary
-    nodes and edges, including conditional edges.
-    FIXED: Improved node naming and edge configuration for LangGraph execution.
+    nodes and edges, including conditional edges for a clear workflow flow.
     """
     
     def __init__(self, workflow_nodes: WorkflowNodes):
@@ -43,7 +41,7 @@ class GraphBuilder:
         Returns:
             StateGraph: The constructed workflow graph
         """
-        logger.debug(t("building_workflow_graph"))
+        logger.debug("Building simplified workflow graph")
         
         # Create a new graph with our state schema
         workflow = StateGraph(WorkflowState)
@@ -60,55 +58,50 @@ class GraphBuilder:
         # Set the entry point
         workflow.set_entry_point("generate_code")
         
-        logger.debug(t("workflow_graph_construction_completed"))
+        logger.debug("Simplified workflow graph construction completed")
         return workflow
     
     def _add_nodes(self, workflow: StateGraph) -> None:
         """
         Add all nodes to the workflow graph.
-        FIXED: Corrected node names to match the expected workflow.
         
         Args:
             workflow: StateGraph to add nodes to
         """
-        # Define main workflow nodes with consistent naming
+        # Define main workflow nodes with clear naming
         workflow.add_node("generate_code", self.workflow_nodes.generate_code_node)
         workflow.add_node("evaluate_code", self.workflow_nodes.evaluate_code_node)
         workflow.add_node("regenerate_code", self.workflow_nodes.regenerate_code_node)
         workflow.add_node("review_code", self.workflow_nodes.review_code_node)
         workflow.add_node("analyze_review", self.workflow_nodes.analyze_review_node)
-        workflow.add_node("generate_comparison_report", self.workflow_nodes.comparison_report_node)
-        workflow.add_node("generate_summary", self.workflow_nodes.generate_summary_node)
+        workflow.add_node("generate_comparison_report", self.workflow_nodes.generate_comparison_report_node)
         
         logger.debug("Added all nodes to workflow graph")
     
     def _add_standard_edges(self, workflow: StateGraph) -> None:
         """
         Add standard (non-conditional) edges to the workflow graph.
-        FIXED: Updated edge configuration for proper workflow flow.
         
         Args:
             workflow: StateGraph to add edges to
         """
-        # Add direct edges between nodes
+        # Direct edges between nodes
         workflow.add_edge("generate_code", "evaluate_code")
         workflow.add_edge("regenerate_code", "evaluate_code")
         workflow.add_edge("review_code", "analyze_review")
-        workflow.add_edge("generate_comparison_report", "generate_summary")
-        workflow.add_edge("generate_summary", END)
+        workflow.add_edge("generate_comparison_report", END)
         
         logger.debug("Added standard edges to workflow graph")
     
     def _add_conditional_edges(self, workflow: StateGraph) -> None:
         """
         Add conditional edges to the workflow graph.
-        FIXED: Updated conditional logic for proper workflow execution.
         
         Args:
             workflow: StateGraph to add conditional edges to
         """
-        # Add conditional edge for code evaluation
-        # This determines whether to regenerate code or move to review
+        # Conditional edge for code evaluation
+        # Determines whether to regenerate code or move to review
         workflow.add_conditional_edges(
             "evaluate_code",
             self.conditions.should_regenerate_or_review,
@@ -118,8 +111,8 @@ class GraphBuilder:
             }
         )
         
-        # Add conditional edges for review cycle
-        # This determines whether to continue review iterations or generate comparison report
+        # Conditional edges for review cycle
+        # Determines whether to continue review iterations or generate comparison report
         workflow.add_conditional_edges(
             "analyze_review",
             self.conditions.should_continue_review,
