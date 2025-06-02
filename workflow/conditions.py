@@ -43,8 +43,13 @@ class WorkflowConditions:
         workflow_phase = getattr(state, "workflow_phase", "full")
         
         logger.debug(f"Deciding workflow path: phase={workflow_phase}, "
-                     f"valid={evaluation_result.get(t('valid'), False) if evaluation_result else False}, "
-                     f"attempts={evaluation_attempts}/{max_evaluation_attempts}")
+                    f"valid={evaluation_result.get(t('valid'), False) if evaluation_result else False}, "
+                    f"attempts={evaluation_attempts}/{max_evaluation_attempts}")
+        
+        # CRITICAL: For generation-only phase, always move to review regardless of evaluation
+        if workflow_phase == "generation":
+            logger.debug("Generation-only phase, forcing move to review to complete workflow.")
+            return "review_code"
         
         # CRITICAL: Always check max attempts FIRST to prevent infinite loops
         if evaluation_attempts >= max_evaluation_attempts:
@@ -56,18 +61,12 @@ class WorkflowConditions:
             logger.debug("Evaluation passed. Moving to review.")
             return "review_code"
 
-        # If we're in generation-only phase and have any evaluation result, move to review
-        # This prevents the workflow from getting stuck in generation phase
-        if workflow_phase == "generation" and evaluation_result is not None:
-            logger.debug("Generation-only phase complete, moving to review regardless of validation.")
-            return "review_code"
-
         # Check if we have missing errors and are under max attempts
         if evaluation_result:
             missing_errors = evaluation_result.get(t("missing_errors"), [])
             if len(missing_errors) > 0 and evaluation_attempts < max_evaluation_attempts:
                 logger.debug(f"Found {len(missing_errors)} missing errors. "
-                           f"Regenerating (attempt {evaluation_attempts + 1}/{max_evaluation_attempts})")
+                        f"Regenerating (attempt {evaluation_attempts + 1}/{max_evaluation_attempts})")
                 return "regenerate_code"
         
         # Safety fallback - always go to review if conditions aren't met

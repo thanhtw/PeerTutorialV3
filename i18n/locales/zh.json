@@ -428,6 +428,13 @@
     "enter_your_review": "請在此輸入您的審查...",
     "review_java_code": "審查 Java 代碼",
     "carefully_examine_code": "請仔細檢查下方代碼並提供全面的審查",
-    "example_review_format": "範例審查格式"
+    "example_review_format": "範例審查格式",
+    "generation_summary": "生成摘要",
+    "code_successfully_generated": "程式碼成功生成",
+    "intentional_errors_included": "包含故意錯誤",
+    "ready_for_review": "準備審查",
+    "next_steps": "下一步",
+    "code_ready_for_review_practice": "您的Java程式碼已準備好進行審查練習。您現在可以繼續分析程式碼並識別故意的錯誤。",
+    "generation_phase_completed_successfully": "程式碼生成階段成功完成！"
   }
 }

@@ -50,9 +50,10 @@ class WorkflowNodes:
         try:
             workflow_phase = getattr(state, 'workflow_phase', 'full')
             
-            # If we're in generation-only phase, skip to comparison report
+            # If we're in generation-only phase, skip to comparison report immediately
             if workflow_phase == "generation":
-                logger.debug("Generation-only phase, skipping review and moving to comparison report")
+                logger.debug("Generation-only phase, skipping review and moving directly to completion")
+                # Set the current step to generate_comparison_report to proceed to completion
                 state.current_step = "generate_comparison_report"
                 return state
             
@@ -100,9 +101,24 @@ class WorkflowNodes:
     def evaluate_code_node(self, state: WorkflowState) -> WorkflowState:
         """
         Evaluate generated code for LangGraph execution.
-        FIXED: Enhanced robustness and proper attempt tracking.
+        FIXED: Enhanced robustness, proper attempt tracking, and generation-only phase handling.
         """
         try:
+            workflow_phase = getattr(state, 'workflow_phase', 'full')
+            
+            # CRITICAL FIX: Skip evaluation in generation-only phase
+            if workflow_phase == "generation":
+                logger.debug("Generation-only phase detected, skipping code evaluation")
+                # Mark as valid to proceed to review/completion
+                state.evaluation_result = {
+                    t("found_errors"): [],
+                    t("missing_errors"): [],
+                    t("valid"): True,
+                    t("feedback"): "Evaluation skipped in generation-only mode"
+                }
+                # Don't increment evaluation_attempts in generation-only mode
+                return state
+            
             logger.debug("Starting code evaluation")
             
             # Validate code snippet
@@ -332,7 +348,7 @@ class WorkflowNodes:
     def comparison_report_node(self, state: WorkflowState) -> WorkflowState:
         """
         Generate comparison report node.
-        FIXED: Improved error handling and report generation.
+        FIXED: Improved error handling and report generation with generation-only phase support.
         
         Args:
             state: Current workflow state
@@ -341,9 +357,29 @@ class WorkflowNodes:
             Updated workflow state with comparison report
         """
         try:
-            logger.debug("Generating comparison report")
+            workflow_phase = getattr(state, 'workflow_phase', 'full')
+            logger.debug(f"Generating comparison report (phase: {workflow_phase})")
             
-            # Check if we have review history
+            # Handle generation-only phase
+            if workflow_phase == "generation":
+                logger.debug("Generation-only phase, creating basic completion report")
+                original_error_count = getattr(state, 'original_error_count', 0)
+                state.comparison_report = f"""# {t('code_generation_completed')}
+
+    ## {t('generation_summary')}
+    - {t('code_successfully_generated')}: ✅
+    - {t('intentional_errors_included')}: {original_error_count}
+    - {t('ready_for_review')}: ✅
+
+    ## {t('next_steps')}
+    {t('code_ready_for_review_practice')}
+
+    {t('generation_phase_completed_successfully')}
+    """
+                state.current_step = "generate_summary"
+                return state
+            
+            # Check if we have review history for full workflow
             if not hasattr(state, 'review_history') or not state.review_history:
                 logger.warning(t("no_review_history_found"))
                 state.comparison_report = self._generate_fallback_comparison_report(state, None)
@@ -400,17 +436,28 @@ class WorkflowNodes:
     def generate_summary_node(self, state: WorkflowState) -> WorkflowState:
         """
         Generate final summary node - marks the completion of the workflow.
-        FIXED: Improved summary generation and workflow completion.
+        FIXED: Improved summary generation and workflow completion with generation-only phase support.
         """
         try:
-            logger.debug("Generating final summary for workflow completion")
+            workflow_phase = getattr(state, 'workflow_phase', 'full')
+            logger.debug(f"Generating final summary for workflow completion (phase: {workflow_phase})")
             
             # Mark the workflow as completed
             state.current_step = "complete"
             
-            # Generate final summary if needed
+            # Generate final summary based on workflow phase
             if not hasattr(state, 'final_summary') or not state.final_summary:
-                if hasattr(state, 'review_history') and state.review_history:
+                if workflow_phase == "generation":
+                    # Generation-only phase summary
+                    original_error_count = getattr(state, 'original_error_count', 0)
+                    if original_error_count > 0:
+                        state.final_summary = f"Code generation completed: Java code with {original_error_count} intentional errors generated successfully"
+                    else:
+                        state.final_summary = "Code generation completed: Java code generated successfully"
+                    logger.debug("Generated summary for generation-only phase")
+                    
+                elif hasattr(state, 'review_history') and state.review_history:
+                    # Full workflow with reviews
                     latest_review = state.review_history[-1]
                     if hasattr(latest_review, 'analysis') and latest_review.analysis:
                         analysis = latest_review.analysis
@@ -425,8 +472,12 @@ class WorkflowNodes:
                             state.final_summary = f"Review completed: {identified_count} errors identified"
                     else:
                         state.final_summary = "Review workflow completed"
+                    logger.debug("Generated summary for review workflow")
+                    
                 else:
-                    state.final_summary = "Review workflow completed"
+                    # Fallback summary
+                    state.final_summary = "Workflow completed successfully"
+                    logger.debug("Generated fallback summary")
             
             logger.debug("Summary generation completed successfully")
             return state

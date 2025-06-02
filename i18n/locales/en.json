@@ -659,6 +659,13 @@
     "processing_student_review": "Processing student review",
     "review_java_code": "Review Java Code",
     "carefully_examine_code": "Carefully examine the code below and provide a comprehensive review",
-    "example_review_format": "Example Review Format:"
+    "example_review_format": "Example Review Format:",
+    "generation_summary": "Generation Summary", 
+    "code_successfully_generated": "Code Successfully Generated",
+    "intentional_errors_included": "Intentional Errors Included",
+    "ready_for_review": "Ready for Review",
+    "next_steps": "Next Steps",
+    "code_ready_for_review_practice": "Your Java code is ready for review practice. You can now proceed to analyze the code and identify the intentional errors.",
+    "generation_phase_completed_successfully": "Code generation phase completed successfully!"
   }
 }

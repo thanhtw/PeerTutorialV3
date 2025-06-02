@@ -206,6 +206,7 @@ def add_line_numbers(code: str) -> str:
 def extract_both_code_versions(response) -> Tuple[str, str]:
     """
     Extract both annotated and clean code versions from LLM response.
+    FIXED: Enhanced regex patterns and better handling of various response formats.
     
     Args:
         response: LLM response containing code blocks
@@ -214,38 +215,161 @@ def extract_both_code_versions(response) -> Tuple[str, str]:
         Tuple of (annotated_code, clean_code)
     """
     try:
-        response_text = str(response)
+        response_text = process_llm_response(response)
         
-        # Patterns for different code block formats
+        if not response_text:
+            logger.error("Empty response from LLM")
+            return "", ""
+        
+        logger.debug(f"Processing LLM response (length: {len(response_text)})")
+        logger.debug(f"Response preview: {response_text[:200]}...")
+        
+        # More comprehensive patterns for different code block formats
+        # Order matters - more specific patterns first
         patterns = [
-            r'```java-annotated\s*(.*?)```',  # Annotated version
-            r'```java-clean\s*(.*?)```',      # Clean version
-            r'```java\s*(.*?)```',            # Generic Java
-            r'```\s*(.*?)```'                 # Generic code block
+            # Specific annotated and clean patterns
+            (r'```java-annotated\s*\n(.*?)```', r'```java-clean\s*\n(.*?)```'),
+            (r'```java-annotated(.*?)```', r'```java-clean(.*?)```'),
+            
+            # Generic Java patterns
+            (r'```java\s*\n(.*?)```', r'```java\s*\n(.*?)```'),
+            (r'```java(.*?)```', r'```java(.*?)```'),
+            
+            # Generic code patterns
+            (r'```\s*\n(.*?)```', r'```\s*\n(.*?)```'),
+            (r'```(.*?)```', r'```(.*?)```'),
         ]
         
-        code_blocks = []
-        for pattern in patterns:
-            matches = re.findall(pattern, response_text, re.DOTALL)
-            code_blocks.extend([match.strip() for match in matches])
+        # Try each pattern combination
+        for annotated_pattern, clean_pattern in patterns:
+            annotated_matches = re.findall(annotated_pattern, response_text, re.DOTALL | re.IGNORECASE)
+            clean_matches = re.findall(clean_pattern, response_text, re.DOTALL | re.IGNORECASE)
+            
+            if annotated_matches and clean_matches:
+                # Found both versions
+                annotated_code = _clean_extracted_code(annotated_matches[0])
+                clean_code = _clean_extracted_code(clean_matches[-1] if len(clean_matches) > 1 else clean_matches[0])
+                
+                if annotated_code.strip() and clean_code.strip():
+                    logger.debug(f"Successfully extracted both versions (annotated: {len(annotated_code)} chars, clean: {len(clean_code)} chars)")
+                    return annotated_code, clean_code
         
-        # Return based on what we found
-        if len(code_blocks) >= 2:
-            return code_blocks[0], code_blocks[1]
-        elif len(code_blocks) == 1:
-            return code_blocks[0], code_blocks[0]  # Use same code for both
+        # Fallback: try to find any code blocks
+        all_code_blocks = []
+        fallback_patterns = [
+            r'```java-annotated\s*\n?(.*?)```',
+            r'```java-clean\s*\n?(.*?)```', 
+            r'```java\s*\n?(.*?)```',
+            r'```\s*\n?(.*?)```'
+        ]
+        
+        for pattern in fallback_patterns:
+            matches = re.findall(pattern, response_text, re.DOTALL | re.IGNORECASE)
+            for match in matches:
+                cleaned = _clean_extracted_code(match)
+                if cleaned.strip() and len(cleaned.strip()) > 10:  # Must have some substantial content
+                    all_code_blocks.append(cleaned)
+        
+        # Remove duplicates while preserving order
+        unique_blocks = []
+        for block in all_code_blocks:
+            if block not in unique_blocks:
+                unique_blocks.append(block)
+        
+        if len(unique_blocks) >= 2:
+            logger.debug(f"Using fallback extraction: found {len(unique_blocks)} unique code blocks")
+            return unique_blocks[0], unique_blocks[1]
+        elif len(unique_blocks) == 1:
+            logger.debug("Using single code block for both versions")
+            return unique_blocks[0], unique_blocks[0]
+        
+        # Last resort: try to extract any Java-like content
+        java_content = _extract_java_content_heuristic(response_text)
+        if java_content:
+            logger.debug("Using heuristic Java content extraction")
+            return java_content, java_content
+        
+        # If all else fails, log the issue and return the raw response
+        logger.error("No code blocks found in response using any pattern")
+        logger.debug(f"Full response for debugging: {response_text}")
+        
+        # Return a minimal fallback
+        fallback_content = response_text.strip()
+        if len(fallback_content) > 100:  # If there's substantial content
+            return fallback_content, fallback_content
         else:
-            logger.warning("No code blocks found in response")
-            return response_text.strip(), response_text.strip()
+            return "", ""
             
     except Exception as e:
         logger.error(f"Error extracting code versions: {str(e)}")
         return "", ""
 
+def _clean_extracted_code(code_text: str) -> str:
+    """
+    Clean extracted code text by removing common artifacts.
+    
+    Args:
+        code_text: Raw extracted code text
+        
+    Returns:
+        Cleaned code text
+    """
+    if not code_text:
+        return ""
+    
+    # Remove leading/trailing whitespace
+    code = code_text.strip()
+    
+    # Remove common prefixes/suffixes that might be captured
+    prefixes_to_remove = ['java', 'java-annotated', 'java-clean', '\n', '\r\n']
+    for prefix in prefixes_to_remove:
+        if code.startswith(prefix):
+            code = code[len(prefix):].strip()
+    
+    # Fix line endings
+    code = code.replace('\r\n', '\n').replace('\r', '\n')
+    
+    # Remove excessive blank lines
+    code = re.sub(r'\n{3,}', '\n\n', code)
+    
+    return code
+
+def _extract_java_content_heuristic(text: str) -> str:
+    """
+    Heuristic approach to extract Java-like content from text.
+    
+    Args:
+        text: Text to extract Java content from
+        
+    Returns:
+        Extracted Java content or empty string
+    """
+    try:
+        # Look for Java class definition patterns
+        java_patterns = [
+            r'(public\s+class\s+\w+.*?(?=public\s+class|\Z))',
+            r'(class\s+\w+.*?(?=class|\Z))',
+            r'(import\s+.*?(?:\n.*?)*?public\s+class.*?(?=import|public\s+class|\Z))'
+        ]
+        
+        for pattern in java_patterns:
+            matches = re.findall(pattern, text, re.DOTALL | re.IGNORECASE)
+            if matches:
+                content = matches[0].strip()
+                if len(content) > 50 and ('class' in content.lower() or 'public' in content.lower()):
+                    logger.debug(f"Extracted Java content using heuristic (length: {len(content)})")
+                    return content
+        
+        return ""
+        
+    except Exception as e:
+        logger.error(f"Error in heuristic Java extraction: {str(e)}")
+        return ""
 
 def process_llm_response(response) -> str:
     """
     Process and clean LLM response with improved error handling.
+    FIXED: Enhanced response processing to handle various response types.
     
     Args:
         response: Raw LLM response
@@ -255,20 +379,42 @@ def process_llm_response(response) -> str:
     """
     try:
         if response is None:
+            logger.warning("Received None response from LLM")
             return ""
+        
+        # Handle different response types
+        content = ""
         
         if hasattr(response, 'content'):
             content = response.content
-        elif isinstance(response, dict) and 'content' in response:
-            content = response['content']
-        else:
+        elif isinstance(response, dict):
+            if 'content' in response:
+                content = response['content']
+            elif 'text' in response:
+                content = response['text']
+            elif 'output' in response:
+                content = response['output']
+        elif isinstance(response, (str, bytes)):
             content = response
+        else:
+            # Try to convert to string as last resort
+            content = str(response)
         
-        return str(content).strip() if content else ""
+        # Ensure we have a string
+        if isinstance(content, bytes):
+            content = content.decode('utf-8', errors='ignore')
+        
+        result = str(content).strip() if content else ""
+        
+        if not result:
+            logger.warning("Empty content after processing LLM response")
+        
+        return result
         
     except Exception as e:
         logger.error(f"Error processing LLM response: {str(e)}")
         return ""
+
 
 
 # =============================================================================

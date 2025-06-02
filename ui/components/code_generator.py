@@ -534,7 +534,7 @@ class CodeGeneratorUI:
                 if st.button(
                     f"🎯 {t('select')} {t('all')}",
                     key=f"select_all_categories_{st.session_state.error_selection_mode}",
-                    help=f"{t('c')}",
+                    help=f"{t('select_all_available_categories')}",
                     use_container_width=True,
                     disabled=len(selected) == len(categories)
                 ):
@@ -753,23 +753,25 @@ class CodeGeneratorUI:
     def _handle_generation_result(self, updated_state: WorkflowState):
         """
         Handle the result of code generation.
+        FIXED: Improved error handling to preserve code snippet even when there are errors.
         
         Args:
             updated_state: The updated workflow state after generation
         """
         try:
-            # Check for errors
-            if hasattr(updated_state, 'error') and updated_state.error:
-                st.error(f"❌ Generation failed: {updated_state.error}")
-                return
-            
-            # Update session state with result
+            # Update session state with result first (important for preserving data)
             st.session_state.workflow_state = updated_state
             
             # Check if code was generated successfully
-            if hasattr(updated_state, 'code_snippet') and updated_state.code_snippet:
+            has_code_snippet = (hasattr(updated_state, 'code_snippet') and 
+                            updated_state.code_snippet is not None)
+            
+            # Check for errors
+            has_error = (hasattr(updated_state, 'error') and 
+                        updated_state.error is not None)
+            
+            if has_code_snippet:
                 logger.debug("Code generation completed successfully")
-                #st.success("✅ Code generated successfully! Proceed to the Review tab.")
                 
                 # Log successful generation
                 if self.workflow_manager and hasattr(self.workflow_manager, 'llm_logger'):
@@ -782,20 +784,38 @@ class CodeGeneratorUI:
                         {
                             "code_length": updated_state.code_length,
                             "difficulty": updated_state.difficulty_level,
-                            "mode": st.session_state.get("error_selection_mode", "unknown")
+                            "mode": st.session_state.get("error_selection_mode", "unknown"),
+                            "has_error": has_error,
+                            "error_message": updated_state.error if has_error else None
                         }
                     )
+                
+                # Show success message (even if there were non-critical errors)
+                if has_error:
+                    # Show warning but still indicate success
+                    st.warning(f"⚠️ Code generated with warnings: {updated_state.error}")
+                    st.info("✅ Code generation completed. You can proceed to review the code.")
+                else:
+                    st.success("✅ Code generated successfully!")
                 
                 # Switch to review tab automatically
                 st.session_state.active_tab = 1
                 st.rerun()
-            else:
-                st.error("❌ Failed to generate code. Please try again.")
-                logger.warning("Code generation completed but no code snippet was created")
                 
+            elif has_error:
+                # Error occurred and no code was generated
+                st.error(f"❌ Generation failed: {updated_state.error}")
+                logger.error(f"Code generation failed with error: {updated_state.error}")
+                
+            else:
+                # No code and no specific error message
+                st.error("❌ Failed to generate code. Please try again.")
+                logger.warning("Code generation completed but no code snippet was created and no error message")
+                    
         except Exception as e:
             logger.error(f"Error handling generation result: {str(e)}")
             st.error(f"❌ Error processing generation result: {str(e)}")
+
 
     def _build_workflow_state(self, **kwargs):
         """Helper to build a WorkflowState object for code generation."""
