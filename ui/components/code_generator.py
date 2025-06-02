@@ -3,6 +3,7 @@ Code Generator UI component for Java Peer Review Training System.
 
 This module provides a professional UI for configuring and generating Java code snippets
 with intentional errors for review practice. Revised to properly integrate with workflow manager.
+FIXED: Proper handling of LangGraph state objects (AddableValuesDict).
 """
 
 import streamlit as st
@@ -20,6 +21,7 @@ class CodeGeneratorUI:
     """
     Professional UI component for Java code generation with clean layout and intuitive workflow.
     Now properly integrated with the workflow manager system.
+    FIXED: Proper handling of LangGraph state objects.
     """
     
     def __init__(self, workflow, code_display_ui):
@@ -750,31 +752,117 @@ class CodeGeneratorUI:
             workflow_state.error = f"Workflow execution failed: {str(e)}"
             return workflow_state
 
-    def _handle_generation_result(self, updated_state: WorkflowState):
+    def _safe_get_state_value(self, state, key: str, default=None):
+        """
+        Safely get a value from a state object, handling both dict-like and attribute access.
+        
+        Args:
+            state: State object (could be WorkflowState, dict, or AddableValuesDict)
+            key: Key to access
+            default: Default value if key not found
+            
+        Returns:
+            Value from state or default
+        """
+        try:
+            # Try attribute access first (for WorkflowState objects)
+            if hasattr(state, key):
+                return getattr(state, key)
+            
+            # Try dictionary access (for dict-like objects)
+            if hasattr(state, '__getitem__'):
+                try:
+                    return state[key]
+                except (KeyError, TypeError):
+                    pass
+            
+            # Try get method (for dict-like objects)
+            if hasattr(state, 'get'):
+                return state.get(key, default)
+            
+            return default
+            
+        except Exception as e:
+            logger.warning(f"Error accessing key '{key}' from state: {str(e)}")
+            return default
+
+    def _convert_state_to_workflow_state(self, state) -> WorkflowState:
+        """
+        Convert a state object (potentially AddableValuesDict) to a WorkflowState object.
+        
+        Args:
+            state: State object from LangGraph workflow
+            
+        Returns:
+            WorkflowState object
+        """
+        try:
+            # If it's already a WorkflowState, return as-is
+            if isinstance(state, WorkflowState):
+                return state
+            
+            # If it's dict-like, extract all the fields
+            state_dict = {}
+            
+            # Define all possible WorkflowState fields
+            workflow_state_fields = [
+                'current_step', 'workflow_phase', 'code_length', 'difficulty_level', 'domain',
+                'error_count_start', 'error_count_end', 'selected_error_categories',
+                'selected_specific_errors', 'code_snippet', 'original_error_count',
+                'evaluation_attempts', 'max_evaluation_attempts', 'evaluation_result',
+                'code_generation_feedback', 'pending_review', 'current_iteration',
+                'max_iterations', 'review_sufficient', 'review_history',
+                'comparison_report', 'error', 'final_summary'
+            ]
+            
+            # Extract each field
+            for field in workflow_state_fields:
+                value = self._safe_get_state_value(state, field)
+                if value is not None:
+                    state_dict[field] = value
+            
+            # Create and return new WorkflowState
+            return WorkflowState(**state_dict)
+            
+        except Exception as e:
+            logger.error(f"Error converting state to WorkflowState: {str(e)}")
+            # Return a minimal WorkflowState with error
+            return WorkflowState(error=f"State conversion failed: {str(e)}")
+
+    def _handle_generation_result(self, updated_state):
         """
         Handle the result of code generation.
+        FIXED: Proper handling of LangGraph state objects using safe access methods.
+        
         Args:
             updated_state: The updated workflow state after generation
         """
         try:
+            # Convert the state to a proper WorkflowState object for session storage
+            workflow_state = self._convert_state_to_workflow_state(updated_state)
+            
             # Update session state with result first (important for preserving data)
-            st.session_state.workflow_state = updated_state
+            st.session_state.workflow_state = workflow_state
 
-            has_code_snippet = 'code_snippet' in updated_state and updated_state['code_snippet'] is not None
-            has_error = 'error' in updated_state and updated_state['error'] is not None
+            # Use safe access methods to check for code snippet and error
+            code_snippet = self._safe_get_state_value(updated_state, 'code_snippet')
+            error = self._safe_get_state_value(updated_state, 'error')
+            
+            has_code_snippet = code_snippet is not None
+            has_error = error is not None and error != ""
            
             if has_code_snippet:
                 logger.debug("Code generation completed successfully")               
                 if has_error:                    
-                    st.warning(f"⚠️ Code generated with warnings: {updated_state.error}")
+                    st.warning(f"⚠️ Code generated with warnings: {error}")
                     st.info("✅ Code generation completed. You can proceed to review the code.")
                 else:
                     st.success("✅ Code generated successfully!") 
                 st.session_state.active_tab = 1
                 st.rerun()                
             elif has_error:               
-                st.error(f"❌ Generation failed: {updated_state.error}")
-                logger.error(f"Code generation failed with error: {updated_state.error}")
+                st.error(f"❌ Generation failed: {error}")
+                logger.error(f"Code generation failed with error: {error}")
                 
             else:               
                 st.error("❌ Failed to generate code. Please try again.")

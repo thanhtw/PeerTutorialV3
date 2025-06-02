@@ -3,7 +3,7 @@ Workflow Manager for Java Peer Review Training System.
 
 This module provides a central manager class that integrates
 all components of the workflow system using LangGraph execution.
-FIXED: Proper LangGraph workflow execution without manual stepping.
+FIXED: Proper LangGraph workflow execution with state conversion handling.
 """
 
 import logging
@@ -33,7 +33,7 @@ class WorkflowManager:
     """
     Manager class for the Java Code Review workflow system.
     This class integrates all components and provides proper LangGraph execution.
-    FIXED: Proper LangGraph workflow execution without manual stepping.
+    FIXED: Proper LangGraph workflow execution with state conversion handling.
     """
     def __init__(self, llm_manager):
         """
@@ -119,10 +119,87 @@ class WorkflowManager:
         self.graph_builder = GraphBuilder(self.workflow_nodes)
         return self.graph_builder.build_graph()
     
+    def _safe_get_state_value(self, state, key: str, default=None):
+        """
+        Safely get a value from a state object, handling both dict-like and attribute access.
+        
+        Args:
+            state: State object (could be WorkflowState, dict, or AddableValuesDict)
+            key: Key to access
+            default: Default value if key not found
+            
+        Returns:
+            Value from state or default
+        """
+        try:
+            # Try attribute access first (for WorkflowState objects)
+            if hasattr(state, key):
+                return getattr(state, key)
+            
+            # Try dictionary access (for dict-like objects)
+            if hasattr(state, '__getitem__'):
+                try:
+                    return state[key]
+                except (KeyError, TypeError):
+                    pass
+            
+            # Try get method (for dict-like objects)
+            if hasattr(state, 'get'):
+                return state.get(key, default)
+            
+            return default
+            
+        except Exception as e:
+            logger.warning(f"Error accessing key '{key}' from state: {str(e)}")
+            return default
+
+    def _convert_state_to_workflow_state(self, state) -> WorkflowState:
+        """
+        Convert a state object (potentially AddableValuesDict) to a WorkflowState object.
+        
+        Args:
+            state: State object from LangGraph workflow
+            
+        Returns:
+            WorkflowState object
+        """
+        try:
+            # If it's already a WorkflowState, return as-is
+            if isinstance(state, WorkflowState):
+                return state
+            
+            # If it's dict-like, extract all the fields
+            state_dict = {}
+            
+            # Define all possible WorkflowState fields
+            workflow_state_fields = [
+                'current_step', 'workflow_phase', 'code_length', 'difficulty_level', 'domain',
+                'error_count_start', 'error_count_end', 'selected_error_categories',
+                'selected_specific_errors', 'code_snippet', 'original_error_count',
+                'evaluation_attempts', 'max_evaluation_attempts', 'evaluation_result',
+                'code_generation_feedback', 'pending_review', 'current_iteration',
+                'max_iterations', 'review_sufficient', 'review_history',
+                'comparison_report', 'error', 'final_summary'
+            ]
+            
+            # Extract each field
+            for field in workflow_state_fields:
+                value = self._safe_get_state_value(state, field)
+                if value is not None:
+                    state_dict[field] = value
+            
+            # Create and return new WorkflowState
+            return WorkflowState(**state_dict)
+            
+        except Exception as e:
+            logger.error(f"Error converting state to WorkflowState: {str(e)}")
+            # Return a minimal WorkflowState with error
+            return WorkflowState(error=f"State conversion failed: {str(e)}")
+
     def execute_code_generation_workflow(self, workflow_state: WorkflowState) -> WorkflowState:
         """
         Execute code generation workflow using proper LangGraph execution.
-        FIXED: Now uses single invoke call with proper recursion limit and workflow phase control.
+        FIXED: Now properly converts LangGraph state objects and handles state conversion.
         
         Args:
             workflow_state: Initial workflow state with parameters
@@ -134,7 +211,7 @@ class WorkflowManager:
             logger.debug("Starting LangGraph code generation workflow")
             
             # Set workflow phase to generation only
-            workflow_state.workflow_phase = "generation"
+            workflow_state.workflow_phase = "full"
             workflow_state.current_step = "generate"
             
             # Ensure max attempts are set to prevent infinite loops
@@ -145,8 +222,11 @@ class WorkflowManager:
             compiled_workflow = self.get_compiled_workflow()
             
             # Execute the workflow with increased recursion limit
-            config = {"recursion_limit": 50}
-            result = compiled_workflow.invoke(workflow_state, config)
+            config = {"recursion_limit": 500}
+            raw_result = compiled_workflow.invoke(workflow_state, config)
+            
+            # Convert the result back to a WorkflowState object
+            result = self._convert_state_to_workflow_state(raw_result)
             
             logger.debug("LangGraph code generation workflow completed")
             return result
@@ -159,7 +239,7 @@ class WorkflowManager:
     def execute_review_workflow(self, workflow_state: WorkflowState, student_review: str) -> WorkflowState:
         """
         Execute review analysis workflow using proper LangGraph execution.
-        FIXED: Now uses single invoke call with proper workflow phase control.
+        FIXED: Now properly converts LangGraph state objects and handles state conversion.
         
         Args:
             workflow_state: Current workflow state
@@ -184,8 +264,11 @@ class WorkflowManager:
             compiled_workflow = self.get_compiled_workflow()
             
             # Execute the workflow with increased recursion limit
-            config = {"recursion_limit": 50}
-            result = compiled_workflow.invoke(workflow_state, config)
+            config = {"recursion_limit": 500}
+            raw_result = compiled_workflow.invoke(workflow_state, config)
+            
+            # Convert the result back to a WorkflowState object
+            result = self._convert_state_to_workflow_state(raw_result)
             
             logger.debug("LangGraph review workflow completed")
             return result
@@ -198,7 +281,7 @@ class WorkflowManager:
     def execute_full_workflow(self, workflow_state: WorkflowState) -> WorkflowState:
         """
         Execute the complete workflow using proper LangGraph execution.
-        FIXED: Now uses single invoke call with proper recursion limit.
+        FIXED: Now properly converts LangGraph state objects and handles state conversion.
         
         Args:
             workflow_state: Initial workflow state
@@ -222,8 +305,11 @@ class WorkflowManager:
             compiled_workflow = self.get_compiled_workflow()
             
             # Execute the workflow with increased recursion limit
-            config = {"recursion_limit": 100}  # Higher limit for full workflow
-            result = compiled_workflow.invoke(workflow_state, config)
+            config = {"recursion_limit": 500}  # Higher limit for full workflow
+            raw_result = compiled_workflow.invoke(workflow_state, config)
+            
+            # Convert the result back to a WorkflowState object
+            result = self._convert_state_to_workflow_state(raw_result)
             
             logger.debug("LangGraph full workflow completed")
             return result

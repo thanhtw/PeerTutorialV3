@@ -674,7 +674,7 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
 def _process_student_review(workflow, student_review: str) -> bool:
     """
     Process a student review using the compiled LangGraph workflow with enhanced feedback.
-    FIXED: Improved LangGraph workflow integration and error handling.
+    FIXED: Improved LangGraph workflow integration and proper state handling.
     """
     with st.status(t("processing_review"), expanded=True) as status:
         try:
@@ -719,13 +719,59 @@ def _process_student_review(workflow, student_review: str) -> bool:
             
             # FIXED: Submit review using the LangGraph workflow
             logger.debug("Submitting review through LangGraph workflow")
-            updated_state = workflow.submit_review(state, student_review)
+            raw_updated_state = workflow.submit_review(state, student_review)
             
-            # Check for errors
-            if hasattr(updated_state, 'error') and updated_state.error:
-                status.update(label=f"❌ {t('error')}: {updated_state.error}", state="error")
-                st.session_state.error = updated_state.error
+            # Helper function to safely access state values
+            def _safe_get_state_value(state, key: str, default=None):
+                """Safely get a value from a state object."""
+                try:
+                    if hasattr(state, key):
+                        return getattr(state, key)
+                    if hasattr(state, '__getitem__'):
+                        try:
+                            return state[key]
+                        except (KeyError, TypeError):
+                            pass
+                    if hasattr(state, 'get'):
+                        return state.get(key, default)
+                    return default
+                except Exception:
+                    return default
+            
+            # Check for errors using safe access
+            error = _safe_get_state_value(raw_updated_state, 'error')
+            if error:
+                status.update(label=f"❌ {t('error')}: {error}", state="error")
+                st.session_state.error = error
                 return False
+            
+            # Convert to WorkflowState if needed (handle AddableValuesDict)
+            if not isinstance(raw_updated_state, WorkflowState):
+                try:
+                    # Extract all fields safely
+                    state_dict = {}
+                    workflow_state_fields = [
+                        'current_step', 'workflow_phase', 'code_length', 'difficulty_level', 'domain',
+                        'error_count_start', 'error_count_end', 'selected_error_categories',
+                        'selected_specific_errors', 'code_snippet', 'original_error_count',
+                        'evaluation_attempts', 'max_evaluation_attempts', 'evaluation_result',
+                        'code_generation_feedback', 'pending_review', 'current_iteration',
+                        'max_iterations', 'review_sufficient', 'review_history',
+                        'comparison_report', 'error', 'final_summary'
+                    ]
+                    
+                    for field in workflow_state_fields:
+                        value = _safe_get_state_value(raw_updated_state, field)
+                        if value is not None:
+                            state_dict[field] = value
+                    
+                    updated_state = WorkflowState(**state_dict)
+                except Exception as e:
+                    logger.error(f"Error converting state: {str(e)}")
+                    # Fallback: store the raw state and continue
+                    updated_state = raw_updated_state
+            else:
+                updated_state = raw_updated_state
             
             # Update session state
             st.session_state.workflow_state = updated_state
@@ -736,8 +782,9 @@ def _process_student_review(workflow, student_review: str) -> bool:
             # Add brief delay for user feedback
             time.sleep(1)
             
-            # Check if workflow completed successfully
-            if hasattr(updated_state, 'review_history') and updated_state.review_history:
+            # Check if workflow completed successfully using safe access
+            review_history = _safe_get_state_value(updated_state, 'review_history')
+            if review_history:
                 logger.debug("Review processing completed successfully through LangGraph")
                 st.rerun()
                 return True
