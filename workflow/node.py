@@ -2,7 +2,8 @@
 Simplified Workflow Nodes for Java Peer Review Training System.
 
 This module contains the node implementations for the LangGraph workflow,
-with simplified logic and clear flow between nodes.
+with separated review nodes for clearer flow.
+FIXED: Separated review setup, waiting, and analysis into distinct nodes.
 """
 
 import logging
@@ -21,8 +22,8 @@ class WorkflowNodes:
     """
     Node implementations for the Java Code Review workflow.
     
-    This class contains all node handlers that process state transitions
-    in the LangGraph workflow with simplified, clear logic.
+    This class contains all node handlers with separated review nodes
+    for clearer phase separation.
     """
     
     def __init__(self, code_generator, code_evaluation, error_repository, llm_logger):
@@ -40,10 +41,14 @@ class WorkflowNodes:
         self.error_repository = error_repository
         self.llm_logger = llm_logger
     
+    # =================================================================
+    # PHASE 1: CODE GENERATION AND EVALUATION NODES
+    # =================================================================
+    
     def generate_code_node(self, state: WorkflowState) -> WorkflowState:
         """Generate Java code with errors based on selected parameters."""
         try:
-            logger.info("Starting code generation")
+            logger.info("PHASE 1: Starting code generation")
             
             # Get parameters from state
             code_length = getattr(state, "code_length", "medium")
@@ -121,7 +126,7 @@ class WorkflowNodes:
             state.code_snippet = code_snippet
             state.current_step = "evaluate"
             
-            logger.debug("Code generation completed successfully")
+            logger.debug("PHASE 1: Code generation completed successfully")
             return state
                     
         except Exception as e:           
@@ -134,7 +139,7 @@ class WorkflowNodes:
         Evaluate generated code to check if it contains the required errors.
         """
         try:
-            logger.debug("Starting code evaluation")
+            logger.debug("PHASE 1: Starting code evaluation")
             
             # Validate code snippet exists
             if not hasattr(state, 'code_snippet') or state.code_snippet is None:
@@ -227,7 +232,7 @@ class WorkflowNodes:
                     logger.debug(f"All {original_error_count} requested errors implemented correctly")
                 state.code_generation_feedback = None
 
-            logger.debug(f"Evaluation complete. Valid: {evaluation_result.get(t('valid'), False)}")
+            logger.debug(f"PHASE 1: Evaluation complete. Valid: {evaluation_result.get(t('valid'), False)}")
             return state
             
         except Exception as e:
@@ -241,7 +246,7 @@ class WorkflowNodes:
             current_attempt = getattr(state, 'evaluation_attempts', 0)
             max_attempts = getattr(state, "max_evaluation_attempts", 3)
             
-            logger.debug(f"Starting code regeneration (attempt {current_attempt}/{max_attempts})")
+            logger.debug(f"PHASE 1: Starting code regeneration (attempt {current_attempt}/{max_attempts})")
             
             # Check max attempts (should not happen due to conditions, but safety check)
             if current_attempt >= max_attempts:
@@ -280,7 +285,7 @@ class WorkflowNodes:
                         raw_errors={"java_errors": requested_errors}
                     )
                     
-                    logger.debug(f"Code regenerated successfully for attempt {current_attempt + 1}")
+                    logger.debug(f"PHASE 1: Code regenerated successfully for attempt {current_attempt + 1}")
                     
                 except Exception as regen_error:
                     logger.error(f"Failed to regenerate code: {str(regen_error)}")
@@ -295,60 +300,87 @@ class WorkflowNodes:
             logger.warning("Regeneration failed, continuing with existing code")
             return state
 
+    # =================================================================
+    # PHASE 2: REVIEW PHASE NODE (COMBINED FOR SCHEMA COMPLIANCE)
+    # =================================================================
+    
     def review_code_node(self, state: WorkflowState) -> WorkflowState:
         """
-        Review code node - processes student review submission.
+        PHASE 2: Combined review node that handles both initial setup and review continuation.
+        Uses existing 'review' step name from schema to avoid validation errors.
         """
         try:
-            logger.debug("Processing review submission")
+            logger.debug("PHASE 2: Review code node")
             
-            # Check if there's a pending review to process
-            if hasattr(state, 'pending_review') and state.pending_review:
-                # Process the pending review
-                student_review = state.pending_review
+            # Check if this is initial review setup or continuation
+            current_iteration = getattr(state, "current_iteration", 1)
+            review_history = getattr(state, "review_history", [])
+            
+            # If no review history, this is initial setup
+            if not review_history:
+                logger.info("PHASE 2: Setting up initial review phase")
                 
-                logger.debug(f"Processing student review for iteration {state.current_iteration}")
+                # Validate code snippet exists
+                if not hasattr(state, 'code_snippet') or state.code_snippet is None:
+                    state.error = "No code snippet available for review"
+                    return state
                 
-                # Create a new review attempt
+                # Initialize review state
+                if not hasattr(state, 'max_iterations'):
+                    state.max_iterations = 3
+                if not hasattr(state, 'review_sufficient'):
+                    state.review_sufficient = False
+                if not hasattr(state, 'review_history'):
+                    state.review_history = []
+                
+                # Clear any pending review from previous sessions
+                state.pending_review = None
+                state.current_step = "review"
+                
+                logger.info(f"PHASE 2: Ready for review iteration {current_iteration}/{state.max_iterations}")
+                
+            # Check for pending review to process
+            elif hasattr(state, 'pending_review') and state.pending_review:
+                logger.info(f"PHASE 2: Processing review for iteration {current_iteration}")
+                
+                # Create review attempt
                 review_attempt = ReviewAttempt(
-                    student_review=student_review,
-                    iteration_number=state.current_iteration,
+                    student_review=state.pending_review,
+                    iteration_number=current_iteration,
                     analysis={},
                     targeted_guidance=None
                 )
                 
-                # Initialize review history if it doesn't exist
-                if not hasattr(state, 'review_history') or state.review_history is None:
-                    state.review_history = []
-                
-                # Add to review history
+                # Add to history
                 state.review_history.append(review_attempt)
                 
-                # Clear the pending review
-                state.pending_review = None
+                # DON'T clear pending_review yet - let the conditional edge handle the transition
+                # DON'T set current_step to "analyze" - let the workflow graph handle it
                 
-                # Set step to analyze
-                state.current_step = "analyze"
-                
-                logger.debug(f"Successfully processed student review for iteration {state.current_iteration}")
+                logger.info(f"PHASE 2: Review prepared for analysis (iteration {current_iteration})")
+            
             else:
-                # Set state to waiting for review
-                state.current_step = "review"
-                logger.debug("Waiting for student review submission")
+                # Waiting for review submission
+                state.current_step = "review" 
+                logger.debug("PHASE 2: Waiting for student review submission...")
             
             return state
             
         except Exception as e:
             logger.error(f"Error in review_code_node: {str(e)}", exc_info=True)
-            state.error = f"Error processing review: {str(e)}"
+            state.error = f"Error in review phase: {str(e)}"
             return state
     
     def analyze_review_node(self, state: WorkflowState) -> WorkflowState:
         """
-        Analyze student review using the evaluator.
+        PHASE 2: Analyze student review using the evaluator.
         """
         try:
-            logger.debug("Starting review analysis")
+            logger.debug("PHASE 2: Starting review analysis")
+            
+            # Clear the pending review now that we're processing it
+            if hasattr(state, 'pending_review'):
+                state.pending_review = None
             
             # Validate review history
             if not hasattr(state, 'review_history') or not state.review_history:
@@ -387,7 +419,7 @@ class WorkflowNodes:
             
             # Evaluate the review
             try:
-                logger.debug("Evaluating student review with evaluator")
+                logger.debug("PHASE 2: Evaluating student review with evaluator")
                 analysis = evaluator.evaluate_review(
                     code_snippet=code_snippet,
                     known_problems=known_problems,
@@ -417,13 +449,13 @@ class WorkflowNodes:
                 analysis[t("identified_percentage")] = percentage
                 analysis[t("accuracy_percentage")] = percentage
                 
-                logger.debug(f"Updated review analysis: {identified_count}/{original_error_count} ({percentage:.1f}%)")
+                logger.debug(f"PHASE 2: Updated review analysis: {identified_count}/{original_error_count} ({percentage:.1f}%)")
                 
                 # Mark review as sufficient if all errors are found
                 if identified_count == original_error_count:
                     analysis[t("review_sufficient")] = True
                     state.review_sufficient = True
-                    logger.debug("All errors found! Marking review as sufficient.")
+                    logger.info("PHASE 2: All errors found! Marking review as sufficient.")
 
             # Update the review with analysis
             latest_review.analysis = analysis
@@ -435,7 +467,7 @@ class WorkflowNodes:
             max_iterations = getattr(state, "max_iterations", 3)
             if not state.review_sufficient and state.current_iteration <= max_iterations:
                 try:
-                    logger.debug("Generating targeted guidance")
+                    logger.debug("PHASE 2: Generating targeted guidance")
                     targeted_guidance = evaluator.generate_targeted_guidance(
                         code_snippet=code_snippet,
                         known_problems=known_problems,
@@ -449,7 +481,7 @@ class WorkflowNodes:
                     logger.error(f"Failed to generate guidance: {str(guidance_error)}")
                     latest_review.targeted_guidance = None
             
-            logger.debug("Review analysis completed successfully")
+            logger.debug("PHASE 2: Review analysis completed successfully")
             return state
         
         except Exception as e:
@@ -457,12 +489,16 @@ class WorkflowNodes:
             state.error = f"Error analyzing review: {str(e)}"
             return state
 
+    # =================================================================
+    # PHASE 3: FINAL REPORT GENERATION
+    # =================================================================
+
     def generate_comparison_report_node(self, state: WorkflowState) -> WorkflowState:
         """
-        Generate comparison report node.
+        PHASE 3: Generate comparison report node.
         """
         try:
-            logger.debug("Generating comparison report")
+            logger.debug("PHASE 3: Generating comparison report")
             
             # Check if we have review history
             if not hasattr(state, 'review_history') or not state.review_history:
@@ -497,7 +533,7 @@ class WorkflowNodes:
                                 latest_review.analysis,
                                 converted_history
                             )
-                            logger.debug("Generated comparison report successfully")
+                            logger.debug("PHASE 3: Generated comparison report successfully")
                         except Exception as report_error:
                             logger.error(f"Failed to generate comparison report: {str(report_error)}")
                             state.comparison_report = self._generate_fallback_comparison_report(state, latest_review)
@@ -530,13 +566,17 @@ class WorkflowNodes:
                 else:
                     state.final_summary = "Workflow completed successfully"
             
-            logger.debug("Comparison report generation completed")
+            logger.info("PHASE 3: Comparison report generation completed")
             return state
             
         except Exception as e:
             logger.error(f"Error generating comparison report: {str(e)}", exc_info=True)
             state.error = f"Error generating comparison report: {str(e)}"
             return state
+
+    # =================================================================
+    # HELPER METHODS
+    # =================================================================
 
     def _generate_fallback_comparison_report(self, state: WorkflowState, latest_review) -> str:
         """Generate a basic comparison report as fallback."""
