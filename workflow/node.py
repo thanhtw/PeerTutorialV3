@@ -43,7 +43,7 @@ class WorkflowNodes:
     def generate_code_node(self, state: WorkflowState) -> WorkflowState:
         """Generate Java code with errors based on selected parameters."""
         try:
-            logger.debug("Starting code generation")
+            logger.info("Starting code generation")
             
             # Get parameters from state
             code_length = getattr(state, "code_length", "medium")
@@ -64,11 +64,11 @@ class WorkflowNodes:
                     "logging", "banking", "e-commerce", "student_management"
                 ]
                 state.domain = random.choice(domains)
-                logger.debug(f"Selected domain: {state.domain}")
+                logger.info(f"Selected domain: {state.domain}")
             
             # Determine error selection mode and get errors
             if selected_specific_errors:
-                logger.debug(f"Using specific errors mode with {len(selected_specific_errors)} errors")
+                logger.info(f"Using specific errors mode with {len(selected_specific_errors)} errors")
                 selected_errors = selected_specific_errors
                 original_error_count = len(selected_errors)
             else:
@@ -89,7 +89,7 @@ class WorkflowNodes:
 
                 original_error_count = len(selected_errors)
            
-            logger.debug(f"Final error count for generation: {len(selected_errors)}")
+            logger.info(f"Final error count for generation: {len(selected_errors)}")
             
             # Generate code with selected errors
             response = self.code_generator._generate_with_llm(

@@ -36,19 +36,21 @@ class WorkflowConditions:
         evaluation_result = getattr(state, "evaluation_result", None)
         evaluation_attempts = getattr(state, "evaluation_attempts", 0)
         max_evaluation_attempts = getattr(state, "max_evaluation_attempts", 3)
-        
-        logger.debug(f"Deciding workflow path: "
+       
+        logger.info(f"Deciding workflow path: "
                     f"valid={evaluation_result.get(t('valid'), False) if evaluation_result else False}, "
                     f"attempts={evaluation_attempts}/{max_evaluation_attempts}")
         
         # Check max attempts FIRST to prevent infinite loops
         if evaluation_attempts >= max_evaluation_attempts:
-            logger.debug(f"Max evaluation attempts ({max_evaluation_attempts}) reached. Moving to review.")
+            logger.info(f"Max evaluation attempts ({max_evaluation_attempts}) reached. Moving to review.")
             return "review_code"
         
-        # Check if evaluation result is valid (no missing errors)
+           
+       
+        # If evaluation result is valid, we can move to review
         if evaluation_result and evaluation_result.get(t("valid"), False):
-            logger.debug("Evaluation passed. Moving to review.")
+            logger.info("Evaluation passed. Moving to review.")
             return "review_code"
 
         # Check if we have missing errors and are under max attempts
@@ -60,7 +62,7 @@ class WorkflowConditions:
                 return "regenerate_code"
         
         # Default to review
-        logger.debug("Defaulting to review")
+        logger.info("Defaulting to review")
         return "review_code"
     
     @staticmethod
@@ -80,17 +82,17 @@ class WorkflowConditions:
         review_sufficient = getattr(state, "review_sufficient", False)
         review_history = getattr(state, "review_history", [])
         
-        logger.debug(f"Deciding review path: "
+        logger.info(f"Deciding review path: "
                      f"iteration={current_iteration}/{max_iterations}, sufficient={review_sufficient}")
      
         # Check max iterations FIRST to prevent infinite loops
         if current_iteration > max_iterations:
-            logger.debug(f"Max review iterations ({max_iterations}) reached. Moving to comparison report.")
+            logger.info(f"Max review iterations ({max_iterations}) reached. Moving to comparison report.")
             return "generate_comparison_report"
      
         # Check if review is marked as sufficient
         if review_sufficient:
-            logger.debug("Review marked as sufficient. Moving to comparison report.")
+            logger.info("Review marked as sufficient. Moving to comparison report.")
             return "generate_comparison_report"
         
         # Get the latest review analysis to check if all issues are identified
@@ -104,14 +106,14 @@ class WorkflowConditions:
             # Check if all issues have been identified
             if identified_count >= total_problems and total_problems > 0:              
                 state.review_sufficient = True
-                logger.debug(f"All {total_problems} issues identified. Moving to comparison report.")
+                logger.info(f"All {total_problems} issues identified. Moving to comparison report.")
                 return "generate_comparison_report"
         
         # Continue review if we haven't reached max iterations
         if current_iteration <= max_iterations:
-            logger.debug(f"Continuing review (iteration {current_iteration}/{max_iterations})")
+            logger.info(f"Continuing review (iteration {current_iteration}/{max_iterations})")
             return "continue_review"
         else:
             # Fallback to comparison report
-            logger.debug("Fallback to comparison report")
+            logger.info("Fallback to comparison report")
             return "generate_comparison_report"

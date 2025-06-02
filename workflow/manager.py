@@ -218,7 +218,7 @@ class WorkflowManager:
             compiled_workflow = self.get_compiled_workflow()
             
             # Execute the workflow with increased recursion limit
-            config = {"": 500}
+            config = {"recursion_limit": 100}
             raw_result = compiled_workflow.invoke(workflow_state, config)
             
             # Convert the result back to a WorkflowState object

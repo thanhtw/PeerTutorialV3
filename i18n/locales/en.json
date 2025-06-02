@@ -666,6 +666,7 @@
     "ready_for_review": "Ready for Review",
     "next_steps": "Next Steps",
     "code_ready_for_review_practice": "Your Java code is ready for review practice. You can now proceed to analyze the code and identify the intentional errors.",
-    "generation_phase_completed_successfully": "Code generation phase completed successfully!"
+    "generation_phase_completed_successfully": "Code generation phase completed successfully!",
+    "valid": "Valid"
   }
 }

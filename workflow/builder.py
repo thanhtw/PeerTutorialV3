@@ -58,7 +58,7 @@ class GraphBuilder:
         # Set the entry point
         workflow.set_entry_point("generate_code")
         
-        logger.debug("Simplified workflow graph construction completed")
+        logger.info("Simplified workflow graph construction completed")
         return workflow
     
     def _add_nodes(self, workflow: StateGraph) -> None:
@@ -76,7 +76,7 @@ class GraphBuilder:
         workflow.add_node("analyze_review", self.workflow_nodes.analyze_review_node)
         workflow.add_node("generate_comparison_report", self.workflow_nodes.generate_comparison_report_node)
         
-        logger.debug("Added all nodes to workflow graph")
+        logger.info("Added all nodes to workflow graph")
     
     def _add_standard_edges(self, workflow: StateGraph) -> None:
         """
@@ -91,7 +91,7 @@ class GraphBuilder:
         workflow.add_edge("review_code", "analyze_review")
         workflow.add_edge("generate_comparison_report", END)
         
-        logger.debug("Added standard edges to workflow graph")
+        logger.info("Added standard edges to workflow graph")
     
     def _add_conditional_edges(self, workflow: StateGraph) -> None:
         """
@@ -122,4 +122,4 @@ class GraphBuilder:
             }
         )
         
-        logger.debug("Added conditional edges to workflow graph")
+        logger.info("Added conditional edges to workflow graph")
