@@ -3,7 +3,7 @@ Enhanced Code Display UI component for Java Peer Review Training System.
 
 This module provides professional code display components with enhanced formatting,
 syntax highlighting, and interactive features.
-FIXED: Improved LangGraph workflow integration for review submission.
+FIXED: Improved submit button processing and workflow integration.
 """
 
 import streamlit as st
@@ -107,8 +107,7 @@ class CodeDisplayUI:
         
         # Code container with professional styling - pass the cleaned code
         self._render_code_container(clean_code, lines, known_problems)
-        
-    
+         
     def _render_code_header(self, line_count: int, char_count: int, known_problems: List[str], instructor_mode: bool):
         """Render professional code header with metadata and controls."""
         st.markdown(f"""
@@ -383,7 +382,7 @@ class CodeDisplayUI:
             st.code(t('review_format_example'), language="text")
     
     def _render_enhanced_review_form(self, iteration_count: int, on_submit_callback: Callable) -> bool:
-        """Render enhanced review form with better UX."""
+        """Render enhanced review form with better UX and improved submit processing."""
         
         # Enhanced form header
         st.markdown(f"""
@@ -445,33 +444,76 @@ class CodeDisplayUI:
             st.rerun()
         
         if submit_button:
-            if not student_review_input.strip():
-                st.error(f"❌ {t('please_enter_review')}")
-                return False
-            elif len(student_review_input.strip()) < 20:
-                st.warning(t("review_too_short_warning"))
-                return False
-            elif on_submit_callback:
+            # FIXED: Enhanced submit button processing with better validation and error handling
+            try:
+                print(f"Student review input for iteration {iteration_count}: {student_review_input},{student_review_input.strip()}")
+                # Validate input
+                if not student_review_input or not student_review_input.strip():
+                    st.error(f"❌ {t('please_enter_review')}")
+                    return False
+                
+                review_text = student_review_input.strip()
+                
+                if len(review_text) < 20:
+                    st.warning(t("review_too_short_warning"))
+                    return False
+                
+                # Additional validation - check for meaningful content
+                if len(review_text.split()) < 5:
+                    st.warning("Please provide a more detailed review with at least 5 words.")
+                    return False
+                
+                # Show processing indicator
                 with st.spinner(f"🔄 {t('processing_review')}..."):
-                    # FIXED: Improved callback handling
-                    try:
-                        result = on_submit_callback(student_review_input)
-                        if result is not False:  # Only mark as submitted if not explicitly False
-                            if f"submitted_review_{iteration_count}" not in st.session_state:
-                                st.session_state[f"submitted_review_{iteration_count}"] = student_review_input
-                        return result
-                    except Exception as e:
-                        logger.error(f"Error in submit callback: {str(e)}")
-                        st.error(f"❌ {t('error')} {t('processing_review')}: {str(e)}")
+                    logger.debug(f"Processing review submission for iteration {iteration_count}")
+                    logger.debug(f"Review text length: {len(review_text)} characters")
+                    
+                    # Call the submit callback
+                    if on_submit_callback:
+                        try:
+                            # FIXED: Better error handling and state management
+                            result = on_submit_callback(review_text)
+                            
+                            if result is not False:
+                                # Mark as submitted
+                                submit_key = f"submitted_review_{iteration_count}"
+                                if submit_key not in st.session_state:
+                                    st.session_state[submit_key] = review_text
+                                    
+                                logger.debug(f"Review successfully submitted for iteration {iteration_count}")
+                                
+                                # Show success message briefly
+                                success_placeholder = st.empty()
+                                success_placeholder.success(f"✅ {t('review_submitted_successfully')}")
+                                time.sleep(1)
+                                success_placeholder.empty()
+                                
+                                return True
+                            else:
+                                logger.warning(f"Submit callback returned False for iteration {iteration_count}")
+                                st.error(f"❌ {t('error')} {t('processing_review')}. Please try again.")
+                                return False
+                                
+                        except Exception as callback_error:
+                            logger.error(f"Exception in submit callback: {str(callback_error)}", exc_info=True)
+                            st.error(f"❌ {t('error')} {t('processing_review')}: {str(callback_error)}")
+                            return False
+                    else:
+                        logger.error("No submit callback provided")
+                        st.error(f"❌ {t('error')}: No submission handler available")
                         return False
+                        
+            except Exception as e:
+                logger.error(f"Exception in submit button processing: {str(e)}", exc_info=True)
+                st.error(f"❌ {t('error')} {t('processing_review')}: {str(e)}")
+                return False
         
         return False
-
 
 def render_review_tab(workflow, code_display_ui, auth_ui=None):
     """
     Render the review tab UI with enhanced styling and better user experience.
-    FIXED: Improved LangGraph workflow integration.
+    FIXED: Improved submit button processing and workflow integration.
     
     Args:
         workflow: JavaCodeReviewGraph workflow
@@ -529,7 +571,6 @@ def render_review_tab(workflow, code_display_ui, auth_ui=None):
     # Handle review submission logic
     _handle_review_submission(workflow, code_display_ui, auth_ui)
 
-
 def _extract_known_problems(state) -> List[str]:
     """Extract known problems from workflow state."""
     known_problems = []
@@ -550,11 +591,10 @@ def _extract_known_problems(state) -> List[str]:
     
     return known_problems
 
-
 def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
     """
     Handle the review submission logic with enhanced UX and immediate stats update.
-    FIXED: Improved LangGraph workflow integration and error handling.
+    FIXED: Improved submit processing and better error handling.
     """
     # Get current review state
     state = st.session_state.workflow_state
@@ -588,8 +628,25 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
     
     if current_iteration <= max_iterations and not review_sufficient and not all_errors_found:
         def on_submit_review(review_text):
-            logger.debug(f"Submitting review (iteration {current_iteration})")
-            return _process_student_review(workflow, review_text)
+            """FIXED: Enhanced submit callback with better error handling and logging."""
+            try:
+                logger.debug(f"Submit callback triggered for iteration {current_iteration}")
+                logger.debug(f"Review text: {review_text[:100]}...")  # Log first 100 chars
+                
+                # Process the student review
+                result = _process_student_review(workflow, review_text)
+                
+                if result:
+                    logger.debug(f"Review processing completed successfully for iteration {current_iteration}")
+                else:
+                    logger.warning(f"Review processing returned False for iteration {current_iteration}")
+                
+                return result
+                
+            except Exception as e:
+                logger.error(f"Exception in submit callback: {str(e)}", exc_info=True)
+                st.error(f"Submit processing failed: {str(e)}")
+                return False
         
         code_display_ui.render_review_input(
             student_review=student_review,
@@ -670,56 +727,96 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
             </div>
             """, unsafe_allow_html=True)
 
-
 def _process_student_review(workflow, student_review: str) -> bool:
     """
     Process a student review using the compiled LangGraph workflow with enhanced feedback.
-    FIXED: Improved LangGraph workflow integration and proper state handling.
+    FIXED: Improved error handling, state validation, and processing logic.
     """
-    with st.status(t("processing_review"), expanded=True) as status:
-        try:
-            # Validate workflow state
+    try:
+        logger.debug("Starting student review processing")
+        
+        # Enhanced status tracking
+        with st.status(t("processing_review"), expanded=True) as status:
+            
+            # Step 1: Validate workflow state
+            status.update(label="🔍 Validating workflow state...", state="running")
+            
             if not hasattr(st.session_state, 'workflow_state'):
-                status.update(label=f"❌ {t('error')}: {t('workflow_not_initialized')}", state="error")
-                st.session_state.error = t("please_generate_problem_first")
+                error_msg = "Workflow state not found"
+                logger.error(error_msg)
+                status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
+                st.error(f"❌ {error_msg}. {t('please_generate_problem_first')}")
                 return False
                 
             state = st.session_state.workflow_state
             
-            # Validate code snippet
+            # Step 2: Validate code snippet
+            status.update(label="🔍 Validating code snippet...", state="running")
+            
             if not hasattr(state, "code_snippet") or state.code_snippet is None:
-                status.update(label=f"❌ {t('error')}: {t('no_code_snippet_available')}", state="error")
-                st.session_state.error = t("please_generate_problem_first")
+                error_msg = "No code snippet available"
+                logger.error(error_msg)
+                status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
+                st.error(f"❌ {error_msg}. {t('please_generate_problem_first')}")
                 return False
             
-            # Validate review content
-            if not student_review.strip():
-                status.update(label=f"❌ {t('error')}: {t('review_cannot_be_empty')}", state="error")
-                st.session_state.error = t("please_enter_review")
+            # Step 3: Validate review content
+            status.update(label="🔍 Validating review content...", state="running")
+            
+            if not student_review or not student_review.strip():
+                error_msg = "Review cannot be empty"
+                logger.error(error_msg)
+                status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
+                st.error(f"❌ {t('please_enter_review')}")
                 return False
             
-            # Enhanced validation
-            if len(student_review.strip()) < 10:
-                status.update(label=f"❌ {t('error')}: {t('review_too_short')}", state="error")
-                st.session_state.error = t("provide_detailed_review_minimum")
+            review_text = student_review.strip()
+            
+            if len(review_text) < 10:
+                error_msg = "Review too short"
+                logger.error(error_msg)
+                status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
+                st.error(f"❌ {t('provide_detailed_review_minimum')}")
                 return False
             
-            # Validate review format if evaluator is available
+            # Step 4: Validate review format (if evaluator available)
             if hasattr(workflow, 'workflow_nodes') and hasattr(workflow.workflow_nodes, 'evaluator'):
                 evaluator = workflow.workflow_nodes.evaluator
                 if evaluator and hasattr(evaluator, 'validate_review_format'):
-                    is_valid, reason = evaluator.validate_review_format(student_review)
+                    is_valid, reason = evaluator.validate_review_format(review_text)
                     if not is_valid:
+                        logger.error(f"Review format validation failed: {reason}")
                         status.update(label=f"❌ {t('error')}: {reason}", state="error")
-                        st.session_state.error = reason
+                        st.error(f"❌ {reason}")
                         return False
             
-            # Update status with progress
-            status.update(label=f"🔄 {t('analyzing_your_review')}...", state="running")
+            # Step 5: Submit to workflow
+            status.update(label="🚀 Submitting to workflow...", state="running")
             
-            # FIXED: Submit review using the LangGraph workflow
             logger.debug("Submitting review through LangGraph workflow")
-            raw_updated_state = workflow.submit_review(state, student_review)
+            logger.debug(f"Current state step: {getattr(state, 'current_step', 'unknown')}")
+            logger.debug(f"Current iteration: {getattr(state, 'current_iteration', 'unknown')}")
+            
+            try:
+                # FIXED: Enhanced workflow submission with better error handling
+                raw_updated_state = workflow.submit_review(state, review_text)
+                
+                if not raw_updated_state:
+                    error_msg = "Workflow returned empty state"
+                    logger.error(error_msg)
+                    status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
+                    st.error(f"❌ {error_msg}")
+                    return False
+                
+            except Exception as workflow_error:
+                error_msg = f"Workflow execution failed: {str(workflow_error)}"
+                logger.error(error_msg, exc_info=True)
+                status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
+                st.error(f"❌ {error_msg}")
+                return False
+            
+            # Step 6: Process workflow result
+            status.update(label="⚙️ Processing workflow result...", state="running")
             
             # Helper function to safely access state values
             def _safe_get_state_value(state, key: str, default=None):
@@ -741,9 +838,16 @@ def _process_student_review(workflow, student_review: str) -> bool:
             # Check for errors using safe access
             error = _safe_get_state_value(raw_updated_state, 'error')
             if error:
+                logger.error(f"Workflow returned error: {error}")
                 status.update(label=f"❌ {t('error')}: {error}", state="error")
-                st.session_state.error = error
+                st.error(f"❌ {error}")
                 return False
+            
+            # Step 7: Convert state if needed
+            status.update(label="🔄 Converting state...", state="running")
+            
+            # Import WorkflowState if needed
+            from state_schema import WorkflowState
             
             # Convert to WorkflowState if needed (handle AddableValuesDict)
             if not isinstance(raw_updated_state, WorkflowState):
@@ -751,7 +855,7 @@ def _process_student_review(workflow, student_review: str) -> bool:
                     # Extract all fields safely
                     state_dict = {}
                     workflow_state_fields = [
-                        'current_step', 'workflow_phase', 'code_length', 'difficulty_level', 'domain',
+                        'current_step', 'code_length', 'difficulty_level', 'domain',
                         'error_count_start', 'error_count_end', 'selected_error_categories',
                         'selected_specific_errors', 'code_snippet', 'original_error_count',
                         'evaluation_attempts', 'max_evaluation_attempts', 'evaluation_result',
@@ -766,36 +870,46 @@ def _process_student_review(workflow, student_review: str) -> bool:
                             state_dict[field] = value
                     
                     updated_state = WorkflowState(**state_dict)
-                except Exception as e:
-                    logger.error(f"Error converting state: {str(e)}")
+                    logger.debug("Successfully converted state to WorkflowState")
+                    
+                except Exception as conversion_error:
+                    logger.error(f"Error converting state: {str(conversion_error)}")
                     # Fallback: store the raw state and continue
                     updated_state = raw_updated_state
             else:
                 updated_state = raw_updated_state
             
-            # Update session state
+            # Step 8: Update session state
+            status.update(label="💾 Updating session state...", state="running")
+            
             st.session_state.workflow_state = updated_state
             
-            # Enhanced completion message
-            status.update(label=f"✅ {t('analysis_complete_processed')}", state="complete")
-            
-            # Add brief delay for user feedback
-            time.sleep(1)
+            # Step 9: Verify processing success
+            status.update(label="✅ Verifying processing...", state="running")
             
             # Check if workflow completed successfully using safe access
             review_history = _safe_get_state_value(updated_state, 'review_history')
-            if review_history:
-                logger.debug("Review processing completed successfully through LangGraph")
+            current_iteration = _safe_get_state_value(updated_state, 'current_iteration', 1)
+            
+            if review_history and len(review_history) > 0:
+                logger.debug(f"Review processing completed successfully. History length: {len(review_history)}")
+                status.update(label=f"✅ {t('analysis_complete_processed')}", state="complete")
+                
+                # Brief success display
+                time.sleep(1)
                 st.rerun()
                 return True
             else:
-                logger.warning("Review processing may not have completed properly")
+                logger.warning("Review processing may not have completed properly - no review history found")
+                status.update(label="⚠️ Processing completed with warnings", state="complete")
+                
+                # Still rerun to update UI
+                time.sleep(1)
                 st.rerun()
                 return True
             
-        except Exception as e:
-            error_msg = f"❌ {t('error')} {t('processing_student_review')}: {str(e)}"
-            logger.error(error_msg, exc_info=True)
-            status.update(label=error_msg, state="error")
-            st.session_state.error = error_msg
-            return False
+    except Exception as e:
+        error_msg = f"Exception in review processing: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        st.error(f"❌ {error_msg}")
+        return False
