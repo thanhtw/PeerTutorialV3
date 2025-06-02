@@ -59,7 +59,7 @@ class GraphBuilder:
         # Set the entry point
         workflow.set_entry_point("generate_code")
         
-        logger.info("Schema-compliant workflow graph construction completed")
+        logger.debug("Schema-compliant workflow graph construction completed")
         return workflow
     
     def _add_nodes(self, workflow: StateGraph) -> None:
@@ -81,7 +81,7 @@ class GraphBuilder:
         # Final phase node
         workflow.add_node("generate_comparison_report", self.workflow_nodes.generate_comparison_report_node)
         
-        logger.info("Added all nodes to workflow graph with schema compliance")
+        logger.debug("Added all nodes to workflow graph with schema compliance")
     
     def _add_standard_edges(self, workflow: StateGraph) -> None:
         """
@@ -100,7 +100,7 @@ class GraphBuilder:
         # Final edge
         workflow.add_edge("generate_comparison_report", END)
         
-        logger.info("Added standard edges to workflow graph")
+        logger.debug("Added standard edges to workflow graph")
     
     def _add_conditional_edges(self, workflow: StateGraph) -> None:
         """
@@ -140,4 +140,4 @@ class GraphBuilder:
             }
         )
         
-        logger.info("Added conditional edges to workflow graph with schema compliance")
+        logger.debug("Added conditional edges to workflow graph with schema compliance")

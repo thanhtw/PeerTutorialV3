@@ -42,10 +42,10 @@ class WorkflowConditions:
         pending_review = getattr(state, "pending_review", None)
         
         if pending_review and pending_review.strip():
-            logger.info("PHASE 2A: Pending review found. Proceeding to analysis.")
+            logger.debug("PHASE 2A: Pending review found. Proceeding to analysis.")
             return "analyze_review"
         else:
-            logger.info("PHASE 2A: No pending review. Ending workflow to wait for student input.")
+            logger.debug("PHASE 2A: No pending review. Ending workflow to wait for student input.")
             return "wait_for_review"  # This will END the workflow
     
     @staticmethod
@@ -68,18 +68,18 @@ class WorkflowConditions:
         evaluation_attempts = getattr(state, "evaluation_attempts", 0)
         max_evaluation_attempts = getattr(state, "max_evaluation_attempts", 3)
        
-        logger.info(f"CODE GENERATION DECISION: "
+        logger.debug(f"CODE GENERATION DECISION: "
                     f"valid={evaluation_result.get(t('valid'), False) if evaluation_result else False}, "
                     f"attempts={evaluation_attempts}/{max_evaluation_attempts}")
         
         # Check max attempts FIRST to prevent infinite loops in code generation
         if evaluation_attempts >= max_evaluation_attempts:
-            logger.info(f"Max code generation attempts ({max_evaluation_attempts}) reached. Starting review phase.")
+            logger.debug(f"Max code generation attempts ({max_evaluation_attempts}) reached. Starting review phase.")
             return "review_code"
         
         # If evaluation result is valid, we can start the review phase
         if evaluation_result and evaluation_result.get(t("valid"), False):
-            logger.info("Code evaluation passed. Starting review phase.")
+            logger.debug("Code evaluation passed. Starting review phase.")
             return "review_code"
 
         # Check if we have missing errors and are under max attempts
@@ -91,7 +91,7 @@ class WorkflowConditions:
                 return "regenerate_code"
         
         # Default to starting review if we can't determine what to do
-        logger.info("Defaulting to review phase")
+        logger.debug("Defaulting to review phase")
         return "review_code"
     
     @staticmethod
@@ -115,19 +115,19 @@ class WorkflowConditions:
         review_sufficient = getattr(state, "review_sufficient", False)
         review_history = getattr(state, "review_history", [])
         
-        logger.info(f"STUDENT REVIEW DECISION: "
+        logger.debug(f"STUDENT REVIEW DECISION: "
                      f"iteration={current_iteration}/{max_iterations}, "
                      f"sufficient={review_sufficient}, "
                      f"review_count={len(review_history)}")
      
         # Check max iterations FIRST to prevent infinite loops in review phase
         if current_iteration > max_iterations:
-            logger.info(f"Max review iterations ({max_iterations}) reached. Generating final report.")
+            logger.debug(f"Max review iterations ({max_iterations}) reached. Generating final report.")
             return "generate_comparison_report"
      
         # Check if review is marked as sufficient
         if review_sufficient:
-            logger.info("Review marked as sufficient. Generating final report.")
+            logger.debug("Review marked as sufficient. Generating final report.")
             return "generate_comparison_report"
         
         # Get the latest review analysis to check if all issues are identified
@@ -141,14 +141,14 @@ class WorkflowConditions:
             # Check if all issues have been identified
             if identified_count >= total_problems and total_problems > 0:              
                 state.review_sufficient = True
-                logger.info(f"All {total_problems} issues identified by student. Generating final report.")
+                logger.debug(f"All {total_problems} issues identified by student. Generating final report.")
                 return "generate_comparison_report"
         
         # Continue review if we haven't reached max iterations and review isn't sufficient
         if current_iteration <= max_iterations:
-            logger.info(f"Continuing review phase (iteration {current_iteration}/{max_iterations})")
+            logger.debug(f"Continuing review phase (iteration {current_iteration}/{max_iterations})")
             return "continue_review"
         else:
             # Fallback to final report
-            logger.info("Fallback: Generating final report")
+            logger.debug("Fallback: Generating final report")
             return "generate_comparison_report"

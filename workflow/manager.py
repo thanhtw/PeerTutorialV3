@@ -57,11 +57,11 @@ class WorkflowManager:
         self.workflow = self._build_workflow_graph()
         self._compiled_workflow = None
         
-        logger.info("WorkflowManager initialized successfully")
+        logger.debug("WorkflowManager initialized successfully")
     
     def _initialize_domain_objects(self) -> None:
         """Initialize domain objects with appropriate LLMs."""
-        logger.info("Initializing domain objects")
+        logger.debug("Initializing domain objects")
         
         # Initialize models for different functions
         generative_model = self._initialize_model_for_role("GENERATIVE")
@@ -76,17 +76,17 @@ class WorkflowManager:
         # Store feedback models for generating final feedback
         self.summary_model = summary_model
         
-        logger.info("Domain objects initialization completed")
+        logger.debug("Domain objects initialization completed")
 
     def _initialize_model_for_role(self, role: str):
         """Initialize an LLM for a specific role."""
         try:
-            logger.info(f"Attempting to initialize {role} model")
+            logger.debug(f"Attempting to initialize {role} model")
             
             model = self.llm_manager.initialize_model_from_env(f"{role}_MODEL", f"{role}_TEMPERATURE")
             
             if model:
-                logger.info(f"Successfully initialized {role} model")
+                logger.debug(f"Successfully initialized {role} model")
                 return model
             else:
                 logger.warning(f"Failed to initialize {role} model")
@@ -98,7 +98,7 @@ class WorkflowManager:
     
     def _create_workflow_nodes(self) -> WorkflowNodes:
         """Create workflow nodes with initialized domain objects."""
-        logger.info("Creating workflow nodes")
+        logger.debug("Creating workflow nodes")
         nodes = WorkflowNodes(
             self.code_generator,
             self.code_evaluation,
@@ -113,7 +113,7 @@ class WorkflowManager:
     
     def _build_workflow_graph(self) -> StateGraph:
         """Build the workflow graph using the graph builder."""
-        logger.info("Building workflow graph")
+        logger.debug("Building workflow graph")
         self.graph_builder = GraphBuilder(self.workflow_nodes)
         return self.graph_builder.build_graph()
     
@@ -205,7 +205,7 @@ class WorkflowManager:
             Updated workflow state after generation and evaluation
         """
         try:
-            logger.info("Starting code generation workflow")
+            logger.debug("Starting code generation workflow")
             
             # Set initial step
             workflow_state.current_step = "generate"
@@ -224,7 +224,7 @@ class WorkflowManager:
             # Convert the result back to a WorkflowState object
             result = self._convert_state_to_workflow_state(raw_result)
             
-            logger.info("Code generation workflow completed")
+            logger.debug("Code generation workflow completed")
             return result
             
         except Exception as e:
@@ -244,7 +244,7 @@ class WorkflowManager:
             Updated workflow state after review analysis
         """
         try:
-            logger.info("Starting review workflow")
+            logger.debug("Starting review workflow")
             
             # Set the pending review and current step
             workflow_state.pending_review = student_review
@@ -264,7 +264,7 @@ class WorkflowManager:
             # Convert the result back to a WorkflowState object
             result = self._convert_state_to_workflow_state(raw_result)
             
-            logger.info("Review workflow completed")
+            logger.debug("Review workflow completed")
             return result
             
         except Exception as e:
@@ -283,7 +283,7 @@ class WorkflowManager:
             Final workflow state after complete execution
         """
         try:
-            logger.info("Executing full workflow")
+            logger.debug("Executing full workflow")
             
             # Set initial step
             workflow_state.current_step = "generate"
@@ -304,7 +304,7 @@ class WorkflowManager:
             # Convert the result back to a WorkflowState object
             result = self._convert_state_to_workflow_state(raw_result)
             
-            logger.info("Full workflow completed")
+            logger.debug("Full workflow completed")
             return result
             
         except Exception as e:
@@ -317,9 +317,9 @@ class WorkflowManager:
         Get the compiled workflow.
         """
         if self._compiled_workflow is None:
-            logger.info("Compiling LangGraph workflow")
+            logger.debug("Compiling LangGraph workflow")
             self._compiled_workflow = self.workflow.compile()
-            logger.info("LangGraph workflow compiled successfully")
+            logger.debug("LangGraph workflow compiled successfully")
         
         return self._compiled_workflow
 
