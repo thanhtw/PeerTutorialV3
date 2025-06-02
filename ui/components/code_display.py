@@ -3,7 +3,7 @@ Enhanced Code Display UI component for Java Peer Review Training System.
 
 This module provides professional code display components with enhanced formatting,
 syntax highlighting, and interactive features.
-FIXED: Improved submit button processing and workflow integration.
+FIXED: Submit button key generation issue that prevented button clicks from being detected.
 """
 
 import streamlit as st
@@ -25,24 +25,17 @@ class CodeDisplayUI:
     
     This class handles displaying Java code snippets with enhanced syntax highlighting,
     professional layout, interactive features, and proper formatting.
+    FIXED: Stable key generation to ensure button clicks are properly detected.
     """
     
     def __init__(self):
         """Initialize the CodeDisplayUI component."""
         pass
-    
-    def _get_unique_key(self, base_key: str) -> str:
-        """Generate a unique key for Streamlit elements to avoid conflicts."""
-        if 'code_display_counter' not in st.session_state:
-            st.session_state.code_display_counter = 0
-        
-        st.session_state.code_display_counter += 1
-        return f"{base_key}_{st.session_state.code_display_counter}"
-    
+
     def render_code_display(self, code_snippet, known_problems: List[str] = None, instructor_mode: bool = False) -> None:
         """
         Render a code snippet with enhanced professional styling and features.
-        
+
         Args:
             code_snippet: Code snippet object or string
             known_problems: List of known problems for instructor view
@@ -182,22 +175,6 @@ class CodeDisplayUI:
         result = re.sub(r'\n{3,}', '\n\n', result)
         
         return result
-    
-    def _calculate_basic_complexity(self, code: str) -> int:
-        """Calculate a basic complexity score for the code."""
-        complexity = 0
-        lines = code.split('\n')
-        
-        for line in lines:
-            line = line.strip()
-            # Count control structures
-            if re.search(r'\b(if|for|while|switch|try)\b', line):
-                complexity += 1
-            # Count nested structures (rough estimate)
-            if line.startswith('    ') and re.search(r'\b(if|for|while)\b', line):
-                complexity += 1
-        
-        return complexity
     
     def render_review_input(self, 
                           student_review: str = "", 
@@ -382,7 +359,17 @@ class CodeDisplayUI:
             st.code(t('review_format_example'), language="text")
     
     def _render_enhanced_review_form(self, iteration_count: int, on_submit_callback: Callable) -> bool:
-        """Render enhanced review form with better UX and improved submit processing."""
+        """
+        Render enhanced review form with better UX and FIXED submit processing.
+        FIXED: Use stable keys to ensure button clicks are properly detected.
+        
+        Args:
+            iteration_count: Current iteration number
+            on_submit_callback: Callback function for submit
+            
+        Returns:
+            True if form was submitted successfully, False otherwise
+        """
         
         # Enhanced form header
         st.markdown(f"""
@@ -395,8 +382,10 @@ class CodeDisplayUI:
         </div>
         """, unsafe_allow_html=True)
         
-        # Create unique key for text area
-        text_area_key = self._get_unique_key(f"student_review_input_{iteration_count}")
+        # FIXED: Create stable keys that don't change across renders
+        text_area_key = f"student_review_input_key"
+        submit_button_key = f"submit_review_iter_key"
+        clear_button_key = f"clear_review_iter_key"
         
         # Get initial value
         initial_value = ""
@@ -417,23 +406,26 @@ class CodeDisplayUI:
         # Enhanced buttons with better layout
         st.markdown('<div class="enhanced-button-container">', unsafe_allow_html=True)
         
-        col1, col2 = st.columns([8,2])
+        col1, col2 = st.columns([8, 2])
         
         with col1:
             submit_text = t("submit_review_button") if iteration_count == 1 else f"{t('submit_review_button')} ({t('attempt')} {iteration_count})"
+            # FIXED: Use stable key that doesn't change across renders
             submit_button = st.button(
                 f"🚀 {submit_text}", 
                 type="primary", 
                 use_container_width=True,
                 help=t("submit_review_help"),
-                key=self._get_unique_key(f"submit_review_{iteration_count}")
+                key=submit_button_key  # Stable key
             )
+            
         with col2:
+            # FIXED: Use stable key that doesn't change across renders
             clear_button = st.button(
                 f"🗑️ {t('clear')}", 
                 use_container_width=True,
                 help=t("clear_review_help"),
-                key=self._get_unique_key(f"clear_review_{iteration_count}")
+                key=clear_button_key  # Stable key
             )
         
         st.markdown('</div>', unsafe_allow_html=True)
@@ -446,7 +438,9 @@ class CodeDisplayUI:
         if submit_button:
             # FIXED: Enhanced submit button processing with better validation and error handling
             try:
-                print(f"Student review input for iteration {iteration_count}: {student_review_input},{student_review_input.strip()}")
+                logger.info(f"Submit button clicked for iteration {iteration_count}")
+                logger.info(f"Student review input: '{student_review_input[:100]}...' (length: {len(student_review_input)})")
+                
                 # Validate input
                 if not student_review_input or not student_review_input.strip():
                     st.error(f"❌ {t('please_enter_review')}")
@@ -513,7 +507,6 @@ class CodeDisplayUI:
 def render_review_tab(workflow, code_display_ui, auth_ui=None):
     """
     Render the review tab UI with enhanced styling and better user experience.
-    FIXED: Improved submit button processing and workflow integration.
     
     Args:
         workflow: JavaCodeReviewGraph workflow
@@ -793,9 +786,9 @@ def _process_student_review(workflow, student_review: str) -> bool:
             # Step 5: Submit to workflow
             status.update(label="🚀 Submitting to workflow...", state="running")
             
-            logger.debug("Submitting review through LangGraph workflow")
-            logger.debug(f"Current state step: {getattr(state, 'current_step', 'unknown')}")
-            logger.debug(f"Current iteration: {getattr(state, 'current_iteration', 'unknown')}")
+            logger.info("Submitting review through LangGraph workflow")
+            logger.info(f"Current state step: {getattr(state, 'current_step', 'unknown')}")
+            logger.info(f"Current iteration: {getattr(state, 'current_iteration', 'unknown')}")
             
             try:
                 # FIXED: Enhanced workflow submission with better error handling
