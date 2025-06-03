@@ -488,7 +488,8 @@ class CodeDisplayUI:
                                 
                                 # Show immediate success feedback
                                 st.success("✅ Review submitted successfully!")
-                                
+                                time.sleep(1)  # Brief pause to show success message
+                                st.rerun()
                                 return True
                             else:
                                 logger.warning(f"Submit callback returned False for iteration {iteration_count}")
@@ -710,7 +711,17 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
                 
                 # Add celebration effect
                 st.balloons()
-                # ✅ FIXED: Remove manual rerun, let Streamlit handle it naturally
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.success("🎉 Review completed! All issues identified correctly.")
+                with col2:
+                    if st.button("📊 View Feedback", key="go_to_feedback", type="primary"):
+                        st.session_state.active_tab = 2
+                        st.rerun()
+                
+                # Re-run to refresh the review tab with updated state
+                st.rerun()
+                
         else:
             # Enhanced iterations completed message
             st.markdown(f"""
@@ -796,7 +807,7 @@ def _process_student_review(workflow, student_review: str) -> bool:
             
             try:                
                 raw_updated_state = workflow.submit_review(state, review_text)
-                print( f"Raw updated state: {raw_updated_state}")  # Debugging output
+                
                 if not raw_updated_state:
                     error_msg = "Workflow returned empty state"
                     logger.error(error_msg)

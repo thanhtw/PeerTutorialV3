@@ -410,7 +410,7 @@ class DatabaseErrorRepository:
                 params = tuple(java_error_categories) + (mapped_difficulty, adjusted_count)
                 errors = self.db.execute_query(query, params)
                 if errors and len(errors) >= adjusted_count:
-                    logger.debug(f"Selected {len(errors)} errors for LLM (with difficulty)")
+                    logger.info(f"Selected {len(errors)} errors for LLM (with difficulty)")
                 
                 # Format results
                 selected_errors = []
