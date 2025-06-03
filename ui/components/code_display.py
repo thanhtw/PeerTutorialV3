@@ -794,10 +794,9 @@ def _process_student_review(workflow, student_review: str) -> bool:
             logger.info(f"Current state step: {getattr(state, 'current_step', 'unknown')}")
             logger.info(f"Current iteration: {getattr(state, 'current_iteration', 'unknown')}")
             
-            try:
-                print("raw_updated_state Here")
+            try:                
                 raw_updated_state = workflow.submit_review(state, review_text)
-                
+                print( f"Raw updated state: {raw_updated_state}")  # Debugging output
                 if not raw_updated_state:
                     error_msg = "Workflow returned empty state"
                     logger.error(error_msg)
@@ -891,7 +890,7 @@ def _process_student_review(workflow, student_review: str) -> bool:
             # Check if workflow completed successfully using safe access
             review_history = _safe_get_state_value(updated_state, 'review_history')
             current_iteration = _safe_get_state_value(updated_state, 'current_iteration', 1)
-            #print("review_history", review_history)
+            
             if review_history and len(review_history) > 0:
                 logger.debug(f"Review processing completed successfully. History length: {len(review_history)}")
                 status.update(label=f"✅ {t('analysis_complete_processed')}", state="complete")

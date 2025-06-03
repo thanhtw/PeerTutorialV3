@@ -7,14 +7,17 @@ by leveraging the modular components from the workflow package.
 
 __all__ = ['JavaCodeReviewGraph']
 
+import streamlit as st
 import logging
 from typing import Dict, List, Any, Optional
 
-from state_schema import WorkflowState
+from state_schema import WorkflowState, ReviewAttempt
 
 # Import workflow components
 from workflow.manager import WorkflowManager
 from workflow.conditions import WorkflowConditions
+from utils.language_utils import t
+
 
 # Configure logging
 logging.basicConfig(
@@ -94,7 +97,7 @@ class JavaCodeReviewGraph:
     
     def submit_review(self, state: WorkflowState, student_review: str) -> WorkflowState:
         """
-        Submit a student review for analysis.
+        Submit a student review and update the state.
         
         Args:
             state: Current workflow state
@@ -103,23 +106,136 @@ class JavaCodeReviewGraph:
         Returns:
             Updated workflow state with analysis
         """
-        try:
-            logger.debug("Submitting review for analysis")
-            
-            # Use the workflow manager execution method
-            result = self.workflow_manager.execute_review_workflow(state, student_review)
-            
-            if not result.error:
-                logger.debug("Review submission completed successfully")
-            else:
-                logger.error(f"Review submission failed: {result.error}")
-            
-            return result
-            
-        except Exception as e:
-            logger.error(f"Error submitting review: {str(e)}")
-            state.error = f"Review submission failed: {str(e)}"
-            return state
+        logger.debug(f"Submitting review for iteration {state.current_iteration}")
+        
+        # Create a new review attempt
+        review_attempt = ReviewAttempt(
+            student_review=student_review,
+            iteration_number=state.current_iteration,
+            analysis={},
+            targeted_guidance=None
+        )
+        
+        # Add to review history
+        state.review_history.append(review_attempt)
+        
+        # Run the state through the analyze_review node
+        updated_state = self.workflow_nodes.analyze_review_node(state)
+        
+        # Check if this is the last iteration or review is sufficient
+        if (updated_state.current_iteration > updated_state.max_iterations or 
+            updated_state.review_sufficient):
+            # Generate comparison report for feedback tab
+            self._generate_review_feedback(updated_state)
+        
+        return updated_state
+    
+    def _generate_review_feedback(self, state: WorkflowState) -> None:
+        """
+        Generate feedback for review completion with proper language support.
+        Now also updates category statistics.
+        
+        Args:
+            state: Current workflow state
+        """
+        # Check if we have review history
+        if not state.review_history:
+            logger.warning(t("no_review_history_found"))
+            return
+                
+        # Get latest review
+        latest_review = state.review_history[-1]       
+        # Generate comparison report if not already generated
+        if not state.comparison_report and state.evaluation_result:
+            try:
+                logger.debug(t("generating_comparison_report"))
+                # Extract error information from evaluation results
+                found_errors = state.evaluation_result.get(t('found_errors'), [])                
+                # Get original error count for consistent metrics
+                original_error_count = state.original_error_count                
+                # Update the analysis with the original error count if needed
+                if original_error_count > 0 and "original_error_count" not in latest_review.analysis:
+                    latest_review.analysis["original_error_count"] = original_error_count
+                    
+                    # Recalculate percentages based on original count
+                    identified_count = latest_review.analysis[t('identified_count')]
+                    latest_review.analysis[t("identified_percentage")] = (identified_count / original_error_count) * 100
+                    latest_review.analysis[t("accuracy_percentage")] = (identified_count / original_error_count) * 100
+                        
+                # Convert review history to format expected by generate_comparison_report
+                converted_history = []
+                for review in state.review_history:
+                    converted_history.append({
+                        "iteration_number": review.iteration_number,
+                        "student_comment": review.student_review,
+                        "review_analysis": review.analysis,
+                        "targeted_guidance": review.targeted_guidance
+                    })
+                        
+                if hasattr(self, "evaluator") and self.evaluator:
+                    state.comparison_report = self.evaluator.generate_comparison_report(
+                        found_errors,
+                        latest_review.analysis,
+                        converted_history
+                    )
+                    logger.debug(t("generated_comparison_report"))
+                
+                if "auth" in st.session_state and st.session_state.auth.get("is_authenticated", False):
+                    user_id = st.session_state.auth.get("user_id")
+                    if user_id:
+                        # Check if badge manager is available
+                        try:
+                            from auth.badge_manager import BadgeManager
+                            badge_manager = BadgeManager()
+                            
+                            # Get error categories from found_errors
+                            if state.evaluation_result and t('found_errors') in state.evaluation_result:
+                                found_errors = state.evaluation_result[t('found_errors')]
+                                
+                                # Group by category
+                                category_stats = {}
+                                for error in found_errors:
+                                    error_str = str(error)
+                                    # Extract category from error string (e.g., "LOGICAL - Off-by-one error")
+                                    parts = error_str.split(" - ", 1)
+                                    if len(parts) > 0:
+                                        category = parts[0]
+                                        if category not in category_stats:
+                                            category_stats[category] = {"encountered": 0, "identified": 0}
+                                        category_stats[category]["encountered"] += 1
+                                
+                                # Update identified counts from review analysis
+                                if latest_review and latest_review.analysis:
+                                    identified = latest_review.analysis.get(t('identified_problems'), [])
+                                    for problem in identified:
+                                        problem_str = str(problem)
+                                        parts = problem_str.split(" - ", 1)
+                                        if len(parts) > 0:
+                                            category = parts[0]
+                                            if category in category_stats:
+                                                category_stats[category]["identified"] += 1
+                                
+                                # Update stats for each category
+                                for category, stats in category_stats.items():
+                                    badge_manager.update_category_stats(
+                                        user_id,
+                                        category,
+                                        stats["encountered"],
+                                        stats["identified"]
+                                    )
+                        except ImportError:
+                            logger.warning("Badge manager not available")
+                        except Exception as e:
+                            logger.error(f"Error updating category stats: {str(e)}")
+                
+                    
+            except Exception as e:
+                logger.error(f"{t('error')} {t('generating_comparison_report')}: {str(e)}")
+                state.comparison_report = (
+                    f"# {t('review_feedback')}\n\n"
+                    f"{t('error_generating_report')} "
+                    f"{t('check_review_history')}."
+                )
 
     def execute_full_workflow(self, state: WorkflowState) -> WorkflowState:
         """

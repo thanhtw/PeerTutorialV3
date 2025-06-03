@@ -492,8 +492,7 @@ class WorkflowManager:
 
     def execute_review_workflow(self, workflow_state: WorkflowState, student_review: str) -> WorkflowState:
         """
-        Execute review analysis workflow using LangGraph execution.
-        FIXED: Enhanced submit processing and state sanitization with better conversion handling.
+        Execute review analysis workflow using LangGraph execution.        .
         """
         try:
             logger.debug("Starting enhanced review workflow")
@@ -554,7 +553,7 @@ class WorkflowManager:
             # FIXED: Enhanced state conversion with better error handling
             try:
                 result = self._convert_state_to_workflow_state(raw_result)
-                logger.debug("State conversion completed successfully")
+                logger.info("State conversion completed successfully")
             except Exception as conversion_error:
                 logger.error(f"State conversion failed: {str(conversion_error)}", exc_info=True)
                 # Create a fallback result
