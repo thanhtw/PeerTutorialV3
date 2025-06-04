@@ -310,7 +310,7 @@
     "setup_code_generation_parameters": "設定您的程式碼生成參數",
     "choose_error_selection_method": "選擇您想要如何為生成的程式碼選擇錯誤",
     "random_mode_description": "隨機模式：系統將根據您的水平自動選擇適當的錯誤",
-    "random_mode":"隨機模式",
+    "random_mode": "隨機模式",
     "generation_parameters": "生成參數",
     "code_length": "程式碼長度",
     "these_parameters_optimized": "這些參數根據您的經驗水平進行優化",
@@ -362,7 +362,7 @@
     "random_mode_all_selected_categories": "移除所有已選類別",
     "select_all_available_categories": "選擇所有可用類別",
     "select_error_to_view": "選擇要查看詳細信息的錯誤",
-    "select_error_for_details": "選擇錯誤以查看詳細信息", 
+    "select_error_for_details": "選擇錯誤以查看詳細信息",
     "language_selection": "語言選擇",
     "experience_level_selection": "經驗等級選擇",
     "start_practice_mode_help": "開始練習模式，無時間壓力",
@@ -495,6 +495,15 @@
     "filter_by_category": "按類別篩選",
     "filter_by_difficulty": "按難度篩選", 
     "filter_by_frequency": "按頻率篩選",
-    "frequency": "頻率"
+    "frequency": "頻率",
+    "top_performers": "頂級表現者",
+    "view_full_leaderboard": "查看完整排行榜",
+    "search_errors": "搜尋錯誤",
+    "current_progress_attempts": "當前進度 {current}/{total} 次嘗試已完成",
+    "complete_all_review_attempts_before_feedback": "請完成所有審查嘗試後再查看反饋。",
+    "correctly_identified_issues": "正確識別的問題",
+    "current_process_review1": "當前進度",
+    "current_process_review2": "次嘗試已完成",
+    "default_feedback": "系統無法提取詳細反饋。請檢查整體分析結果。"
   }
 }

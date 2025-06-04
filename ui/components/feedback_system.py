@@ -473,7 +473,7 @@ class FeedbackSystem:
     
     def _display_completion_required_message(self, state):
         """Display message requiring completion of review before viewing feedback."""
-        st.warning(f"{t('complete_review_first')}")
+        st.warning(f"{t('complete_all_review_attempts_before_feedback')}")
         st.info(f"{t('current_process_review1')} {getattr(state, 'current_iteration', 1)-1}/{getattr(state, 'max_iterations', 3)} {t('current_process_review2')}")
     
     def _extract_review_data(self, state):

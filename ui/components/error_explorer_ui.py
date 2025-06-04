@@ -14,7 +14,7 @@ class ErrorExplorerUI:
     def __init__(self):
         """Initialize the Error Explorer UI."""
         self.repository = DatabaseErrorRepository()
-        self.error_data = self._load_error_database()
+       
         
         # Initialize session state
         if "selected_error_code" not in st.session_state:
@@ -301,117 +301,7 @@ class ErrorExplorerUI:
         # Main content based on view mode
         self._render_list_view()
 
-    def _load_error_database(self) -> Dict[str, List[Dict[str, Any]]]:
-        """Load the error database with enhanced mock data."""
-        return {
-            t("logical"): [
-                {
-                    "name": t("null_pointer_access"),
-                    "description": t("null_pointer_description"),
-                    "difficulty": t("medium"),
-                    "frequency": t("high_frequency"),
-                    "example": "String str = null; int len = str.length();",
-                    "fix": t("null_pointer_fix")
-                },
-                {
-                    "name": t("off_by_one_error"), 
-                    "description": t("off_by_one_description"),
-                    "difficulty": t("easy"),
-                    "frequency": t("medium_frequency"),
-                    "example": "for(int i = 0; i <= array.length; i++)",
-                    "fix": t("off_by_one_fix")
-                },
-                {
-                    "name": t("infinite_loop"),
-                    "description": t("infinite_loop_description"),
-                    "difficulty": t("medium"),
-                    "frequency": t("medium_frequency"),
-                    "example": "while(true) { /* missing break condition */ }",
-                    "fix": t("infinite_loop_fix")
-                }
-            ],
-            t("syntax"): [
-                {
-                    "name": t("missing_semicolon"),
-                    "description": t("missing_semicolon_description"),
-                    "difficulty": t("easy"),
-                    "frequency": t("high_frequency"), 
-                    "example": "int x = 5",
-                    "fix": t("missing_semicolon_fix")
-                },
-                {
-                    "name": t("mismatched_braces"),
-                    "description": t("mismatched_braces_description"),
-                    "difficulty": t("easy"),
-                    "frequency": t("medium_frequency"),
-                    "example": "if (condition) { ... ",
-                    "fix": t("mismatched_braces_fix")
-                },
-                {
-                    "name": t("wrong_variable_type"),
-                    "description": t("wrong_variable_type_description"),
-                    "difficulty": t("medium"),
-                    "frequency": t("medium_frequency"),
-                    "example": "int result = \"Hello World\";",
-                    "fix": t("wrong_variable_type_fix")
-                }
-            ],
-            t("code_quality"): [
-                {
-                    "name": t("poor_variable_naming"),
-                    "description": t("poor_variable_naming_description"),
-                    "difficulty": t("medium"),
-                    "frequency": t("high_frequency"),
-                    "example": "int x = calculateTotal();",
-                    "fix": t("poor_variable_naming_fix")
-                },
-                {
-                    "name": t("magic_numbers"),
-                    "description": t("magic_numbers_description"),
-                    "difficulty": t("easy"),
-                    "frequency": t("medium_frequency"),
-                    "example": "if (score > 85) { grade = 'A'; }",
-                    "fix": t("magic_numbers_fix")
-                }
-            ],
-            t("standard_violation"): [
-                {
-                    "name": t("naming_convention_violation"),
-                    "description": t("naming_convention_description"),
-                    "difficulty": t("easy"),
-                    "frequency": t("medium_frequency"),
-                    "example": "class myClass { ... }",
-                    "fix": t("naming_convention_fix")
-                },
-                {
-                    "name": t("improper_indentation"),
-                    "description": t("improper_indentation_description"),
-                    "difficulty": t("easy"),
-                    "frequency": t("low_frequency"),
-                    "example": "if(condition){\nreturn true;\n}",
-                    "fix": t("improper_indentation_fix")
-                }
-            ],
-            t("java_specific"): [
-                {
-                    "name": t("resource_leak"),
-                    "description": t("resource_leak_description"),
-                    "difficulty": t("hard"),
-                    "frequency": t("medium_frequency"),
-                    "example": "FileInputStream fis = new FileInputStream(file);",
-                    "fix": t("resource_leak_fix")
-                },
-                {
-                    "name": t("string_comparison_equals"),
-                    "description": t("string_comparison_description"),
-                    "difficulty": t("medium"),
-                    "frequency": t("high_frequency"),
-                    "example": "if (str1 == str2) { ... }",
-                    "fix": t("string_comparison_fix")
-                }
-            ]
-        }
-
+   
 
 def render_error_explorer():
     """Main function to render the error explorer."""
