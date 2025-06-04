@@ -11,9 +11,10 @@ logger = logging.getLogger(__name__)
 class ErrorExplorerUI:
     """UI component for exploring Java errors with examples and solutions."""
     
-    def __init__(self):
+    def __init__(self, workflow=None):
         """Initialize the Error Explorer UI."""
         self.repository = DatabaseErrorRepository()
+        self.workflow = workflow  # Add workflow for practice functionality
         
         # Initialize session state
         if "selected_error_code" not in st.session_state:
@@ -99,8 +100,8 @@ class ErrorExplorerUI:
         </div>
         """, unsafe_allow_html=True)
         
-        # Main search and filter controls
-        col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
+        # Main search and filter controls - Removed reset button column
+        col1, col2, col3 = st.columns([4, 2, 2])
         
         with col1:
             search_term = st.text_input(
@@ -128,13 +129,6 @@ class ErrorExplorerUI:
                 help="Filter by difficulty level"
             )
         
-        with col4:
-            if st.button("🔄 Reset", help="Clear all filters", use_container_width=True):
-                st.session_state.error_search = ""
-                st.session_state.category_filter = "All Categories"
-                st.session_state.difficulty_filter = "All Levels"
-                st.rerun()
-        
         st.markdown('</div>', unsafe_allow_html=True)
         
         # Store filters in session state
@@ -142,26 +136,8 @@ class ErrorExplorerUI:
         st.session_state.selected_category = selected_category
         st.session_state.selected_difficulty = selected_difficulty
 
-    def _render_view_toggle(self):
-        """Render view toggle controls."""
-        st.markdown('<div class="view-toggle-section">', unsafe_allow_html=True)
-        
-        col1, col2, col3 = st.columns([2, 1, 1])
-        
-        with col2:
-            view_mode = st.radio(
-                "View Mode",
-                options=["Cards", "List"],
-                horizontal=True,
-                key="view_mode",
-                help="Choose how to display the errors"
-            )
-            st.session_state.error_explorer_view = view_mode.lower()
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-    
     def _render_error_content(self):
-        """Render the main error content based on filters."""
+        """Render the main error content with professional cards."""
         # Get filtered errors
         filtered_errors = self._get_filtered_errors()
         
@@ -169,21 +145,20 @@ class ErrorExplorerUI:
             self._render_no_results()
             return
         
-        # Results count with enhanced styling
+        # Results count with smaller, more compact styling
         st.markdown(f"""
-        <div class="results-count">
-            <div class="count-info">
-                <span class="count-number">{len(filtered_errors)}</span> 
-                <span class="count-text">{t("errors_found")}</span>
-            </div>
+        <div style="text-align: center; margin: 10px 0;">
+            <span style="font-size: 0.9em; color: #6c757d; background: #f8f9fa; padding: 4px 12px; border-radius: 15px;">
+                {len(filtered_errors)} {t("errors_found")}
+            </span>
         </div>
         """, unsafe_allow_html=True)
         
-        # Render in list view only
-        self._render_list_view(filtered_errors)
+        # Render professional error cards
+        self._render_professional_error_cards(filtered_errors)
     
-    def _render_list_view(self, filtered_errors: List[Dict[str, Any]]):
-        """Render errors in a compact list view with expandable details."""
+    def _render_professional_error_cards(self, filtered_errors: List[Dict[str, Any]]):
+        """Render errors in professional card format with integrated content and buttons."""
         errors_by_category = self._group_errors_by_category(filtered_errors)
         
         for category_name, errors in errors_by_category.items():
@@ -191,195 +166,13 @@ class ErrorExplorerUI:
                        unsafe_allow_html=True)
             
             for error in errors:
-                self._render_error_list_item(error)
+                self._render_professional_error_card(error)
     
-    def _render_expanded_error_details(self, error: Dict[str, Any]):
-        """Render detailed error information when expanded."""
-        error_name = error.get(t("error_name"), "Unknown Error")
-        implementation_guide = error.get(t("implementation_guide"), "")
-        
-        # Create a container for the expanded content
-        st.markdown('<div class="expanded-details-container">', unsafe_allow_html=True)
-        
-        # Show full description
-        full_description = error.get(t("description"), "")
-        if full_description:
-            st.markdown("**📋 Full Description:**")
-            st.info(full_description)
-        
-        # Show implementation guide if available
-        if implementation_guide:
-            st.markdown("**💡 How to Fix This Error:**")
-            st.success(implementation_guide)
-        
-        # Get and display examples
-        examples = self.repository.get_error_examples(error_name)
-        
-        # Create tabs for different content sections
-        if examples.get("wrong_examples") or examples.get("correct_examples"):
-            tab1, tab2, tab3 = st.tabs(["❌ Problematic Code", "✅ Corrected Code", "📚 Additional Info"])
-            
-            with tab1:
-                if examples.get("wrong_examples"):
-                    st.markdown("**Examples of code that causes this error:**")
-                    for i, example in enumerate(examples["wrong_examples"][:2]):
-                        st.markdown(f"**Example {i+1}:**")
-                        st.code(example, language="java")
-                        if i < len(examples["wrong_examples"]) - 1:
-                            st.markdown("---")
-                else:
-                    st.info("📝 No problematic code examples available for this error yet.")
-            
-            with tab2:
-                if examples.get("correct_examples"):
-                    st.markdown("**Corrected versions of the problematic code:**")
-                    for i, example in enumerate(examples["correct_examples"][:2]):
-                        st.markdown(f"**Corrected Example {i+1}:**")
-                        st.code(example, language="java")
-                        if i < len(examples["correct_examples"]) - 1:
-                            st.markdown("---")
-                else:
-                    st.info("📝 No corrected code examples available for this error yet.")
-            
-            with tab3:
-                # Show additional information
-                explanation = examples.get("explanation", "")
-                if explanation:
-                    st.markdown("**💡 Key Learning Points:**")
-                    st.info(explanation)
-                
-                # Show error metadata
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.markdown("**🏷️ Error Code:**")
-                    st.code(error.get('error_code', 'N/A'))
-                
-                with col2:
-                    st.markdown("**⚡ Difficulty:**")
-                    difficulty = error.get('difficulty_level', 'medium')
-                    if difficulty == 'easy':
-                        st.success(f"🟢 {difficulty.title()}")
-                    elif difficulty == 'medium':
-                        st.warning(f"🟡 {difficulty.title()}")
-                    else:
-                        st.error(f"🔴 {difficulty.title()}")
-        else:
-            # If no examples, just show the additional info
-            explanation = examples.get("explanation", "")
-            if explanation:
-                st.markdown("**💡 Key Learning Points:**")
-                st.info(explanation)
-            
-            # Show error metadata
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown("**🏷️ Error Code:**")
-                st.code(error.get('error_code', 'N/A'))
-            
-            with col2:
-                st.markdown("**⚡ Difficulty:**")
-                difficulty = error.get('difficulty_level', 'medium')
-                if difficulty == 'easy':
-                    st.success(f"🟢 {difficulty.title()}")
-                elif difficulty == 'medium':
-                    st.warning(f"🟡 {difficulty.title()}")
-                else:
-                    st.error(f"🔴 {difficulty.title()}")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    def _render_expanded_error_content(self, error: Dict[str, Any]):
-        """Render the expanded content for an error card with professional styling."""
-        error_name = error.get(t("error_name"), "Unknown Error")
-        implementation_guide = error.get(t("implementation_guide"), "")
-        
-        # Enhanced expanded content container
-        st.markdown('<div class="expanded-content-container">', unsafe_allow_html=True)
-        
-        # Detailed description section
-        if implementation_guide:
-            st.markdown(f"""
-            <div class="enhanced-guidance-section">
-                <div class="guidance-header">
-                    <span class="guidance-icon">💡</span>
-                    <h4>How to Fix This Error</h4>
-                </div>
-                <div class="guidance-content">
-                    <p>{implementation_guide}</p>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # Get and display examples
-        examples = self.repository.get_error_examples(error_name)
-        
-        # Create tabs for different content sections
-        tab1, tab2, tab3 = st.tabs(["❌ Problematic Code", "✅ Corrected Code", "📚 Learning Resources"])
-        
-        with tab1:
-            if examples.get("wrong_examples"):
-                st.markdown("**Examples of code that causes this error:**")
-                for i, example in enumerate(examples["wrong_examples"][:3]):
-                    st.markdown(f"""
-                    <div class="example-header">
-                        <div class="example-icon wrong">❌</div>
-                        <h5>Problematic Example {i+1}</h5>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    st.markdown('<div class="code-example error-code">', unsafe_allow_html=True)
-                    st.code(example, language="java")
-                    st.markdown('</div>', unsafe_allow_html=True)
-            else:
-                st.info("📝 No problematic code examples available for this error yet.")
-        
-        with tab2:
-            if examples.get("correct_examples"):
-                st.markdown("**Corrected versions of the problematic code:**")
-                for i, example in enumerate(examples["correct_examples"][:3]):
-                    st.markdown(f"""
-                    <div class="example-header">
-                        <div class="example-icon correct">✅</div>
-                        <h5>Corrected Example {i+1}</h5>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    st.markdown('<div class="code-example correct-code">', unsafe_allow_html=True)
-                    st.code(example, language="java")
-                    st.markdown('</div>', unsafe_allow_html=True)
-            else:
-                st.info("📝 No corrected code examples available for this error yet.")
-        
-        with tab3:
-            # Learning resources and tips
-            explanation = examples.get("explanation", "")
-            if explanation:
-                st.markdown("**💡 Key Learning Points:**")
-                st.info(explanation)
-            
-            # Additional learning suggestions
-            st.markdown("**🎓 Recommended Learning Path:**")
-            learning_steps = [
-                "Understand the root cause of this error",
-                "Practice identifying this pattern in code",
-                "Learn the correct implementation approach",
-                "Apply the fix in real scenarios",
-                "Review and prevent similar errors"
-            ]
-            
-            for i, step in enumerate(learning_steps, 1):
-                st.write(f"{i}. {step}")
-            
-            # Related errors suggestion
-            st.markdown("**🔗 Related Error Patterns:**")
-            st.info("Explore similar errors in the same category to build comprehensive understanding.")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    def _render_error_list_item(self, error: Dict[str, Any]):
-        """Render an error in list format with expandable details."""
+    def _render_professional_error_card(self, error: Dict[str, Any]):
+        """Render a single professional error card with integrated content."""
         error_name = error.get(t("error_name"), "Unknown Error")
         description = error.get(t("description"), "")
+        implementation_guide = error.get(t("implementation_guide"), "")
         difficulty = error.get('difficulty_level', 'medium')
         error_code = error.get('error_code', f"error_{hash(error_name) % 10000}")
         
@@ -387,138 +180,250 @@ class ErrorExplorerUI:
         expanded_key = f"expanded_{error_code}"
         is_expanded = st.session_state.get(expanded_key, False)
         
-        # Render the list item header
+        # Create the professional card container
         st.markdown(f"""
-        <div class="error-list-item">
-            <div class="error-list-header">
-                <div class="list-title">
-                    <span class="error-icon">🔧</span>
-                    <span class="error-name">{error_name}</span>
+        <div class="error-card">
+            <div class="card-header">
+                <div class="error-title-section">
+                    <h4 class="error-title">
+                        <span style="margin-right: 8px;">🔧</span>
+                        {error_name}
+                    </h4>
+                    <div class="error-metadata">
+                        <span class="error-code-badge">{error_code}</span>
+                        <span class="difficulty-badge {difficulty}">{difficulty.title()}</span>
+                    </div>
                 </div>
-                <div class="list-badges">
-                    <span class="error-badge {difficulty}">{difficulty.title()}</span>
-                </div>
-            </div>
-            <div class="error-list-content">
-                <p class="list-description">{description[:150]}{'...' if len(description) > 150 else ''}</p>
             </div>
         </div>
         """, unsafe_allow_html=True)
         
-        # Action buttons
-        col1, col2, col3 = st.columns([2, 1, 1])
+        # Content section - always show description, guide, and examples
+        with st.container():
+            # Description
+            st.markdown("**📋 Description:**")
+            st.info(description)
+            
+            # Implementation guide if available
+            if implementation_guide:
+                st.markdown("**💡 How to Fix This Error:**")
+                st.success(implementation_guide)
+            
+            # Get and display examples
+            examples = self.repository.get_error_examples(error_name)
+            
+            if examples.get("wrong_examples") or examples.get("correct_examples"):
+                # Create compact tabs for examples
+                if examples.get("wrong_examples") and examples.get("correct_examples"):
+                    tab1, tab2 = st.tabs(["❌ Problematic", "✅ Corrected"])
+                    
+                    with tab1:
+                        if examples.get("wrong_examples"):
+                            # Show first example only to keep it compact
+                            example = examples["wrong_examples"][0]
+                            st.code(example, language="java")
+                    
+                    with tab2:
+                        if examples.get("correct_examples"):
+                            # Show first example only to keep it compact
+                            example = examples["correct_examples"][0]
+                            st.code(example, language="java")
+                elif examples.get("wrong_examples"):
+                    st.markdown("**❌ Problematic Code Example:**")
+                    st.code(examples["wrong_examples"][0], language="java")
+                elif examples.get("correct_examples"):
+                    st.markdown("**✅ Correct Code Example:**")
+                    st.code(examples["correct_examples"][0], language="java")
+            
+            # Action buttons at the bottom of the card
+            col1, col2, col3 = st.columns([2, 1, 1])
+            
+            with col1:
+                # Show additional info if examples explanation exists
+                explanation = examples.get("explanation", "")
+                if explanation:
+                    st.markdown("**💡 Key Points:**")
+                    st.caption(explanation)
+            
+            with col2:
+                if st.button(
+                    f"{'Less' if is_expanded else 'More'}", 
+                    key=f"toggle_{error_code}", 
+                    use_container_width=True,
+                    help="View additional examples and details"
+                ):
+                    st.session_state[expanded_key] = not is_expanded
+                    st.rerun()
+            
+            with col3:
+                if st.button(
+                    "🎯 Practice", 
+                    key=f"practice_{error_code}", 
+                    use_container_width=True,
+                    type="primary",
+                    help="Generate practice code with this error type"
+                ):
+                    self._handle_practice_error(error)
+            
+            # Show expanded content if toggled
+            if is_expanded:
+                self._render_expanded_examples(error_name, examples)
+        
+        # Add spacing between cards
+        st.markdown("<br>", unsafe_allow_html=True)
+    
+    def _render_expanded_examples(self, error_name: str, examples: Dict[str, Any]):
+        """Render expanded examples and additional content."""
+        st.markdown("---")
+        st.markdown("**📚 Additional Examples and Learning Resources**")
+        
+        # Show more examples if available
+        col1, col2 = st.columns(2)
         
         with col1:
-            # Empty column for spacing
-            pass
-            
+            if examples.get("wrong_examples") and len(examples["wrong_examples"]) > 1:
+                st.markdown("**More Problematic Examples:**")
+                for i, example in enumerate(examples["wrong_examples"][1:3], 2):  # Show 2nd and 3rd examples
+                    with st.expander(f"Example {i}"):
+                        st.code(example, language="java")
+        
         with col2:
-            if st.button(
-                f"{'Hide' if is_expanded else 'View'}", 
-                key=f"view_{error_code}", 
-                use_container_width=True
-            ):
-                st.session_state[expanded_key] = not is_expanded
-                st.rerun()
+            if examples.get("correct_examples") and len(examples["correct_examples"]) > 1:
+                st.markdown("**More Corrected Examples:**")
+                for i, example in enumerate(examples["correct_examples"][1:3], 2):  # Show 2nd and 3rd examples
+                    with st.expander(f"Example {i}"):
+                        st.code(example, language="java")
         
-        with col3:
-            if st.button(f"Practice", key=f"practice_list_{error_code}", use_container_width=True):
-                self._handle_practice_error(error)
+        # Additional learning tips
+        st.markdown("**🎓 Learning Tips:**")
+        learning_tips = [
+            "Compare the problematic and corrected code side by side",
+            "Try to identify the exact line or pattern causing the error",
+            "Practice writing the correction without looking at the solution",
+            "Look for similar patterns in your own code"
+        ]
         
-        # Show expanded content if the error is expanded
-        if is_expanded:
-            self._render_expanded_error_details(error)
-    
-    def _render_progress_badges(self, error: Dict[str, Any]) -> str:
-        """Generate HTML for progress badges."""
-        # This would integrate with user progress tracking
-        # For now, showing sample progress states
-        return """
-        <div class="progress-badges">
-            <span class="progress-badge practiced">📚 Available</span>
-        </div>
-        """
-    
-    def _get_frequency_class(self, error: Dict[str, Any]) -> str:
-        """Get CSS class for frequency badge based on error frequency."""
-        frequency_weight = error.get('frequency_weight', 1)
-        if frequency_weight >= 4:
-            return "high-frequency"
-        elif frequency_weight >= 2:
-            return "medium-frequency"
-        else:
-            return "low-frequency"
-    
-    def _get_frequency_display(self, error: Dict[str, Any]) -> str:
-        """Get display text for frequency."""
-        frequency_weight = error.get('frequency_weight', 1)
-        if frequency_weight >= 4:
-            return "High Frequency"
-        elif frequency_weight >= 2:
-            return "Medium Frequency"
-        else:
-            return "Low Frequency"
+        for tip in learning_tips:
+            st.markdown(f"• {tip}")
     
     def _handle_practice_error(self, error: Dict[str, Any]):
-        """Handle practice error button click with enhanced feedback."""
+        """Handle practice error by generating code with LangGraph and starting review workflow."""
+        if not self.workflow:
+            st.error("Practice mode requires workflow integration. Please contact administrator.")
+            return
+        
         error_name = error.get(t("error_name"), "Unknown Error")
+        error_code = error.get('error_code', '')
         
-        # Enhanced success message with actionable next steps
-        st.success("🎯 Practice Session Started!")
-        
-        # Create an info container with next steps
-        st.markdown(f"""
-        <div class="practice-started-container">
-            <div class="practice-header">
-                <h4>🚀 Now Practicing: {error_name}</h4>
-            </div>
-            <div class="practice-instructions">
-                <p><strong>Next Steps:</strong></p>
-                <ul>
-                    <li>Review the problematic code examples above</li>
-                    <li>Try to identify the error patterns</li>
-                    <li>Study the corrected implementations</li>
-                    <li>Practice writing your own solutions</li>
-                </ul>
-                <p><em>💡 Tip: Use the "Generate" tab to create practice code with this error type!</em></p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Track usage in database
         try:
-            self.repository.update_error_usage(
-                error_code=error.get('error_code', ''),
-                action_type='practiced',
-                context={'source': 'error_explorer', 'method': 'practice_button'}
+            # Show immediate feedback
+            st.success(f"🎯 Generating practice code with {error_name}...")
+            
+            # Create a progress bar for user feedback
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            # Step 1: Reset workflow state for new practice session
+            progress_bar.progress(20)
+            status_text.text("Preparing practice session...")
+            
+            # Reset workflow state
+            from state_schema import WorkflowState
+            st.session_state.workflow_state = WorkflowState()
+            
+            # Step 2: Set up error-specific generation
+            progress_bar.progress(40)
+            status_text.text("Configuring error parameters...")
+            
+            # Configure the workflow for this specific error
+            state = st.session_state.workflow_state
+            
+            # Set up the error selection for targeted generation
+            state.selected_categories = {"java_errors": [error.get('category', 'Other')]}
+            state.specific_errors = [error]  # Focus on this specific error
+            state.difficulty_level = error.get('difficulty_level', 'medium')
+            state.current_step = 'generate'
+            
+            # Step 3: Generate code with the specific error
+            progress_bar.progress(60)
+            status_text.text("Generating code with error...")
+            
+            # Use the workflow to generate code
+            result = self.workflow.generate_code_with_errors(
+                selected_categories=state.selected_categories,
+                specific_errors=state.specific_errors,
+                difficulty=state.difficulty_level
             )
+            
+            if result.get('success', False):
+                # Step 4: Set up the generated code in workflow state
+                progress_bar.progress(80)
+                status_text.text("Setting up practice environment...")
+                
+                code_content = result.get('code_content', '')
+                known_errors = result.get('known_errors', [])
+                
+                # Create code snippet object
+                from dataclasses import dataclass
+                from typing import List as ListType
+                
+                @dataclass
+                class CodeSnippet:
+                    content: str
+                    known_errors: ListType[Dict[str, Any]]
+                    language: str = "java"
+                    difficulty: str = "medium"
+                
+                state.code_snippet = CodeSnippet(
+                    content=code_content,
+                    known_errors=known_errors,
+                    language="java",
+                    difficulty=state.difficulty_level
+                )
+                
+                # Step 5: Complete setup
+                progress_bar.progress(100)
+                status_text.text("Practice session ready!")
+                
+                # Track usage in database
+                try:
+                    self.repository.update_error_usage(
+                        error_code=error_code,
+                        action_type='practiced',
+                        context={
+                            'source': 'error_explorer', 
+                            'method': 'practice_button',
+                            'generated_code': True
+                        }
+                    )
+                except Exception as e:
+                    logger.debug(f"Could not track error usage: {str(e)}")
+                
+                # Clear progress indicators
+                progress_bar.empty()
+                status_text.empty()
+                
+                # Show success message and navigate
+                st.success(f"✅ Practice code generated successfully!")
+                st.info(f"💡 Navigate to the **Review** tab to start analyzing the code with {error_name}")
+                
+                # Set the active tab to review (index 1)
+                st.session_state.active_tab = 1
+                st.session_state["force_tab_switch"] = True
+                
+                # Brief pause for user to read the message
+                time.sleep(2)
+                st.rerun()
+                
+            else:
+                progress_bar.empty()
+                status_text.empty()
+                st.error(f"❌ Failed to generate practice code: {result.get('error', 'Unknown error')}")
+                
         except Exception as e:
-            logger.debug(f"Could not track error usage: {str(e)}")
-    
-    def _show_error_statistics(self, error: Dict[str, Any]):
-        """Show detailed statistics for an error."""
-        error_name = error.get(t("error_name"), "Unknown Error")
-        
-        # This would show real statistics from the database
-        st.markdown(f"""
-        <div class="stats-popup">
-            <h4>📊 Statistics for {error_name}</h4>
-            <div class="stat-grid">
-                <div class="stat-item">
-                    <div class="stat-value">{error.get('usage_count', 0)}</div>
-                    <div class="stat-label">Total Views</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value">{error.get('difficulty_level', 'medium').title()}</div>
-                    <div class="stat-label">Difficulty</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value">{error.get('frequency_weight', 1)}/5</div>
-                    <div class="stat-label">Frequency</div>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+            logger.error(f"Error in practice mode: {str(e)}")
+            st.error(f"❌ Error setting up practice session: {str(e)}")
+            st.info("Please try again or contact support if the problem persists.")
     
     def _get_categories(self) -> List[str]:
         """Get all available categories."""
@@ -607,14 +512,14 @@ class ErrorExplorerUI:
                     <li>Check your spelling and try different keywords</li>
                     <li>Broaden your search by selecting "All Categories"</li>
                     <li>Try searching for common terms like "null", "loop", or "syntax"</li>
-                    <li>Reset all filters and browse the complete error library</li>
+                    <li>Clear the search box to browse all errors</li>
                 </ul>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
 
-def render_error_explorer():
-    """Main function to render the error explorer."""
-    explorer = ErrorExplorerUI()
+def render_error_explorer(workflow=None):
+    """Main function to render the error explorer with workflow integration."""
+    explorer = ErrorExplorerUI(workflow=workflow)
     explorer.render()
