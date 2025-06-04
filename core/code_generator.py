@@ -256,9 +256,6 @@ class CodeGenerator:
             include_error_annotations=False if selected_errors is None else True
         )
 
-        #print(f"Generated prompt: {prompt}")  # Debugging line to check the prompt
-        # Log the prompt for debuggings
-            
         try:
             # Metadata for logging
             metadata = {
