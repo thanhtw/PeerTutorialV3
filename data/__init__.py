@@ -8,8 +8,6 @@ The database repository is now the primary method for accessing error data.
 
 # Import the main repositories
 from data.database_error_repository import DatabaseErrorRepository
-from data.json_error_repository import JsonErrorRepository
-
 # Default to database repository for new code
 ErrorRepository = DatabaseErrorRepository
 
@@ -22,12 +20,10 @@ def create_error_repository(use_database=True):
         use_database: If True, use DatabaseErrorRepository. If False, use JsonErrorRepository.
         
     Returns:
-        Error repository instance
-    """
-    if use_database:
-        return DatabaseErrorRepository()
-    else:
-        return JsonErrorRepository()
+        Error repository instance    """
+    
+    return DatabaseErrorRepository()
+   
 
 def get_default_repository():
     """Get the default error repository (database-based)."""

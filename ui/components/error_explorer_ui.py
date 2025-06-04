@@ -1,6 +1,6 @@
 import streamlit as st
 import logging
-from learning.error_library_manager import ErrorLibraryManager
+from data.database_error_repository import DatabaseErrorRepository
 from typing import List, Dict, Optional, Any
 from utils.language_utils import t
 from static.css_utils import load_css
@@ -16,16 +16,16 @@ class ErrorExplorerUI:
 
     def __init__(self):
         """
-        Initializes the ErrorExplorerUI with an ErrorLibraryManager instance.
+        Initializes the ErrorExplorerUI with a DatabaseErrorRepository instance.
         """
-        self.manager = ErrorLibraryManager()
+        self.repository = DatabaseErrorRepository()
         self.error_data = self._load_error_database()
         
         # Initialize session state
         if "selected_error_code" not in st.session_state:
             st.session_state.selected_error_code = None
         if "error_explorer_view" not in st.session_state:
-            st.session_state.error_explorer_view = "grid"
+            st.session_state.error_explorer_view = "list"
         if "user_progress" not in st.session_state:
             st.session_state.user_progress = {}
         
@@ -60,8 +60,16 @@ class ErrorExplorerUI:
 
     def _render_header(self):
         """Render the professional header with branding and statistics."""
-        # Get error statistics
-        total_errors = sum(len(errors) for errors in self.error_data.values())
+        # Get error statistics from database
+        try:
+            stats = self.repository.get_error_statistics()
+            total_errors = stats.get('total_errors', 0)
+            total_categories = stats.get('total_categories', 0)
+        except Exception as e:
+            logger.debug(f"Could not get database statistics: {str(e)}")
+            # Fallback to counting loaded data
+            total_errors = sum(len(errors) for errors in self.error_data.values())
+            total_categories = len(self.error_data)
         
         st.markdown(f"""
         <div class="error-explorer-header">
@@ -76,7 +84,7 @@ class ErrorExplorerUI:
                         <div class="stat-label">{t('total_errors_available')}</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-number">{len(self.error_data)}</div>
+                        <div class="stat-number">{total_categories}</div>
                         <div class="stat-label">{t('error_categories')}</div>
                     </div>
                 </div>
@@ -88,15 +96,9 @@ class ErrorExplorerUI:
         """Render the main content area with enhanced layout."""
         # Search and filter controls
         self._render_search_and_filters()
-        
-        # View toggle
-        self._render_view_toggle()
-        
+       
         # Main content based on view mode
-        if st.session_state.error_explorer_view == "grid":
-            self._render_grid_view()
-        else:
-            self._render_list_view()
+        self._render_list_view()
 
     def _render_search_and_filters(self):
         """Render enhanced search and filter controls."""
@@ -146,69 +148,11 @@ class ErrorExplorerUI:
             "frequency": selected_frequency
         }
 
-    def _render_view_toggle(self):
-        """Render view mode toggle buttons."""
-        col1, col2, col3 = st.columns([1, 1, 4])
-        
-        with col1:
-            if st.button(f"📋 {t('list_view')}", key="list_view_btn", 
-                        type="primary" if st.session_state.error_explorer_view == "list" else "secondary"):
-                st.session_state.error_explorer_view = "list"
-                st.rerun()
-        
-        with col2:
-            if st.button(f"🔲 {t('grid_view')}", key="grid_view_btn",
-                        type="primary" if st.session_state.error_explorer_view == "grid" else "secondary"):
-                st.session_state.error_explorer_view = "grid"
-                st.rerun()
-        
-        with col3:
-            # Results count
-            filtered_data = self._apply_filters()
-            total_filtered = sum(len(errors) for errors in filtered_data.values())
-            st.markdown(f"*{t('showing_results')}: {total_filtered} {t('errors_found')}*")
-
-    def _render_grid_view(self):
-        """Render errors in a modern grid layout."""
-        filtered_data = self._apply_filters()
-        
-        if not filtered_data:
-            self._render_no_results()
-            return
-        
-        # Render categories
-        for category, errors in filtered_data.items():
-            if not errors:
-                continue
-                
-            # Category header
-            st.markdown(f"""
-            <div class="category-section">
-                <h3 class="category-title">
-                    {self._get_category_icon(category)} {category}
-                    <span class="error-count">({len(errors)} {t('errors')})</span>
-                </h3>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Error cards in grid
-            self._render_error_grid(errors, category)
-
-    def _render_error_grid(self, errors: List[Dict], category: str):
-        """Render errors in a responsive grid layout."""
-        # Calculate columns based on screen size (responsive)
-        cols_per_row = 3
-        error_rows = [errors[i:i + cols_per_row] for i in range(0, len(errors), cols_per_row)]
-        
-        for row in error_rows:
-            columns = st.columns(len(row))
-            
-            for col, error in zip(columns, row):
-                with col:
-                    self._render_error_card(error, category)
+    
+    
 
     def _render_error_card(self, error: Dict[str, Any], category: str):
-        """Render individual error card with enhanced styling."""
+        """Render individual error card with enhanced styling and proper content display."""
         error_name = error.get("name", t("unknown_error"))
         description = error.get("description", "")
         difficulty = error.get("difficulty", t("medium"))
@@ -219,50 +163,44 @@ class ErrorExplorerUI:
         practiced = progress.get("practiced", False)
         mastered = progress.get("mastered", False)
         
-        # Progress indicators
-        progress_badges = ""
-        if practiced:
-            progress_badges += f'<span class="progress-badge practiced">✅ {t("practiced")}</span>'
-        if mastered:
-            progress_badges += f'<span class="progress-badge mastered">🏆 {t("mastered")}</span>'
-        
-        # Card HTML
-        card_id = f"error_card_{error_name.replace(' ', '_')}"
-        
-        st.markdown(f"""
-        <div class="error-card" id="{card_id}">
-            <div class="card-header">
-                <h4 class="error-title">{error_name}</h4>
-                <div class="badges">
-                    <span class="difficulty-badge difficulty-{difficulty.lower()}">
-                        {difficulty}
-                    </span>
-                    <span class="frequency-badge frequency-{frequency.lower().replace('_', '-')}">
-                        {frequency}
-                    </span>
-                </div>
-            </div>
+        # Use a container for better layout control
+        with st.container():
+            # Card header with title
+            st.markdown(f"**{error_name}**")
             
-            <div class="card-body">
-                <p class="error-description">{description[:100]}{'...' if len(description) > 100 else ''}</p>
-                
-                <div class="progress-section">
-                    {progress_badges}
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Action buttons
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if st.button(f"📖 {t('view_details')}", key=f"view_{error_name}_{category}", use_container_width=True):
-                self._show_error_details(error, category)
-        
-        with col2:
-            if st.button(f"🎯 {t('practice_error')}", key=f"practice_{error_name}_{category}", use_container_width=True):
-                self._handle_practice_error(error, category)
+            # Badges in a single row using inline HTML
+            difficulty_color = "🟢" if difficulty.lower() == "easy" else "🔴" if difficulty.lower() == "hard" else "🟡"
+            st.markdown(f"{difficulty_color} {difficulty} | 📊 {frequency}", help="Difficulty and Frequency")
+            
+            # Description
+            if description:
+                # Truncate description for card display
+                display_description = description[:100] + "..." if len(description) > 100 else description
+                st.write(display_description)
+            
+            # Progress indicators
+            progress_text = []
+            if practiced:
+                progress_text.append("✅ Practiced")
+            if mastered:
+                progress_text.append("🏆 Mastered")
+            
+            if progress_text:
+                st.markdown(" | ".join(progress_text))
+            
+            # Action buttons in columns
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button(f"📖 {t('view_details')}", key=f"view_{error_name}_{category}", use_container_width=True):
+                    self._show_error_details(error, category)
+            
+            with col2:
+                if st.button(f"🎯 {t('practice_error')}", key=f"practice_{error_name}_{category}", use_container_width=True):
+                    self._handle_practice_error(error, category)
+            
+            # Add separator between cards
+            st.markdown("---")
 
     def _render_list_view(self):
         """Render errors in a detailed list view."""
@@ -356,6 +294,18 @@ class ErrorExplorerUI:
     def _show_error_details(self, error: Dict[str, Any], category: str):
         """Show detailed error information in a modal-like expander."""
         error_name = error.get("name", t("unknown_error"))
+        error_code = error.get("error_code", "")
+        
+        # Track viewing in database
+        if error_code:
+            try:
+                self.repository.update_error_usage(
+                    error_code=error_code,
+                    action_type='viewed',
+                    context={'category': category, 'source': 'error_explorer_details'}
+                )
+            except Exception as e:
+                logger.debug(f"Could not track error viewing: {str(e)}")
         
         # Create a detailed view
         st.markdown("---")
@@ -463,6 +413,7 @@ class ErrorExplorerUI:
     def _handle_practice_error(self, error: Dict[str, Any], category: str):
         """Handle practice error action."""
         error_name = error.get("name", "")
+        error_code = error.get("error_code", "")
         
         # Update progress
         if error_name not in st.session_state.user_progress:
@@ -470,12 +421,24 @@ class ErrorExplorerUI:
         
         st.session_state.user_progress[error_name]["practiced"] = True
         
+        # Track usage in database
+        if error_code:
+            try:
+                self.repository.update_error_usage(
+                    error_code=error_code,
+                    action_type='practiced',
+                    context={'category': category, 'source': 'error_explorer'}
+                )
+            except Exception as e:
+                logger.debug(f"Could not track error usage: {str(e)}")
+        
         st.success(f"🎯 {t('practice_started')}: {error_name}")
         st.info(t("practice_feature_coming_soon"))
 
     def _handle_mark_as_learned(self, error: Dict[str, Any]):
         """Handle mark as learned action."""
         error_name = error.get("name", "")
+        error_code = error.get("error_code", "")
         
         # Update progress
         if error_name not in st.session_state.user_progress:
@@ -483,10 +446,111 @@ class ErrorExplorerUI:
         
         st.session_state.user_progress[error_name]["mastered"] = True
         
+        # Track usage in database
+        if error_code:
+            try:
+                self.repository.update_error_usage(
+                    error_code=error_code,
+                    action_type='mastered',
+                    context={'source': 'error_explorer'}
+                )
+            except Exception as e:
+                logger.debug(f"Could not track error usage: {str(e)}")
+        
         st.success(f"🏆 {t('marked_as_mastered')}: {error_name}")
 
     def _load_error_database(self) -> Dict[str, List[Dict[str, Any]]]:
-        """Load the error database with enhanced mock data."""
+        """Load the error database from DatabaseErrorRepository."""
+        try:
+            # Get all categories from database
+            categories_data = self.repository.get_all_categories()
+            java_categories = categories_data.get("java_errors", [])
+            
+            if not java_categories:
+                logger.warning("No categories found in database, using fallback data")
+                return self._get_fallback_error_data()
+            
+            error_data = {}
+            
+            # Load errors for each category
+            for category_name in java_categories:
+                try:
+                    category_errors = self.repository.get_category_errors(category_name)
+                    
+                    # Transform database format to UI format
+                    formatted_errors = []
+                    for error in category_errors:
+                        formatted_error = {
+                            "name": error.get(t("error_name"), error.get("error_name", t("unknown_error"))),
+                            "description": error.get(t("description"), error.get("description", "")),
+                            "difficulty": error.get("difficulty_level", t("medium")),
+                            "frequency": self._map_difficulty_to_frequency(error.get("difficulty_level", "medium")),
+                            "example": self._generate_example_code(error.get("error_code", ""), error.get(t("error_name"), "")),
+                            "fix": error.get(t("implementation_guide"), error.get("implementation_guide", "")),
+                            "error_code": error.get("error_code", "")
+                        }
+                        formatted_errors.append(formatted_error)
+                    
+                    if formatted_errors:
+                        error_data[category_name] = formatted_errors
+                        logger.debug(f"Loaded {len(formatted_errors)} errors for category: {category_name}")
+                    
+                except Exception as e:
+                    logger.error(f"Error loading category {category_name}: {str(e)}")
+                    continue
+            
+            if not error_data:
+                logger.warning("No error data loaded from database, using fallback")
+                return self._get_fallback_error_data()
+            
+            logger.info(f"Successfully loaded {sum(len(errors) for errors in error_data.values())} errors from database")
+            return error_data
+            
+        except Exception as e:
+            logger.error(f"Error loading error database: {str(e)}")
+            return self._get_fallback_error_data()
+
+    def _map_difficulty_to_frequency(self, difficulty: str) -> str:
+        """Map difficulty level to frequency for display purposes."""
+        difficulty_frequency_map = {
+            "easy": t("high_frequency"),
+            "medium": t("medium_frequency"), 
+            "hard": t("low_frequency"),
+            t("easy"): t("high_frequency"),
+            t("medium"): t("medium_frequency"),
+            t("hard"): t("low_frequency")
+        }
+        return difficulty_frequency_map.get(difficulty, t("medium_frequency"))
+
+    def _generate_example_code(self, error_code: str, error_name: str) -> str:
+        """Generate example code based on error type."""
+        # Basic example code mapping based on error patterns
+        code_examples = {
+            "null_pointer": "String str = null; int len = str.length();",
+            "array_bounds": "int[] arr = new int[5]; int x = arr[5];",
+            "class_cast": "Object obj = \"Hello\"; Integer num = (Integer) obj;",
+            "number_format": "int num = Integer.parseInt(\"abc\");",
+            "file_not_found": "FileReader fr = new FileReader(\"missing.txt\");",
+            "division_by_zero": "int result = 10 / 0;",
+            "concurrent_modification": "List<String> list = new ArrayList<>(); for(String s : list) { list.add(\"new\"); }",
+            "stack_overflow": "public void recursiveMethod() { recursiveMethod(); }",
+            "out_of_memory": "List<Integer> list = new ArrayList<>(); while(true) { list.add(1); }",
+            "illegal_argument": "Thread.sleep(-1000);",
+            "unsupported_operation": "List<String> list = Arrays.asList(\"a\"); list.add(\"b\");"
+        }
+        
+        # Try to match error name or code to example
+        error_key = error_code.lower() if error_code else error_name.lower()
+        
+        for key, example in code_examples.items():
+            if key in error_key:
+                return example
+        
+        # Default example if no match found
+        return "// Example code will be provided based on error type"
+
+    def _get_fallback_error_data(self) -> Dict[str, List[Dict[str, Any]]]:
+        """Provide fallback error data when database is not available."""
         return {
             t("logical"): [
                 {
@@ -495,23 +559,8 @@ class ErrorExplorerUI:
                     "difficulty": t("medium"),
                     "frequency": t("high_frequency"),
                     "example": "String str = null; int len = str.length();",
-                    "fix": t("null_pointer_fix")
-                },
-                {
-                    "name": t("off_by_one_error"), 
-                    "description": t("off_by_one_description"),
-                    "difficulty": t("easy"),
-                    "frequency": t("medium_frequency"),
-                    "example": "for(int i = 0; i <= array.length; i++)",
-                    "fix": t("off_by_one_fix")
-                },
-                {
-                    "name": t("infinite_loop"),
-                    "description": t("infinite_loop_description"),
-                    "difficulty": t("medium"),
-                    "frequency": t("medium_frequency"),
-                    "example": "while(true) { /* missing break condition */ }",
-                    "fix": t("infinite_loop_fix")
+                    "fix": t("null_pointer_fix"),
+                    "error_code": "NPE001"
                 }
             ],
             t("syntax"): [
@@ -519,79 +568,10 @@ class ErrorExplorerUI:
                     "name": t("missing_semicolon"),
                     "description": t("missing_semicolon_description"),
                     "difficulty": t("easy"),
-                    "frequency": t("high_frequency"), 
+                    "frequency": t("high_frequency"),
                     "example": "int x = 5",
-                    "fix": t("missing_semicolon_fix")
-                },
-                {
-                    "name": t("mismatched_braces"),
-                    "description": t("mismatched_braces_description"),
-                    "difficulty": t("easy"),
-                    "frequency": t("medium_frequency"),
-                    "example": "if (condition) { ... ",
-                    "fix": t("mismatched_braces_fix")
-                },
-                {
-                    "name": t("wrong_variable_type"),
-                    "description": t("wrong_variable_type_description"),
-                    "difficulty": t("medium"),
-                    "frequency": t("medium_frequency"),
-                    "example": "int result = \"Hello World\";",
-                    "fix": t("wrong_variable_type_fix")
-                }
-            ],
-            t("code_quality"): [
-                {
-                    "name": t("poor_variable_naming"),
-                    "description": t("poor_variable_naming_description"),
-                    "difficulty": t("medium"),
-                    "frequency": t("high_frequency"),
-                    "example": "int x = calculateTotal();",
-                    "fix": t("poor_variable_naming_fix")
-                },
-                {
-                    "name": t("magic_numbers"),
-                    "description": t("magic_numbers_description"),
-                    "difficulty": t("easy"),
-                    "frequency": t("medium_frequency"),
-                    "example": "if (score > 85) { grade = 'A'; }",
-                    "fix": t("magic_numbers_fix")
-                }
-            ],
-            t("standard_violation"): [
-                {
-                    "name": t("naming_convention_violation"),
-                    "description": t("naming_convention_description"),
-                    "difficulty": t("easy"),
-                    "frequency": t("medium_frequency"),
-                    "example": "class myClass { ... }",
-                    "fix": t("naming_convention_fix")
-                },
-                {
-                    "name": t("improper_indentation"),
-                    "description": t("improper_indentation_description"),
-                    "difficulty": t("easy"),
-                    "frequency": t("low_frequency"),
-                    "example": "if(condition){\nreturn true;\n}",
-                    "fix": t("improper_indentation_fix")
-                }
-            ],
-            t("java_specific"): [
-                {
-                    "name": t("resource_leak"),
-                    "description": t("resource_leak_description"),
-                    "difficulty": t("hard"),
-                    "frequency": t("medium_frequency"),
-                    "example": "FileInputStream fis = new FileInputStream(file);",
-                    "fix": t("resource_leak_fix")
-                },
-                {
-                    "name": t("string_comparison_equals"),
-                    "description": t("string_comparison_description"),
-                    "difficulty": t("medium"),
-                    "frequency": t("high_frequency"),
-                    "example": "if (str1 == str2) { ... }",
-                    "fix": t("string_comparison_fix")
+                    "fix": t("missing_semicolon_fix"),
+                    "error_code": "SYN001"
                 }
             ]
         }
@@ -841,81 +821,24 @@ class ErrorExplorerUI:
         </style>
         """, unsafe_allow_html=True)
 
-    def _render_error_details(self, selected_data: Dict[str, Any]):
-        """Render detailed information about the selected error."""
-        error = selected_data["error"]
-        category = selected_data["category"]
-        
-        st.subheader(f"🔍 {error['name']}")
-        
-        # Error metadata
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.metric(t("difficulty_level"), error["difficulty"])
-        
-        with col2:
-            st.metric(t("error_frequency"), error["frequency"])
-        
-        with col3:
-            st.metric("Category", category)
-        
-        # Error description
-        st.markdown(f"**{t('error_details')}:**")
-        st.write(error["description"])
-        
-        # Code example
-        st.markdown(f"**{t('common_mistakes')}:**")
-        st.code(error["example"], language="java")
-        
-        # Fix suggestion
-        st.markdown(f"**{t('best_practices')}:**")
-        st.success(error["fix"])
-        
-        # Action buttons
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if st.button(f"🎯 {t('practice_this_error')}", key=f"practice_{error['name']}"):
-                st.info(f"🚀 {t('practice_this_error')} feature coming soon!")
-        
-        with col2:
-            if st.button(f"✅ {t('mark_as_learned')}", key=f"learned_{error['name']}"):
-                st.success(f"✅ {t('mark_as_learned')}!")
-        
-        with col3:
-            if st.button(f"📖 {t('view_details')}", key=f"details_{error['name']}"):
-                self._show_detailed_explanation(error)
-    
-    def _render_welcome_message(self):
-        """Render welcome message when no error is selected."""
-        st.markdown(f"""
-        <div style="text-align: center; padding: 40px;">
-            <h3>👋 {t('welcome_to')} {t('error_explorer')}</h3>
-            <p>{t('browse_errors')} and learn about different types of Java errors.</p>
-            <p>Select an error from the list to see detailed information and examples.</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    def _show_detailed_explanation(self, error: Dict[str, Any]):
-        """Show detailed explanation in an expander."""
-        with st.expander(f"📖 {t('implementation_examples')}", expanded=True):
-            st.markdown(f"""
-            ### {t('implementation_examples')}
-            
-            **Problem:** {error['description']}
-            
-            **Example of the Error:**
-            ```java
-            {error['example']}
-            ```
-            
-            **How to Fix:**
-            {error['fix']}
-            
-            **{t('best_practices')}:**
-            - Always validate inputs
-            - Use proper error handling
-            - Follow Java naming conventions
-            - Write clear, self-documenting code
-            """)
+    def get_database_statistics(self) -> Dict[str, Any]:
+        """Get database statistics for display or analysis."""
+        try:
+            return self.repository.get_error_statistics()
+        except Exception as e:
+            logger.error(f"Error getting database statistics: {str(e)}")
+            return {
+                'total_errors': sum(len(errors) for errors in self.error_data.values()),
+                'total_categories': len(self.error_data),
+                'errors_by_category': {cat: len(errors) for cat, errors in self.error_data.items()},
+                'most_used_errors': []
+            }
+
+    def refresh_error_data(self):
+        """Refresh error data from database."""
+        try:
+            self.error_data = self._load_error_database()
+            st.success(t("error_data_refreshed"))
+        except Exception as e:
+            logger.error(f"Error refreshing data: {str(e)}")
+            st.error(t("error_refreshing_data"))
