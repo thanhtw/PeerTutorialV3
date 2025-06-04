@@ -1,8 +1,10 @@
 import streamlit as st
+import os
 import logging
 from typing import Dict, List, Any, Optional
 from data.database_error_repository import DatabaseErrorRepository
 from utils.language_utils import t, get_current_language
+from static.css_utils import load_css
 
 logger = logging.getLogger(__name__)
 
@@ -12,12 +14,37 @@ class ErrorExplorerUI:
     def __init__(self):
         """Initialize the Error Explorer UI."""
         self.repository = DatabaseErrorRepository()
+        self.error_data = self._load_error_database()
         
+        # Initialize session state
+        if "selected_error_code" not in st.session_state:
+            st.session_state.selected_error_code = None
+        if "error_explorer_view" not in st.session_state:
+            st.session_state.error_explorer_view = "list"
+        if "user_progress" not in st.session_state:
+            st.session_state.user_progress = {}
+        self._load_styles()
+    def _load_styles(self):
+        """Load CSS styles for the Error Explorer UI."""
+        try:
+            # Get the current directory and construct path to CSS files
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            css_dir = os.path.join(current_dir, "..", "..", "static", "css", "error_explorer")
+            
+            if os.path.exists(css_dir):
+                loaded_files = load_css(css_directory=css_dir)
+                if loaded_files:
+                    logger.debug(f"Loaded Error Explorer CSS files: {loaded_files}")
+            else:
+                logger.warning(f"CSS directory not found: {css_dir}")
+        except Exception as e:
+            logger.error(f"Error loading Error Explorer CSS: {str(e)}")
+
     def render(self):
         """Render the complete error explorer interface."""
-        st.title("🔍 " + t("error_explorer"))
-        st.markdown(t("error_explorer_description"))
-        
+       
+        # Professional header
+        self._render_header()
         # Search and filter section
         self._render_search_filters()
         
@@ -231,6 +258,160 @@ class ErrorExplorerUI:
             <p>Try adjusting your search criteria or filters.</p>
         </div>
         """, unsafe_allow_html=True)
+
+    def _render_header(self):
+        """Render the professional header with branding and statistics."""
+        # Get error statistics from database
+        try:
+            stats = self.repository.get_error_statistics()
+            total_errors = stats.get('total_errors', 0)
+            total_categories = stats.get('total_categories', 0)
+        except Exception as e:
+            logger.debug(f"Could not get database statistics: {str(e)}")
+            # Fallback to counting loaded data
+            total_errors = sum(len(errors) for errors in self.error_data.values())
+            total_categories = len(self.error_data)
+        
+        st.markdown(f"""
+        <div class="error-explorer-header">
+            <div class="header-content">
+                <div class="title-section">
+                    <h1>🔍 {t('error_explorer')}</h1>
+                    <p class="subtitle">{t('explore_comprehensive_error_library')}</p>
+                </div>
+                <div class="stats-section">
+                    <div class="stat-card">
+                        <div class="stat-number">{total_errors}</div>
+                        <div class="stat-label">{t('total_errors_available')}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">{total_categories}</div>
+                        <div class="stat-label">{t('error_categories')}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    def _render_main_content(self):
+        """Render the main content area with enhanced layout."""
+        # Search and filter controls
+        self._render_search_and_filters()
+       
+        # Main content based on view mode
+        self._render_list_view()
+
+    def _load_error_database(self) -> Dict[str, List[Dict[str, Any]]]:
+        """Load the error database with enhanced mock data."""
+        return {
+            t("logical"): [
+                {
+                    "name": t("null_pointer_access"),
+                    "description": t("null_pointer_description"),
+                    "difficulty": t("medium"),
+                    "frequency": t("high_frequency"),
+                    "example": "String str = null; int len = str.length();",
+                    "fix": t("null_pointer_fix")
+                },
+                {
+                    "name": t("off_by_one_error"), 
+                    "description": t("off_by_one_description"),
+                    "difficulty": t("easy"),
+                    "frequency": t("medium_frequency"),
+                    "example": "for(int i = 0; i <= array.length; i++)",
+                    "fix": t("off_by_one_fix")
+                },
+                {
+                    "name": t("infinite_loop"),
+                    "description": t("infinite_loop_description"),
+                    "difficulty": t("medium"),
+                    "frequency": t("medium_frequency"),
+                    "example": "while(true) { /* missing break condition */ }",
+                    "fix": t("infinite_loop_fix")
+                }
+            ],
+            t("syntax"): [
+                {
+                    "name": t("missing_semicolon"),
+                    "description": t("missing_semicolon_description"),
+                    "difficulty": t("easy"),
+                    "frequency": t("high_frequency"), 
+                    "example": "int x = 5",
+                    "fix": t("missing_semicolon_fix")
+                },
+                {
+                    "name": t("mismatched_braces"),
+                    "description": t("mismatched_braces_description"),
+                    "difficulty": t("easy"),
+                    "frequency": t("medium_frequency"),
+                    "example": "if (condition) { ... ",
+                    "fix": t("mismatched_braces_fix")
+                },
+                {
+                    "name": t("wrong_variable_type"),
+                    "description": t("wrong_variable_type_description"),
+                    "difficulty": t("medium"),
+                    "frequency": t("medium_frequency"),
+                    "example": "int result = \"Hello World\";",
+                    "fix": t("wrong_variable_type_fix")
+                }
+            ],
+            t("code_quality"): [
+                {
+                    "name": t("poor_variable_naming"),
+                    "description": t("poor_variable_naming_description"),
+                    "difficulty": t("medium"),
+                    "frequency": t("high_frequency"),
+                    "example": "int x = calculateTotal();",
+                    "fix": t("poor_variable_naming_fix")
+                },
+                {
+                    "name": t("magic_numbers"),
+                    "description": t("magic_numbers_description"),
+                    "difficulty": t("easy"),
+                    "frequency": t("medium_frequency"),
+                    "example": "if (score > 85) { grade = 'A'; }",
+                    "fix": t("magic_numbers_fix")
+                }
+            ],
+            t("standard_violation"): [
+                {
+                    "name": t("naming_convention_violation"),
+                    "description": t("naming_convention_description"),
+                    "difficulty": t("easy"),
+                    "frequency": t("medium_frequency"),
+                    "example": "class myClass { ... }",
+                    "fix": t("naming_convention_fix")
+                },
+                {
+                    "name": t("improper_indentation"),
+                    "description": t("improper_indentation_description"),
+                    "difficulty": t("easy"),
+                    "frequency": t("low_frequency"),
+                    "example": "if(condition){\nreturn true;\n}",
+                    "fix": t("improper_indentation_fix")
+                }
+            ],
+            t("java_specific"): [
+                {
+                    "name": t("resource_leak"),
+                    "description": t("resource_leak_description"),
+                    "difficulty": t("hard"),
+                    "frequency": t("medium_frequency"),
+                    "example": "FileInputStream fis = new FileInputStream(file);",
+                    "fix": t("resource_leak_fix")
+                },
+                {
+                    "name": t("string_comparison_equals"),
+                    "description": t("string_comparison_description"),
+                    "difficulty": t("medium"),
+                    "frequency": t("high_frequency"),
+                    "example": "if (str1 == str2) { ... }",
+                    "fix": t("string_comparison_fix")
+                }
+            ]
+        }
+
 
 def render_error_explorer():
     """Main function to render the error explorer."""
