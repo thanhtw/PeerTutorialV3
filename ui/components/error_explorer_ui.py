@@ -146,12 +146,13 @@ class ErrorExplorerUI:
             self._render_no_results()
             return
         
-        # Results count with smaller, more compact styling
+        # Results count with compact styling
         st.markdown(f"""
-        <div style="text-align: center; margin: 10px 0;">
-            <span style="font-size: 0.9em; color: #6c757d; background: #f8f9fa; padding: 4px 12px; border-radius: 15px;">
-                {len(filtered_errors)} {t("errors_found")}
-            </span>
+        <div class="results-count">
+            <div class="count-info">
+                <span class="count-number">{len(filtered_errors)}</span>
+                <span class="count-text">{t("errors_found")}</span>
+            </div>
         </div>
         """, unsafe_allow_html=True)
         
@@ -163,123 +164,117 @@ class ErrorExplorerUI:
         errors_by_category = self._group_errors_by_category(filtered_errors)
         
         for category_name, errors in errors_by_category.items():
-            st.markdown(f'<h3 class="category-title">{category_name} <span class="error-count">({len(errors)})</span></h3>', 
-                       unsafe_allow_html=True)
+            # Category section with professional styling
+            st.markdown(f"""
+            <div class="category-section">
+                <h3 class="category-title">
+                    <span class="category-icon">📂</span>
+                    {category_name}
+                    <span class="error-count">{len(errors)}</span>
+                </h3>
+            </div>
+            """, unsafe_allow_html=True)
             
             for error in errors:
-                self._render_optimized_error_card(error)
+                self._render_professional_error_card(error)
     
-    def _render_optimized_error_card(self, error: Dict[str, Any]):
-        """Render an optimized error card with expanders for examples."""
+    def _render_professional_error_card(self, error: Dict[str, Any]):
+        """Render a professional error card with proper CSS classes."""
         error_name = error.get(t("error_name"), "Unknown Error")
         description = error.get(t("description"), "")
         implementation_guide = error.get(t("implementation_guide"), "")
         difficulty = error.get('difficulty_level', 'medium')
         error_code = error.get('error_code', f"error_{hash(error_name) % 10000}")
         
-        # Create the professional card container with CSS class
-        card_container = st.container()
-        with card_container:
+        # Get examples for the content
+        examples = self.repository.get_error_examples(error_name)
+        
+        # Use a container with CSS class to ensure everything is inside one card
+        with st.container():
             # Add CSS class to the container
             st.markdown(f"""
-            <style>
-            .element-container:has(> .stContainer) {{
-                background: linear-gradient(135deg, #ffffff 0%, #f8fafe 100%);
-                border: 2px solid #e1e8f0;
-                border-radius: 16px;
-                padding: 20px;
-                margin-bottom: 20px;
-                box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
-                transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-                position: relative;
-                overflow: hidden;
-            }}
-            </style>
-            """, unsafe_allow_html=True)
-            
-            # Card header
-            st.markdown(f"""
-            <div class="card-header" style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f1f3f4;">
-                <div class="error-title-section">
-                    <h4 style="margin: 0 0 8px 0; color: #2c3e50; font-size: 1.2rem; font-weight: 600; display: flex; align-items: center; line-height: 1.3;">
-                        <span style="margin-right: 8px;">🔧</span>
-                        {error_name}
-                    </h4>
-                    <div style="display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap;">
-                        <span style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 74, 188, 0.05)); color: #667eea; padding: 4px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 500; border: 1px solid rgba(102, 126, 234, 0.2); font-family: 'Courier New', monospace;">{error_code}</span>
-                        <span class="difficulty-badge {difficulty}" style="color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); border: none; background: {'linear-gradient(135deg, #28a745, #20c997)' if difficulty == 'easy' else 'linear-gradient(135deg, #ffc107, #ffb347)' if difficulty == 'medium' else 'linear-gradient(135deg, #dc3545, #e74c3c)'}; {'color: #212529;' if difficulty == 'medium' else ''}">{difficulty.title()}</span>
+            <div class="professional-error-card-container">
+                <div class="error-card-header">
+                    <div class="error-title-wrapper">
+                        <h4 class="error-title">
+                            <span class="error-icon">🔧</span>
+                            <span class="error-name">{error_name}</span>
+                        </h4>
+                        <div class="error-badges">
+                            <span class="error-code-badge">{error_code}</span>
+                            <span class="difficulty-badge difficulty-{difficulty}">{difficulty.title()}</span>
+                        </div>
                     </div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
             
-            # Get examples for the expander
-            examples = self.repository.get_error_examples(error_name)
-            
-            # Single expander containing description, fix guide, and examples
-            with st.expander("📝 **View Code Examples**", expanded=False):
-                # Description
-                st.markdown("**📋 Description:**")
-                st.info(description)
+            # Expander will now be inside the container
+            with st.expander("📚 **Code Examples & Solutions**", expanded=False):
+                # Description section
+                st.markdown('<div class="error-description-section">', unsafe_allow_html=True)
+                if description:
+                    st.markdown("**📋 What is this error?**")
+                    st.info(description)
                 
-                # Implementation guide if available
                 if implementation_guide:
-                    st.markdown("**💡 How to Fix This Error:**")
+                    st.markdown("**💡 How to fix this error:**")
                     st.success(implementation_guide)
+                st.markdown('</div>', unsafe_allow_html=True)
                 
-                # Code examples
-                self._render_code_examples(examples)
-            
-                # Practice button at the bottom of the card
-                col1, col2 = st.columns([3, 1])
+                # Problem code section
+                st.markdown('<div class="problem-code-section">', unsafe_allow_html=True)
+                if examples.get("wrong_examples"):
+                    st.markdown("**❌ Problematic Code Examples**")
+                    for i, example in enumerate(examples["wrong_examples"][:3], 1):
+                        if len(examples["wrong_examples"]) > 1:
+                            st.markdown(f"**Example {i}:**")
+                        
+                        st.markdown('<div class="code-example error-code">', unsafe_allow_html=True)
+                        st.code(example, language="java")
+                        st.markdown('</div>', unsafe_allow_html=True)
+                        
+                        if i < len(examples["wrong_examples"][:3]):
+                            st.markdown('<div class="example-divider"></div>', unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
                 
-                with col1:
-                    # Show explanation if available
-                    explanation = examples.get("explanation", "")
-                    if explanation:
-                        st.markdown("**💡 Key Points:**")
-                        st.caption(explanation)
+                # Solution code section
+                st.markdown('<div class="solution-code-section">', unsafe_allow_html=True)
+                if examples.get("correct_examples"):
+                    st.markdown("**✅ Corrected Code Examples**")
+                    for i, example in enumerate(examples["correct_examples"][:3], 1):
+                        if len(examples["correct_examples"]) > 1:
+                            st.markdown(f"**Example {i}:**")
+                        
+                        st.markdown('<div class="code-example correct-code">', unsafe_allow_html=True)
+                        st.code(example, language="java")
+                        st.markdown('</div>', unsafe_allow_html=True)
+                        
+                        if i < len(examples["correct_examples"][:3]):
+                            st.markdown('<div class="example-divider"></div>', unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
                 
+                # Key points section
+                explanation = examples.get("explanation", "")
+                if explanation:
+                    st.markdown('<div class="key-points-section">', unsafe_allow_html=True)
+                    st.markdown("**🎯 Key Points:**")
+                    st.caption(explanation)
+                    st.markdown('</div>', unsafe_allow_html=True)
+                
+                # Practice button section
+                st.markdown('<div class="practice-button-section">', unsafe_allow_html=True)
+                col1, col2, col3 = st.columns([2, 1, 2])
                 with col2:
                     if st.button(
-                        "🎯 Practice", 
+                        "🎯 Start Practice", 
                         key=f"practice_{error_code}", 
                         use_container_width=True,
                         type="primary",
                         help="Generate practice code with this error type"
                     ):
                         self._handle_practice_error(error)
-        
-        # Add spacing between cards
-        st.markdown("<br>", unsafe_allow_html=True)
-    
-    def _render_code_examples(self, examples: Dict[str, Any]):
-        """Render code examples in a structured format."""
-        # Wrong examples section
-        if examples.get("wrong_examples"):
-            st.markdown("#### ❌ **Problematic Code Examples**")
-            for i, example in enumerate(examples["wrong_examples"][:3], 1):  # Show up to 3 examples
-                if len(examples["wrong_examples"]) > 1:
-                    st.markdown(f"**Example {i}:**")
-                st.code(example, language="java")
-                if i < len(examples["wrong_examples"][:3]):
-                    st.markdown("---")
-        
-        # Correct examples section
-        if examples.get("correct_examples"):
-            st.markdown("#### ✅ **Corrected Code Examples**")
-            for i, example in enumerate(examples["correct_examples"][:3], 1):  # Show up to 3 examples
-                if len(examples["correct_examples"]) > 1:
-                    st.markdown(f"**Example {i}:**")
-                st.code(example, language="java")
-                if i < len(examples["correct_examples"][:3]):
-                    st.markdown("---")
-        
-        # Comparison tip
-        if examples.get("wrong_examples") and examples.get("correct_examples"):
-            st.info("💡 **Tip:** Compare the problematic and corrected examples to understand the differences!")
-    
-
+                st.markdown('</div>', unsafe_allow_html=True)
     
     def _handle_practice_error(self, error: Dict[str, Any]):
         """Handle practice error by generating code with LangGraph and starting review workflow."""

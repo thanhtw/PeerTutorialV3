@@ -1,25 +1,19 @@
-/* Add this to your static/css/error_explorer/cards.css file */
+/* Professional Error Explorer Cards - Enhanced Styling */
 
-/* Professional Error Card Enhancements */
-.error-card {
+/* Professional Error Card Container - Unified Block */
+.professional-error-card-container {
     background: linear-gradient(135deg, #ffffff 0%, #f8fafe 100%);
     border: 2px solid #e1e8f0;
     border-radius: 16px;
-    padding: 20px;
-    margin-bottom: 20px;
+    padding: 0; /* Remove padding to control spacing internally */
+    margin-bottom: 8px; /* Reduced spacing between cards */
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: hidden;
 }
 
-.error-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 35px rgba(102, 126, 234, 0.15);
-    border-color: #667eea;
-}
-
-.error-card::before {
+.professional-error-card-container::before {
     content: '';
     position: absolute;
     top: 0;
@@ -32,35 +26,54 @@
     transition: transform 0.4s ease;
 }
 
-.error-card:hover::before {
+.professional-error-card-container:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 35px rgba(102, 126, 234, 0.15);
+    border-color: #667eea;
+}
+
+.professional-error-card-container:hover::before {
     transform: scaleX(1);
 }
 
-.card-header {
-    margin-bottom: 16px;
-    padding-bottom: 12px;
+/* Error Card Header */
+.error-card-header {
+    margin-bottom: 0; /* Remove bottom margin */
+    padding: 20px 20px 16px 20px; /* Add internal padding */
     border-bottom: 1px solid #f1f3f4;
+    background: transparent;
 }
 
-.error-title-section {
-    flex: 1;
+.error-title-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
 .error-title {
-    margin: 0 0 8px 0;
+    margin: 0;
     color: #2c3e50;
     font-size: 1.2rem;
     font-weight: 600;
     display: flex;
     align-items: center;
     line-height: 1.3;
+    gap: 8px;
 }
 
-.error-metadata {
+.error-icon {
+    font-size: 1.3em;
+    color: #667eea;
+}
+
+.error-name {
+    flex: 1;
+}
+
+.error-badges {
     display: flex;
     gap: 8px;
     align-items: center;
-    margin-top: 8px;
     flex-wrap: wrap;
 }
 
@@ -88,197 +101,323 @@
     border: none;
 }
 
-.difficulty-badge.easy {
+.difficulty-badge.difficulty-easy {
     background: linear-gradient(135deg, #28a745, #20c997);
 }
 
-.difficulty-badge.medium {
+.difficulty-badge.difficulty-medium {
     background: linear-gradient(135deg, #ffc107, #ffb347);
     color: #212529;
 }
 
-.difficulty-badge.hard {
+.difficulty-badge.difficulty-hard {
     background: linear-gradient(135deg, #dc3545, #e74c3c);
 }
 
-/* Content sections within cards */
-.error-card .stMarkdown {
-    margin-bottom: 12px;
+/* Unified Expander Styling - Make it part of the card */
+.professional-error-card-container .stExpander {
+    margin: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
 }
 
-.error-card .stInfo {
-    border-left: 4px solid #17a2b8;
-    background-color: rgba(23, 162, 184, 0.1);
-    margin: 8px 0;
+.professional-error-card-container .stExpander > div:first-child {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 8px 20px 16px 20px !important; /* Match card padding */
+    border-top: 1px solid #f1f3f4 !important; /* Subtle separator */
 }
 
-.error-card .stSuccess {
+.professional-error-card-container .stExpander [data-testid="stExpanderDetails"] {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 20px 20px 20px !important; /* Match card padding */
+    margin: 0 !important;
+}
+
+/* Remove default Streamlit expander styling */
+.professional-error-card-container .stExpander > div:first-child:hover {
+    background: rgba(102, 126, 234, 0.05) !important;
+}
+
+/* Ensure the entire container behaves as one block */
+.professional-error-card-container > div[data-testid="stContainer"] {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.professional-error-card-container > div[data-testid="stContainer"] > div {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* Content Sections */
+.error-description-section {
+    margin-bottom: 20px;
+    padding: 16px;
+    background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
+    border-radius: 10px;
     border-left: 4px solid #28a745;
-    background-color: rgba(40, 167, 69, 0.1);
-    margin: 8px 0;
 }
 
-/* Compact tabs for examples within cards */
-.error-card .stTabs [data-baseweb="tab-list"] {
-    gap: 4px;
-    margin-bottom: 8px;
-    background: rgba(102, 126, 234, 0.05);
-    padding: 4px;
+.problem-code-section {
+    margin-bottom: 20px;
+    padding: 16px;
+    background: linear-gradient(135deg, #fdf2f2 0%, #fef5f5 100%);
+    border-radius: 10px;
+    border-left: 4px solid #e74c3c;
+}
+
+.solution-code-section {
+    margin-bottom: 20px;
+    padding: 16px;
+    background: linear-gradient(135deg, #f2f9f2 0%, #f8fdf8 100%);
+    border-radius: 10px;
+    border-left: 4px solid #27ae60;
+}
+
+.key-points-section {
+    margin-bottom: 20px;
+    padding: 12px;
+    background: linear-gradient(135deg, #e7f3ff 0%, #f1f8ff 100%);
     border-radius: 8px;
+    border-left: 3px solid #0066cc;
 }
 
-.error-card .stTabs [data-baseweb="tab"] {
-    padding: 6px 12px;
-    font-size: 0.85rem;
-    border-radius: 6px;
-    background: transparent;
-    border: 1px solid transparent;
+.practice-button-section {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid #e9ecef;
 }
 
-.error-card .stTabs [aria-selected="true"] {
-    background: white;
-    border-color: #667eea;
-    color: #667eea;
-    font-weight: 600;
-}
-
-.error-card .stTabs [data-baseweb="tab-panel"] {
-    padding: 12px 0;
-}
-
-/* Button styling within cards */
-.error-card .stButton > button {
-    font-size: 0.85rem;
-    padding: 0.4rem 0.8rem;
+/* Code Examples Enhancement */
+.code-example {
+    margin: 12px 0;
     border-radius: 8px;
-    font-weight: 500;
-    transition: all 0.3s ease;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
-.error-card .stButton > button[data-testid="baseButton-primary"] {
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    border: none;
-    color: white;
+.code-example.error-code {
+    border: 1px solid #f5c6cb;
+    background: #fff5f5;
 }
 
-.error-card .stButton > button[data-testid="baseButton-primary"]:hover {
-    background: linear-gradient(135deg, #764ba2, #667eea);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+.code-example.error-code pre {
+    background: #fff5f5 !important;
+    border-left: 4px solid #e74c3c;
 }
 
-/* Code blocks within cards */
-.error-card .stCode {
-    margin: 8px 0;
-    border-radius: 8px;
-    font-size: 0.85rem;
+.code-example.correct-code {
+    border: 1px solid #c3e6cb;
+    background: #f8fff8;
 }
 
-.error-card .stCode > div {
-    border-radius: 8px;
+.code-example.correct-code pre {
+    background: #f8fff8 !important;
+    border-left: 4px solid #27ae60;
 }
 
-/* Caption styling for key points */
-.error-card .stCaption {
-    background: rgba(102, 126, 234, 0.05);
-    padding: 8px 12px;
-    border-radius: 8px;
-    border-left: 3px solid #667eea;
-    margin: 8px 0;
-    font-style: italic;
-}
-
-/* Expanded examples section */
-.error-card hr {
-    border: none;
+.example-divider {
     height: 1px;
     background: linear-gradient(90deg, transparent, #e1e8f0, transparent);
     margin: 16px 0;
 }
 
-/* Expander styling within cards */
-.error-card .stExpander {
-    background: rgba(248, 249, 250, 0.8);
-    border: 1px solid #e9ecef;
-    border-radius: 8px;
-    margin: 4px 0;
+/* Professional Button Styling */
+.professional-error-card-container .practice-button-section .stButton > button {
+    background: linear-gradient(135deg, #667eea, #764ba2) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 12px 24px !important;
+    font-weight: 600 !important;
+    font-size: 0.9rem !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3) !important;
 }
 
-.error-card .stExpander > div:first-child {
-    border-radius: 8px 8px 0 0;
-    background: rgba(102, 126, 234, 0.05);
+.professional-error-card-container .practice-button-section .stButton > button:hover {
+    background: linear-gradient(135deg, #764ba2, #667eea) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4) !important;
 }
 
-/* Learning tips list styling */
-.error-card ul {
-    margin-left: 16px;
-    margin-bottom: 12px;
+/* Category Section Enhancements */
+.category-section {
+    margin: 25px 0 15px 0;
 }
 
-.error-card li {
-    margin-bottom: 4px;
-    line-height: 1.4;
-    color: #495057;
+.category-title {
+    color: #2c3e50;
+    border-bottom: 3px solid #667eea;
+    padding-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 15px;
+    position: relative;
 }
 
-/* Progress indicators for practice mode */
-.practice-progress {
+.category-title::after {
+    content: '';
+    position: absolute;
+    bottom: -3px;
+    left: 0;
+    width: 60px;
+    height: 3px;
     background: linear-gradient(90deg, #667eea, #764ba2);
-    border-radius: 8px;
-    padding: 12px;
+    border-radius: 2px;
+}
+
+.category-icon {
+    font-size: 1.4rem;
+    color: #667eea;
+}
+
+.error-count {
+    font-size: 0.9rem;
+    color: #6c757d;
+    font-weight: 500;
+    background: rgba(102, 126, 234, 0.1);
+    padding: 4px 12px;
+    border-radius: 20px;
+    margin-left: auto;
+}
+
+/* Results Count Enhancement */
+.results-count {
+    display: flex;
+    justify-content: center;
+    margin: 15px 0;
+    padding: 8px;
+}
+
+.count-info {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    margin: 8px 0;
-    text-align: center;
+    padding: 8px 20px;
+    border-radius: 25px;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
 }
 
-.practice-status {
-    background: rgba(40, 167, 69, 0.1);
-    border: 1px solid #28a745;
-    border-radius: 8px;
-    padding: 12px;
-    margin: 8px 0;
-    color: #155724;
+.count-number {
+    font-size: 1.2rem;
+    font-weight: bold;
 }
 
-/* Responsive design for cards */
+.count-text {
+    font-weight: 500;
+}
+
+/* Enhanced Info/Success/Caption Styling */
+.professional-error-card-container .error-description-section .stInfo,
+.professional-error-card-container .problem-code-section .stMarkdown,
+.professional-error-card-container .solution-code-section .stMarkdown,
+.professional-error-card-container .key-points-section .stCaption {
+    margin: 8px 0;
+}
+
+.professional-error-card-container .error-description-section .stInfo > div {
+    background: rgba(40, 167, 69, 0.1) !important;
+    border-left: 4px solid #28a745 !important;
+    color: #155724 !important;
+}
+
+.professional-error-card-container .error-description-section .stSuccess > div {
+    background: rgba(40, 167, 69, 0.15) !important;
+    border-left: 4px solid #28a745 !important;
+    color: #155724 !important;
+}
+
+/* Section Headers */
+.professional-error-card-container .problem-code-section h4,
+.professional-error-card-container .solution-code-section h4,
+.professional-error-card-container .error-description-section h4 {
+    margin-top: 0 !important;
+    margin-bottom: 12px !important;
+    font-weight: 600 !important;
+}
+
+.professional-error-card-container .problem-code-section h4 {
+    color: #c82333 !important;
+}
+
+.professional-error-card-container .solution-code-section h4 {
+    color: #1e7e34 !important;
+}
+
+.professional-error-card-container .error-description-section h4 {
+    color: #155724 !important;
+}
+
+/* Responsive Design */
 @media (max-width: 768px) {
-    .error-card {
+    .professional-error-card-container {
         padding: 16px;
-        margin-bottom: 16px;
+        margin-bottom: 6px;
     }
     
     .error-title {
         font-size: 1.1rem;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
     }
     
-    .error-metadata {
+    .error-badges {
         flex-wrap: wrap;
-        gap: 4px;
+        gap: 6px;
     }
     
-    .error-card .stButton > button {
-        font-size: 0.8rem;
-        padding: 0.3rem 0.6rem;
+    .category-title {
+        font-size: 1.3rem;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
     }
     
-    .card-header {
-        padding-bottom: 8px;
+    .error-count {
+        margin-left: 0;
+    }
+    
+    .error-description-section,
+    .problem-code-section,
+    .solution-code-section {
+        padding: 12px;
+        margin-bottom: 16px;
     }
 }
 
 @media (max-width: 480px) {
-    .error-card {
+    .professional-error-card-container {
         padding: 12px;
     }
     
     .error-title {
         font-size: 1rem;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 4px;
     }
     
-    .error-metadata {
-        margin-top: 4px;
+    .category-title {
+        font-size: 1.2rem;
+    }
+    
+    .count-info {
+        padding: 6px 16px;
+        font-size: 0.8rem;
     }
 }
