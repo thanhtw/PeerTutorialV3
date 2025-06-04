@@ -125,3 +125,94 @@
     padding: 0.5rem 1rem;
     border-radius: 8px 8px 0 0;
 }
+
+/* Code Example Styles */
+.code-example {
+    margin: 1rem 0;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.code-example.error-code {
+    border-left: 4px solid #e74c3c;
+    background-color: #fdf2f2;
+}
+
+.code-example.correct-code {
+    border-left: 4px solid #27ae60;
+    background-color: #f2f9f2;
+}
+
+.code-example pre {
+    margin: 0 !important;
+    padding: 1rem !important;
+    background: transparent !important;
+}
+
+/* Error Card Enhancement */
+.error-card {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+.error-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+.error-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    margin: 0.25rem 0.5rem 0.25rem 0;
+}
+
+.error-badge.easy {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.error-badge.medium {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.error-badge.hard {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+/* Example Section Enhancements */
+.example-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.example-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.example-icon.wrong {
+    background-color: #e74c3c;
+}
+
+.example-icon.correct {
+    background-color: #27ae60;
+}

@@ -192,14 +192,15 @@ class CodeGeneratorUI:
                 st.warning(f"⚠️ {t('please_select_at_least_one_specific_error')}")
 
     def _render_advanced_error_selection(self):
-        """Render the advanced error selection interface with all categories and errors loaded."""
-        
+        from data.database_error_repository import DatabaseErrorRepository  # Add import
+        repository = DatabaseErrorRepository()  # Use database repository
+                
         # Initialize selected specific errors
         if "selected_specific_errors" not in st.session_state:
             st.session_state.selected_specific_errors = []
         
-        # Load all categories from database
-        categories_dict = self._get_error_categories()
+        # Load all categories from database using repository
+        categories_dict = repository.get_all_categories()
         all_categories = categories_dict.get("java_errors", [])
         
         if not all_categories:
@@ -216,7 +217,7 @@ class CodeGeneratorUI:
         for category in all_categories:
             icon = self._get_category_icon(category)
             with st.expander(f"{icon} {category}", expanded=True):
-                errors = self._load_errors_by_category(category)
+                errors = repository.get_category_errors(category)  # Use repository method
                 
                 if not errors:
                     st.warning(f"No errors found for category: {category}")
@@ -301,7 +302,7 @@ class CodeGeneratorUI:
                 # Select all errors from all categories
                 all_selected = []
                 for category in all_categories:
-                    errors = self._load_errors_by_category(category)
+                    errors = repository.get_category_errors(category)
                     # Sort errors by difficulty_level for consistency
                     errors_sorted = sorted(
                         errors,

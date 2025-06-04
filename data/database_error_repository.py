@@ -8,6 +8,7 @@ replacing the JSON file-based approach for better performance and maintainabilit
 
 import logging
 import random
+import json
 from typing import Dict, List, Any, Optional, Set, Union, Tuple
 from db.mysql_connection import MySQLConnection
 from utils.language_utils import get_current_language, t
@@ -606,6 +607,157 @@ class DatabaseErrorRepository:
             logger.error(f"Error getting statistics: {str(e)}")
             return {}
 
+    def get_error_examples(self, error_name: str) -> Dict[str, Any]:
+        """
+        Get example codes for a specific error from database.
+        
+        Args:
+            error_name: Name of the error
+            
+        Returns:
+            Dictionary containing example codes and solutions
+        """
+        try:
+            self.current_language = get_current_language()
+            name_field = self._get_language_fields('error_name')
+            
+            query = f"""
+            SELECT examples, tags
+            FROM java_errors 
+            WHERE {name_field} = %s AND is_active = TRUE
+            """
+            
+            result = self.db.execute_query(query, (error_name,), fetch_one=True)
+            
+            if result and result.get('examples'):
+                try:
+                    examples_data = json.loads(result['examples']) if isinstance(result['examples'], str) else result['examples']
+                    
+                    # Extract wrong and correct examples
+                    examples = {
+                        "wrong_examples": [],
+                        "correct_examples": [],
+                        "explanation": ""
+                    }
+                    
+                    if isinstance(examples_data, list):
+                        for example in examples_data:
+                            if 'wrong' in example:
+                                examples["wrong_examples"].append(example['wrong'])
+                            if 'correct' in example:
+                                examples["correct_examples"].append(example['correct'])
+                            if 'advice' in example:
+                                examples["explanation"] = example['advice']
+                    
+                    return examples
+                    
+                except json.JSONDecodeError:
+                    logger.warning(f"Invalid JSON in examples for error: {error_name}")
+                    
+            return self._get_default_examples(error_name)
+            
+        except Exception as e:
+            logger.error(f"Error getting examples for {error_name}: {str(e)}")
+            return self._get_default_examples(error_name)
+    
+    def _get_default_examples(self, error_name: str) -> Dict[str, Any]:
+        """Generate default examples when database examples are not available."""
+        return {
+            "wrong_examples": [f"// Example showing {error_name}\n// This code demonstrates the error"],
+            "correct_examples": [f"// Corrected version\n// This code shows the proper implementation"],
+            "explanation": f"This demonstrates how to identify and fix {error_name}"
+        }
+    
+    def get_all_errors_with_examples(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Get all errors with their examples for pattern recognition game.
+        
+        Returns:
+            Dictionary of errors with their pattern data
+        """
+        try:
+            self.current_language = get_current_language()
+            name_field = self._get_language_fields('error_name')
+            desc_field = self._get_language_fields('description')
+            
+            query = f"""
+            SELECT 
+                ec.category_code,
+                je.{name_field} as error_name,
+                je.{desc_field} as description,
+                je.examples,
+                je.tags
+            FROM java_errors je
+            JOIN error_categories ec ON je.category_id = ec.id
+            WHERE je.is_active = TRUE AND ec.is_active = TRUE
+            ORDER BY ec.sort_order, je.{name_field}
+            """
+            
+            errors = self.db.execute_query(query)
+            pattern_database = {}
+            
+            for error in errors or []:
+                error_key = error['category_code'] + "_" + error['error_name'].lower().replace(" ", "_")
+                
+                # Parse examples from JSON
+                examples_data = {}
+                if error.get('examples'):
+                    try:
+                        examples_json = json.loads(error['examples']) if isinstance(error['examples'], str) else error['examples']
+                        
+                        correct_patterns = []
+                        incorrect_patterns = []
+                        
+                        if isinstance(examples_json, list):
+                            for example in examples_json:
+                                if 'wrong' in example:
+                                    correct_patterns.append(example['wrong'])  # Wrong examples become "correct" patterns to identify
+                                if 'correct' in example:
+                                    incorrect_patterns.append(example['correct'])  # Correct examples become "incorrect" patterns
+                        
+                        examples_data = {
+                            "correct_patterns": correct_patterns,
+                            "incorrect_patterns": incorrect_patterns
+                        }
+                        
+                    except json.JSONDecodeError:
+                        examples_data = self._get_default_pattern_examples(error['error_name'])
+                else:
+                    examples_data = self._get_default_pattern_examples(error['error_name'])
+                
+                pattern_database[error_key] = {
+                    "name": error['error_name'],
+                    "description": error['description'],
+                    "correct_patterns": examples_data.get("correct_patterns", []),
+                    "incorrect_patterns": examples_data.get("incorrect_patterns", []),
+                    "explanation": f"Learn to identify {error['error_name']} patterns",
+                    "warning_signs": self._extract_warning_signs(error.get('tags'))
+                }
+            
+            return pattern_database
+            
+        except Exception as e:
+            logger.error(f"Error getting pattern database: {str(e)}")
+            return {}
+    
+    def _get_default_pattern_examples(self, error_name: str) -> Dict[str, List[str]]:
+        """Generate default pattern examples."""
+        return {
+            "correct_patterns": [f"// Pattern showing {error_name}"],
+            "incorrect_patterns": [f"// Correct implementation"]
+        }
+    
+    def _extract_warning_signs(self, tags_json: str) -> List[str]:
+        """Extract warning signs from tags JSON."""
+        try:
+            if tags_json:
+                tags = json.loads(tags_json) if isinstance(tags_json, str) else tags_json
+                if isinstance(tags, list):
+                    return [f"Look for {tag}" for tag in tags[:3]]  # First 3 tags as warning signs
+        except:
+            pass
+        return ["Review code carefully", "Check logic flow", "Verify syntax"]
+        
 # Compatibility function to maintain backward compatibility
 def create_database_repository() -> DatabaseErrorRepository:
     """Create and return a DatabaseErrorRepository instance."""

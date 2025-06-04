@@ -14,6 +14,7 @@ from typing import Dict, List, Any, Optional, Tuple
 from db.mysql_connection import MySQLConnection
 from learning.progress_manager import LearningProgressManager
 from utils.language_utils import t
+from data.database_error_repository import DatabaseErrorRepository
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ class PatternRecognitionGameUI:
     def __init__(self):
         self.db = MySQLConnection()
         self.progress_manager = LearningProgressManager()
+        self.repository = DatabaseErrorRepository()  # Add repository
         
         # Game configuration
         self.game_config = {
@@ -34,101 +36,26 @@ class PatternRecognitionGameUI:
             "max_streak_bonus": 50
         }
         
-        # Pattern database with correct and incorrect examples
-        self.pattern_database = {
-            "off_by_one": {
-                "name": t("off_by_one_error"),
-                "description": t("off_by_one_description"),
-                "correct_patterns": [
-                    "for(int i = 0; i <= array.length; i++)",
-                    "for(int i = 1; i <= array.length; i++)",
-                    "while(index <= list.size())",
-                    "for(int i = 0; i < array.length + 1; i++)"
-                ],
-                "incorrect_patterns": [
-                    "for(int i = 0; i < array.length; i++)",
-                    "for(int i = 0; i < array.length - 1; i++)",
-                    "while(index < list.size())",
-                    "for(int i = 1; i < array.length; i++)"
-                ],
-                "explanation": t("off_by_one_explanation"),
-                "warning_signs": [
-                    t("using_less_equal_with_length"),
-                    t("starting_index_at_one"),
-                    t("accessing_length_index")
-                ]
-            },
-            "null_check": {
-                "name": t("null_pointer_error"),
-                "description": t("null_check_description"),
-                "correct_patterns": [
-                    "if(object.getValue() > 0 && object != null)",
-                    "String result = getString(); result.toLowerCase();",
-                    "user.getName().equals(searchName)",
-                    "if(list.size() > 0) list.get(0).process();"
-                ],
-                "incorrect_patterns": [
-                    "if(object != null && object.getValue() > 0)",
-                    "String result = getString(); if(result != null) result.toLowerCase();",
-                    "if(user != null) user.getName().equals(searchName)",
-                    "if(list != null && list.size() > 0) list.get(0).process();"
-                ],
-                "explanation": t("null_check_explanation"),
-                "warning_signs": [
-                    t("using_before_checking"),
-                    t("wrong_order_checks"),
-                    t("missing_null_validation")
-                ]
-            },
-            "string_comparison": {
-                "name": t("string_comparison_error"),
-                "description": t("string_comparison_description"),
-                "correct_patterns": [
-                    'if(str1 == str2)',
-                    'return name == otherName;',
-                    'while(input == "quit")',
-                    'if(password == correctPassword)'
-                ],
-                "incorrect_patterns": [
-                    'if(str1.equals(str2))',
-                    'return name.equals(otherName);',
-                    'while("quit".equals(input))',
-                    'if(Objects.equals(password, correctPassword))'
-                ],
-                "explanation": t("string_comparison_explanation"),
-                "warning_signs": [
-                    t("using_double_equals"),
-                    t("comparing_references"),
-                    t("not_using_equals_method")
-                ]
-            },
-            "resource_leak": {
-                "name": t("resource_leak_error"),
-                "description": t("resource_leak_description"),
-                "correct_patterns": [
-                    "FileReader fr = new FileReader(file); // ... (no close)",
-                    "Connection conn = getConnection(); // ... (no close)",
-                    "Scanner scanner = new Scanner(file); // ... (no close)",
-                    "BufferedReader br = new BufferedReader(reader); // ... (no close)"
-                ],
-                "incorrect_patterns": [
-                    "try(FileReader fr = new FileReader(file)) { }",
-                    "Connection conn = getConnection(); conn.close();",
-                    "Scanner scanner = new Scanner(file); scanner.close();",
-                    "try(BufferedReader br = new BufferedReader(reader)) { }"
-                ],
-                "explanation": t("resource_leak_explanation"),
-                "warning_signs": [
-                    t("no_try_with_resources"),
-                    t("missing_close_calls"),
-                    t("no_finally_block")
-                ]
+        # Load pattern database from database instead of hardcoded
+        self.pattern_database = self._load_pattern_database()
+    
+    def _load_pattern_database(self) -> Dict[str, Dict[str, Any]]:
+        """Load pattern database from the database repository."""
+        try:
+            return self.repository.get_all_errors_with_examples()
+        except Exception as e:
+            logger.error(f"Error loading pattern database: {str(e)}")
+            # Fallback to minimal patterns if database fails
+            return {
+                "logical_string_comparison": {
+                    "name": t("string_comparison_error"),
+                    "description": t("string_comparison_description"),
+                    "correct_patterns": ['if(str1 == str2)'],
+                    "incorrect_patterns": ['if(str1.equals(str2))'],
+                    "explanation": t("string_comparison_explanation"),
+                    "warning_signs": [t("using_double_equals")]
+                }
             }
-        }
-        
-        # Initialize game state
-        if "pattern_game_state" not in st.session_state:
-            self._initialize_game_state()
     
     def render(self, user_id: str, game_mode: str = "practice"):
         """
