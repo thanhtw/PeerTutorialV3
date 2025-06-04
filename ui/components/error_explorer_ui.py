@@ -149,58 +149,6 @@ class ErrorExplorerUI:
         }
 
     
-    
-
-    def _render_error_card(self, error: Dict[str, Any], category: str):
-        """Render individual error card with enhanced styling and proper content display."""
-        error_name = error.get("name", t("unknown_error"))
-        description = error.get("description", "")
-        difficulty = error.get("difficulty", t("medium"))
-        frequency = error.get("frequency", t("medium_frequency"))
-        
-        # Get user progress for this error
-        progress = st.session_state.user_progress.get(error_name, {})
-        practiced = progress.get("practiced", False)
-        mastered = progress.get("mastered", False)
-        
-        # Use a container for better layout control
-        with st.container():
-            # Card header with title
-            st.markdown(f"**{error_name}**")
-            
-            # Badges in a single row using inline HTML
-            difficulty_color = "🟢" if difficulty.lower() == "easy" else "🔴" if difficulty.lower() == "hard" else "🟡"
-            st.markdown(f"{difficulty_color} {difficulty} | 📊 {frequency}", help="Difficulty and Frequency")
-            
-            # Description
-            if description:
-                # Truncate description for card display
-                display_description = description[:100] + "..." if len(description) > 100 else description
-                st.write(display_description)
-            
-            # Progress indicators
-            progress_text = []
-            if practiced:
-                progress_text.append("✅ Practiced")
-            if mastered:
-                progress_text.append("🏆 Mastered")
-            
-            if progress_text:
-                st.markdown(" | ".join(progress_text))
-            
-            # Action buttons in columns
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                if st.button(f"📖 {t('view_details')}", key=f"view_{error_name}_{category}", use_container_width=True):
-                    self._show_error_details(error, category)
-            
-            with col2:
-                if st.button(f"🎯 {t('practice_error')}", key=f"practice_{error_name}_{category}", use_container_width=True):
-                    self._handle_practice_error(error, category)
-            
-            # Add separator between cards
-            st.markdown("---")
 
     def _render_list_view(self):
         """Render errors in a detailed list view."""
