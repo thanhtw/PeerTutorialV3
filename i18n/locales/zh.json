@@ -720,6 +720,7 @@
     "current_process_review1": "當前進度",
     "current_process_review2": "次嘗試已完成",
     "default_feedback": "系統無法提取詳細反饋。請檢查整體分析結果。",
-    "your_achievements": "你的成就"
+    "your_achievements": "你的成就",
+    "generate_code_problem": "產生程式碼問題"
   }
 }
