@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import logging
+import time
 from typing import Dict, List, Any, Optional
 from data.database_error_repository import DatabaseErrorRepository
 from utils.language_utils import t, get_current_language
@@ -100,7 +101,7 @@ class ErrorExplorerUI:
         </div>
         """, unsafe_allow_html=True)
         
-        # Main search and filter controls - Removed reset button column
+        # Main search and filter controls
         col1, col2, col3 = st.columns([4, 2, 2])
         
         with col1:
@@ -166,145 +167,119 @@ class ErrorExplorerUI:
                        unsafe_allow_html=True)
             
             for error in errors:
-                self._render_professional_error_card(error)
+                self._render_optimized_error_card(error)
     
-    def _render_professional_error_card(self, error: Dict[str, Any]):
-        """Render a single professional error card with integrated content."""
+    def _render_optimized_error_card(self, error: Dict[str, Any]):
+        """Render an optimized error card with expanders for examples."""
         error_name = error.get(t("error_name"), "Unknown Error")
         description = error.get(t("description"), "")
         implementation_guide = error.get(t("implementation_guide"), "")
         difficulty = error.get('difficulty_level', 'medium')
         error_code = error.get('error_code', f"error_{hash(error_name) % 10000}")
         
-        # Check if this error is expanded
-        expanded_key = f"expanded_{error_code}"
-        is_expanded = st.session_state.get(expanded_key, False)
-        
-        # Create the professional card container
-        st.markdown(f"""
-        <div class="error-card">
-            <div class="card-header">
+        # Create the professional card container with CSS class
+        card_container = st.container()
+        with card_container:
+            # Add CSS class to the container
+            st.markdown(f"""
+            <style>
+            .element-container:has(> .stContainer) {{
+                background: linear-gradient(135deg, #ffffff 0%, #f8fafe 100%);
+                border: 2px solid #e1e8f0;
+                border-radius: 16px;
+                padding: 20px;
+                margin-bottom: 20px;
+                box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+                transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+                position: relative;
+                overflow: hidden;
+            }}
+            </style>
+            """, unsafe_allow_html=True)
+            
+            # Card header
+            st.markdown(f"""
+            <div class="card-header" style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f1f3f4;">
                 <div class="error-title-section">
-                    <h4 class="error-title">
+                    <h4 style="margin: 0 0 8px 0; color: #2c3e50; font-size: 1.2rem; font-weight: 600; display: flex; align-items: center; line-height: 1.3;">
                         <span style="margin-right: 8px;">🔧</span>
                         {error_name}
                     </h4>
-                    <div class="error-metadata">
-                        <span class="error-code-badge">{error_code}</span>
-                        <span class="difficulty-badge {difficulty}">{difficulty.title()}</span>
+                    <div style="display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap;">
+                        <span style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 74, 188, 0.05)); color: #667eea; padding: 4px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 500; border: 1px solid rgba(102, 126, 234, 0.2); font-family: 'Courier New', monospace;">{error_code}</span>
+                        <span class="difficulty-badge {difficulty}" style="color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); border: none; background: {'linear-gradient(135deg, #28a745, #20c997)' if difficulty == 'easy' else 'linear-gradient(135deg, #ffc107, #ffb347)' if difficulty == 'medium' else 'linear-gradient(135deg, #dc3545, #e74c3c)'}; {'color: #212529;' if difficulty == 'medium' else ''}">{difficulty.title()}</span>
                     </div>
                 </div>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Content section - always show description, guide, and examples
-        with st.container():
-            # Description
-            st.markdown("**📋 Description:**")
-            st.info(description)
+            """, unsafe_allow_html=True)
             
-            # Implementation guide if available
-            if implementation_guide:
-                st.markdown("**💡 How to Fix This Error:**")
-                st.success(implementation_guide)
-            
-            # Get and display examples
+            # Get examples for the expander
             examples = self.repository.get_error_examples(error_name)
             
-            if examples.get("wrong_examples") or examples.get("correct_examples"):
-                # Create compact tabs for examples
-                if examples.get("wrong_examples") and examples.get("correct_examples"):
-                    tab1, tab2 = st.tabs(["❌ Problematic", "✅ Corrected"])
-                    
-                    with tab1:
-                        if examples.get("wrong_examples"):
-                            # Show first example only to keep it compact
-                            example = examples["wrong_examples"][0]
-                            st.code(example, language="java")
-                    
-                    with tab2:
-                        if examples.get("correct_examples"):
-                            # Show first example only to keep it compact
-                            example = examples["correct_examples"][0]
-                            st.code(example, language="java")
-                elif examples.get("wrong_examples"):
-                    st.markdown("**❌ Problematic Code Example:**")
-                    st.code(examples["wrong_examples"][0], language="java")
-                elif examples.get("correct_examples"):
-                    st.markdown("**✅ Correct Code Example:**")
-                    st.code(examples["correct_examples"][0], language="java")
+            # Single expander containing description, fix guide, and examples
+            with st.expander("📝 **View Code Examples**", expanded=False):
+                # Description
+                st.markdown("**📋 Description:**")
+                st.info(description)
+                
+                # Implementation guide if available
+                if implementation_guide:
+                    st.markdown("**💡 How to Fix This Error:**")
+                    st.success(implementation_guide)
+                
+                # Code examples
+                self._render_code_examples(examples)
             
-            # Action buttons at the bottom of the card
-            col1, col2, col3 = st.columns([2, 1, 1])
-            
-            with col1:
-                # Show additional info if examples explanation exists
-                explanation = examples.get("explanation", "")
-                if explanation:
-                    st.markdown("**💡 Key Points:**")
-                    st.caption(explanation)
-            
-            with col2:
-                if st.button(
-                    f"{'Less' if is_expanded else 'More'}", 
-                    key=f"toggle_{error_code}", 
-                    use_container_width=True,
-                    help="View additional examples and details"
-                ):
-                    st.session_state[expanded_key] = not is_expanded
-                    st.rerun()
-            
-            with col3:
-                if st.button(
-                    "🎯 Practice", 
-                    key=f"practice_{error_code}", 
-                    use_container_width=True,
-                    type="primary",
-                    help="Generate practice code with this error type"
-                ):
-                    self._handle_practice_error(error)
-            
-            # Show expanded content if toggled
-            if is_expanded:
-                self._render_expanded_examples(error_name, examples)
+                # Practice button at the bottom of the card
+                col1, col2 = st.columns([3, 1])
+                
+                with col1:
+                    # Show explanation if available
+                    explanation = examples.get("explanation", "")
+                    if explanation:
+                        st.markdown("**💡 Key Points:**")
+                        st.caption(explanation)
+                
+                with col2:
+                    if st.button(
+                        "🎯 Practice", 
+                        key=f"practice_{error_code}", 
+                        use_container_width=True,
+                        type="primary",
+                        help="Generate practice code with this error type"
+                    ):
+                        self._handle_practice_error(error)
         
         # Add spacing between cards
         st.markdown("<br>", unsafe_allow_html=True)
     
-    def _render_expanded_examples(self, error_name: str, examples: Dict[str, Any]):
-        """Render expanded examples and additional content."""
-        st.markdown("---")
-        st.markdown("**📚 Additional Examples and Learning Resources**")
+    def _render_code_examples(self, examples: Dict[str, Any]):
+        """Render code examples in a structured format."""
+        # Wrong examples section
+        if examples.get("wrong_examples"):
+            st.markdown("#### ❌ **Problematic Code Examples**")
+            for i, example in enumerate(examples["wrong_examples"][:3], 1):  # Show up to 3 examples
+                if len(examples["wrong_examples"]) > 1:
+                    st.markdown(f"**Example {i}:**")
+                st.code(example, language="java")
+                if i < len(examples["wrong_examples"][:3]):
+                    st.markdown("---")
         
-        # Show more examples if available
-        col1, col2 = st.columns(2)
+        # Correct examples section
+        if examples.get("correct_examples"):
+            st.markdown("#### ✅ **Corrected Code Examples**")
+            for i, example in enumerate(examples["correct_examples"][:3], 1):  # Show up to 3 examples
+                if len(examples["correct_examples"]) > 1:
+                    st.markdown(f"**Example {i}:**")
+                st.code(example, language="java")
+                if i < len(examples["correct_examples"][:3]):
+                    st.markdown("---")
         
-        with col1:
-            if examples.get("wrong_examples") and len(examples["wrong_examples"]) > 1:
-                st.markdown("**More Problematic Examples:**")
-                for i, example in enumerate(examples["wrong_examples"][1:3], 2):  # Show 2nd and 3rd examples
-                    with st.expander(f"Example {i}"):
-                        st.code(example, language="java")
-        
-        with col2:
-            if examples.get("correct_examples") and len(examples["correct_examples"]) > 1:
-                st.markdown("**More Corrected Examples:**")
-                for i, example in enumerate(examples["correct_examples"][1:3], 2):  # Show 2nd and 3rd examples
-                    with st.expander(f"Example {i}"):
-                        st.code(example, language="java")
-        
-        # Additional learning tips
-        st.markdown("**🎓 Learning Tips:**")
-        learning_tips = [
-            "Compare the problematic and corrected code side by side",
-            "Try to identify the exact line or pattern causing the error",
-            "Practice writing the correction without looking at the solution",
-            "Look for similar patterns in your own code"
-        ]
-        
-        for tip in learning_tips:
-            st.markdown(f"• {tip}")
+        # Comparison tip
+        if examples.get("wrong_examples") and examples.get("correct_examples"):
+            st.info("💡 **Tip:** Compare the problematic and corrected examples to understand the differences!")
+    
+
     
     def _handle_practice_error(self, error: Dict[str, Any]):
         """Handle practice error by generating code with LangGraph and starting review workflow."""

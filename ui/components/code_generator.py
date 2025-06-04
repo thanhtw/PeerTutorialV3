@@ -216,7 +216,7 @@ class CodeGeneratorUI:
         # Display all categories and their errors
         for category in all_categories:
             icon = self._get_category_icon(category)
-            with st.expander(f"{icon} {category}", expanded=True):
+            with st.expander(f"{icon} {category}", expanded=False):
                 errors = repository.get_category_errors(category)  # Use repository method
                 
                 if not errors:
