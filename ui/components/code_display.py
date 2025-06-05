@@ -434,6 +434,7 @@ class CodeDisplayUI:
         """
         try:
             logger.info(f"Processing review submission for iteration {iteration_count}")
+            logger.info(f"Review text length: {len(review_text)} characters")
             
             # Validate input
             if not review_text or not review_text.strip():
@@ -453,15 +454,18 @@ class CodeDisplayUI:
             
             # Show processing indicator
             with st.spinner(f"🔄 {t('processing_review')}..."):
-                logger.info(f"Calling submit callback with review length: {len(cleaned_review)}")
+                logger.info(f"Calling submit callback with review: '{cleaned_review[:100]}...'")
                 
                 # Call the submit callback
                 if on_submit_callback:
                     try:
+                        logger.info("Executing callback function...")
                         result = on_submit_callback(cleaned_review)
+                        logger.info(f"Callback returned: {result} (type: {type(result)})")
                         
-                        if result is not False:
-                            # FIXED: Set success flag instead of immediate st.rerun()
+                        # FIXED: More lenient success check
+                        if result is True or result is None:  # Accept True or None as success
+                            # Set success flag instead of immediate st.rerun()
                             st.session_state[success_flag] = True
                             
                             # Clear the draft
@@ -479,8 +483,8 @@ class CodeDisplayUI:
                             st.rerun()
                             return True
                         else:
-                            logger.warning(f"Submit callback returned False for iteration {iteration_count}")
-                            st.error(f"❌ {t('error')} {t('processing_review')}. Please try again.")
+                            logger.warning(f"Submit callback returned: {result} for iteration {iteration_count}")
+                            st.error(f"❌ {t('error')} {t('processing_review')}. Callback returned: {result}")
                             return False
                             
                     except Exception as callback_error:
@@ -500,7 +504,7 @@ class CodeDisplayUI:
 
 def render_review_tab(workflow, code_display_ui, auth_ui=None):
     """
-    FIXED: Render the review tab UI with better state management.
+    FIXED: Render the review tab UI with enhanced debugging and state management.
     """
     st.markdown(f"""
     <div style="margin-bottom: 2rem;">
@@ -517,6 +521,28 @@ def render_review_tab(workflow, code_display_ui, auth_ui=None):
         </p>
     </div>
     """, unsafe_allow_html=True)
+    
+    # ADDED: Debug information (can be enabled for troubleshooting)
+    if st.session_state.get("debug_mode", False):
+        with st.expander("🔧 Debug Information", expanded=False):
+            st.code(f"""
+Debug Info:
+- Workflow: {type(workflow) if workflow else 'None'}
+- Has workflow_state: {hasattr(st.session_state, 'workflow_state')}
+- Workflow state type: {type(st.session_state.workflow_state) if hasattr(st.session_state, 'workflow_state') else 'None'}
+- Has code_snippet: {hasattr(st.session_state.workflow_state, 'code_snippet') if hasattr(st.session_state, 'workflow_state') else False}
+- Current iteration: {getattr(st.session_state.workflow_state, 'current_iteration', 'N/A') if hasattr(st.session_state, 'workflow_state') else 'N/A'}
+- Current step: {getattr(st.session_state.workflow_state, 'current_step', 'N/A') if hasattr(st.session_state, 'workflow_state') else 'N/A'}
+            """)
+            
+            if st.button("Toggle Debug Mode Off"):
+                st.session_state.debug_mode = False
+                st.rerun()
+    else:
+        # Small debug toggle button
+        if st.button("🔧 Debug", help="Show debug information"):
+            st.session_state.debug_mode = True
+            st.rerun()
     
     # Check workflow state
     if not hasattr(st.session_state, 'workflow_state') or not st.session_state.workflow_state:
@@ -541,10 +567,15 @@ def render_review_tab(workflow, code_display_ui, auth_ui=None):
         """, unsafe_allow_html=True)
         return
     
+    # Validate workflow
+    if not workflow:
+        st.error("❌ No workflow available for processing reviews. Please refresh the page.")
+        return
+    
     # Get known problems for instructor view
     known_problems = _extract_known_problems(st.session_state.workflow_state)
     
-    # Display code with enhanced styling
+    # Display the code
     code_display_ui.render_code_display(
         getattr(st.session_state.workflow_state, 'code_snippet', None),
         known_problems=known_problems
@@ -575,12 +606,14 @@ def _extract_known_problems(state) -> List[str]:
 
 def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
     """
-    FIXED: Handle review submission with better state management.
+    FIXED: Handle review submission with better state management and debugging.
     """
     # Get current review state
     state = st.session_state.workflow_state
     current_iteration = getattr(state, 'current_iteration', 1)
     max_iterations = getattr(state, 'max_iterations', 3)
+    
+    logger.info(f"Handling review submission - iteration {current_iteration}/{max_iterations}")
     
     # Get review data
     review_history = getattr(state, 'review_history', None)
@@ -609,25 +642,44 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
     
     if current_iteration <= max_iterations and not review_sufficient and not all_errors_found:
         def on_submit_review(review_text):
-            """FIXED: Submit callback with better error handling."""
+            """FIXED: Submit callback with enhanced error handling and debugging."""
             try:
                 logger.info(f"Submit callback triggered for iteration {current_iteration}")
+                logger.info(f"Review text: '{review_text[:100]}...' (length: {len(review_text)})")
+                
+                # Validate workflow and state
+                if not workflow:
+                    logger.error("No workflow available for review processing")
+                    st.error("❌ No workflow available for processing reviews")
+                    return False
+                
+                if not hasattr(st.session_state, 'workflow_state') or not st.session_state.workflow_state:
+                    logger.error("No workflow state available")
+                    st.error("❌ No workflow state available. Please generate code first.")
+                    return False
                 
                 # Process the student review
+                logger.info("Calling _process_student_review...")
                 result = _process_student_review(workflow, review_text)
+                logger.info(f"_process_student_review returned: {result}")
                 
-                if result:
+                if result is True:
                     logger.info(f"Review processing completed successfully for iteration {current_iteration}")
+                    return True
+                elif result is None:
+                    logger.info(f"Review processing completed (returned None) for iteration {current_iteration}")
+                    return True  # Treat None as success
                 else:
-                    logger.warning(f"Review processing returned False for iteration {current_iteration}")
-                
-                return result
+                    logger.warning(f"Review processing returned: {result} for iteration {current_iteration}")
+                    return False
                 
             except Exception as e:
                 logger.error(f"Exception in submit callback: {str(e)}", exc_info=True)
                 st.error(f"Submit processing failed: {str(e)}")
                 return False
         
+        # Render the review input with the callback
+        logger.info("Rendering review input with callback")
         code_display_ui.render_review_input(
             student_review=student_review,
             on_submit_callback=on_submit_review,
@@ -704,15 +756,26 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
 
 def _process_student_review(workflow, student_review: str) -> bool:
     """
-    FIXED: Process student review with better error handling.
+    FIXED: Process student review with enhanced error handling and debugging.
     """
     try:
         logger.debug("Starting student review processing")
+        logger.info(f"Processing review: '{student_review[:100]}...' (length: {len(student_review)})")
         
         # Enhanced status tracking
         with st.status(t("processing_review"), expanded=True) as status:
             
-            # Step 1: Validate workflow state
+            # Step 1: Validate workflow
+            status.update(label="🔍 Validating workflow...", state="running")
+            
+            if not workflow:
+                error_msg = "No workflow provided"
+                logger.error(error_msg)
+                status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
+                st.error(f"❌ {error_msg}")
+                return False
+            
+            # Step 2: Validate workflow state
             status.update(label="🔍 Validating workflow state...", state="running")
             
             if not hasattr(st.session_state, 'workflow_state'):
@@ -723,8 +786,9 @@ def _process_student_review(workflow, student_review: str) -> bool:
                 return False
                 
             state = st.session_state.workflow_state
+            logger.info(f"Current workflow state: step={getattr(state, 'current_step', 'unknown')}, iteration={getattr(state, 'current_iteration', 'unknown')}")
             
-            # Step 2: Validate code snippet
+            # Step 3: Validate code snippet
             status.update(label="🔍 Validating code snippet...", state="running")
             
             if not hasattr(state, "code_snippet") or state.code_snippet is None:
@@ -734,11 +798,35 @@ def _process_student_review(workflow, student_review: str) -> bool:
                 st.error(f"❌ {error_msg}. {t('please_generate_problem_first')}")
                 return False
             
-            # Step 3: Submit to workflow
-            status.update(label="🚀 Processing review...", state="running")
+            # Step 4: Validate review content
+            status.update(label="🔍 Validating review content...", state="running")
+            
+            if not student_review or not student_review.strip():
+                error_msg = "Review cannot be empty"
+                logger.error(error_msg)
+                status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
+                st.error(f"❌ {t('please_enter_review')}")
+                return False
+            
+            review_text = student_review.strip()
+            
+            if len(review_text) < 10:
+                error_msg = "Review too short"
+                logger.error(error_msg)
+                status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
+                st.error(f"❌ {t('provide_detailed_review_minimum')}")
+                return False
+            
+            # Step 5: Submit to workflow
+            status.update(label="🚀 Submitting to workflow...", state="running")
+            
+            logger.info("Submitting review through LangGraph workflow")
+            logger.info(f"Workflow type: {type(workflow)}")
+            logger.info(f"Calling workflow.submit_review with state and review text")
             
             try:                
-                raw_updated_state = workflow.submit_review(state, student_review)
+                raw_updated_state = workflow.submit_review(state, review_text)
+                logger.info(f"Workflow.submit_review returned: {type(raw_updated_state)}")
                 
                 if not raw_updated_state:
                     error_msg = "Workflow returned empty state"
@@ -754,15 +842,46 @@ def _process_student_review(workflow, student_review: str) -> bool:
                 st.error(f"❌ {error_msg}")
                 return False
             
-            # Step 4: Update session state
+            # Step 6: Validate workflow result
+            status.update(label="⚙️ Processing workflow result...", state="running")
+            
+            # Check for errors
+            error = getattr(raw_updated_state, 'error', None)
+            if error:
+                logger.error(f"Workflow returned error: {error}")
+                status.update(label=f"❌ {t('error')}: {error}", state="error")
+                st.error(f"❌ {error}")
+                return False
+            
+            # Step 7: Update session state
             status.update(label="💾 Updating session state...", state="running")
             
+            # Update session state with the result
             st.session_state.workflow_state = raw_updated_state
             st.session_state.review_processing_success = True
             st.session_state.last_review_timestamp = time.time()
             
-            status.update(label=f"✅ {t('analysis_complete_processed')}", state="complete")
-            return True
+            logger.info("Session state updated successfully")
+            
+            # Step 8: Verify processing success
+            status.update(label="✅ Verifying processing...", state="running")
+            
+            # Check if review was actually processed
+            review_history = getattr(raw_updated_state, 'review_history', None)
+            current_iteration = getattr(raw_updated_state, 'current_iteration', 1)
+            
+            if review_history and len(review_history) > 0:
+                logger.info(f"Review processing completed successfully. History length: {len(review_history)}")
+                logger.info(f"Current iteration: {current_iteration}")
+                status.update(label=f"✅ {t('analysis_complete_processed')}", state="complete")
+                
+                return True
+            else:
+                logger.warning("Review processing may not have completed properly - no review history found")
+                status.update(label="⚠️ Processing completed with warnings", state="complete")
+                
+                # Still return True as the workflow didn't fail
+                return True
             
     except Exception as e:
         error_msg = f"Exception in review processing: {str(e)}"
