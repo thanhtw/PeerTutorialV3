@@ -1,8 +1,9 @@
+# app.py - Updated with practice mode integration
+
 """
 Java Peer Code Review Training System - LangGraph Version
 
-This module provides a Streamlit web interface for the Java code review training system
-using LangGraph for workflow management with a modular UI structure.
+UPDATED: Enhanced practice mode integration and fixed setIn errors.
 """
 
 import streamlit as st
@@ -40,7 +41,7 @@ from ui.utils.main_ui import (
 # Import UI components
 from ui.components.code_generator import CodeGeneratorUI
 from ui.components.code_display import CodeDisplayUI, render_review_tab  
-from ui.components.feedback_system import render_feedback_tab, render_enhanced_feedback_tab
+from ui.components.feedback_system import render_enhanced_feedback_tab
 from ui.components.auth_ui import AuthUI
 from ui.components.enhanced_tutorial import EnhancedTutorialUI
 from ui.components.learning_dashboard import LearningDashboardUI
@@ -63,7 +64,7 @@ except Exception as e:
     logger.warning(f"CSS loading failed: {str(e)}")
 
 def main():
-    """Enhanced main application function with provider selection."""
+    """Enhanced main application function with practice mode support."""
 
     # Initialize language selection and i18n system
     init_language()
@@ -89,6 +90,7 @@ def main():
     user_level = auth_ui.get_user_level()   
     st.session_state.user_level = user_level
     
+    # FIXED: Handle full reset with better state management
     if st.session_state.get("full_reset", False):
         del st.session_state["full_reset"]
         preserved = {
@@ -96,16 +98,20 @@ def main():
             for key in ["auth", "provider_selection", "user_level", "language"]
             if key in st.session_state
         }        
-        # Clear workflow-related state
+        # Clear workflow-related state but preserve practice mode if active
         workflow_keys = [k for k in st.session_state.keys() 
-                        if k not in preserved.keys()]
+                        if k not in preserved.keys() and not k.startswith("practice_")]
         for key in workflow_keys:
             del st.session_state[key]
         
         # Restore preserved values
         st.session_state.update(preserved)
-        st.session_state.workflow_state = WorkflowState()
-        st.session_state.active_tab = 0
+        
+        # Only reset workflow state if not in practice mode
+        if not st.session_state.get("practice_mode_active", False):
+            st.session_state.workflow_state = WorkflowState()
+            st.session_state.active_tab = 0
+        
         st.rerun()
 
     # Initialize session state
@@ -126,7 +132,7 @@ def main():
         st.info("3. Add GROQ_API_KEY=your_key_here to your .env file")
         st.stop()
 
-    # Configure provider without testing connection (will be tested on first use)
+    # Configure provider
     try:
         success = llm_manager.set_provider("groq", api_key)
         if not success:
@@ -152,7 +158,42 @@ def main():
     code_generator_ui = CodeGeneratorUI(workflow, code_display_ui)
     enhanced_tutorial_ui = EnhancedTutorialUI(llm_manager)
     learning_dashboard_ui = LearningDashboardUI()
-    error_explorer_ui = ErrorExplorerUI()
+    error_explorer_ui = ErrorExplorerUI(workflow)  # Pass workflow for practice mode
+    
+    # UPDATED: Check if we're in practice mode
+    if st.session_state.get("practice_mode_active", False):
+        # Render practice mode interface
+        render_practice_mode_interface(error_explorer_ui, workflow)
+    else:
+        # Render normal tabbed interface
+        render_normal_interface(
+            code_generator_ui, 
+            workflow, 
+            code_display_ui, 
+            auth_ui,
+            enhanced_tutorial_ui,
+            learning_dashboard_ui,
+            error_explorer_ui,
+            user_level
+        )
+
+def render_practice_mode_interface(error_explorer_ui, workflow):
+    """Render the streamlined practice mode interface."""
+    
+    # Header with practice mode indicator
+    st.markdown(f"""
+    <div style="text-align: center; margin-bottom: 20px; background: linear-gradient(90deg, #4CAF50, #45a049); color: white; padding: 1rem; border-radius: 8px;">
+        <h1 style="color: white; margin-bottom: 5px;">🎯 {t('practice_mode')} - {t('app_title')}</h1>
+        <p style="font-size: 1.1rem; color: white; margin: 0;">Focused practice session with specific error types</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Render the error explorer in practice mode with workflow
+    error_explorer_ui.render(workflow)
+
+def render_normal_interface(code_generator_ui, workflow, code_display_ui, auth_ui, 
+                          enhanced_tutorial_ui, learning_dashboard_ui, error_explorer_ui, user_level):
+    """Render the normal tabbed interface."""
     
     # Header with improved styling
     st.markdown(f"""
@@ -174,20 +215,17 @@ def main():
         t("tab_generate"),
         t("tab_review"),
         t("tab_feedback"),
-        t("tab_tutorial"),  # New
-        t("tab_dashboard"), # New
-        t("tab_error_explorer") # New
-        #t("tab_logs")
+        t("tab_tutorial"),
+        t("tab_dashboard"),
+        t("tab_error_explorer")
     ]
     
     # Use the enhanced tabs function
     tabs = create_enhanced_tabs(tab_labels)
-    
-    # Get user level from auth_ui
-    user_level = auth_ui.get_user_level()
 
     # Tab content
     with tabs[0]:
+        # Check for special practice session completion flow
         if st.session_state.get("practice_session_active", False):
             error_name = st.session_state.get("practice_error_name", "")
             st.info(f"🎯 **Practice Session Active** - Practicing with error: **{error_name}**")
@@ -199,7 +237,7 @@ def main():
         render_enhanced_review_tab(workflow, code_display_ui, auth_ui)
     
     with tabs[2]:
-        render_enhanced_feedback_tab(workflow, auth_ui)  # Use the enhanced v
+        render_enhanced_feedback_tab(workflow, auth_ui)
         
     with tabs[3]: # Tutorial Tab
         user_id = st.session_state.auth.get("user_id")
@@ -213,17 +251,15 @@ def main():
         if user_id:
             learning_dashboard_ui.render(user_id=user_id)
         else:
-            st.warning(t("user_not_authenticated_dashboard")) # Message for user not found
+            st.warning(t("user_not_authenticated_dashboard"))
         
     with tabs[5]: # Error Explorer Tab
         error_explorer_ui.render(workflow)
-        
-    # with tabs[3]:  # This should be tabs[6] if logs are re-enabled
-    #     render_llm_logs_tab()
 
 def render_enhanced_review_tab(workflow, code_display_ui, auth_ui=None):
     """
     Enhanced review tab that supports both regular and practice sessions.
+    FIXED: Better state management to avoid setIn errors.
     """
     # Check if this is a practice session
     practice_session = st.session_state.get("practice_session_active", False)
@@ -242,10 +278,10 @@ def render_enhanced_review_tab(workflow, code_display_ui, auth_ui=None):
         with col2:
             if st.button("🔄 End Practice Session", help="Return to normal workflow"):
                 # Clear practice session flags
-                if "practice_session_active" in st.session_state:
-                    del st.session_state["practice_session_active"]
-                if "practice_error_name" in st.session_state:
-                    del st.session_state["practice_error_name"]
+                practice_keys = [key for key in st.session_state.keys() if key.startswith("practice_")]
+                for key in practice_keys:
+                    if key in st.session_state:
+                        del st.session_state[key]
                 
                 # Reset workflow state
                 st.session_state.workflow_state = WorkflowState()
@@ -253,7 +289,6 @@ def render_enhanced_review_tab(workflow, code_display_ui, auth_ui=None):
                 st.rerun()
     
     # Use the original render_review_tab function
-    from ui.components.code_display import render_review_tab
     render_review_tab(workflow, code_display_ui, auth_ui)
 
 if __name__ == "__main__":

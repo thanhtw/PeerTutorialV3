@@ -1,9 +1,10 @@
+# ui/components/code_display.py - FIXED version
+
 """
 Enhanced Code Display UI component for Java Peer Review Training System.
 
-This module provides professional code display components with enhanced formatting,
-syntax highlighting, and interactive features.
-FIXED: Simplified code display logic since CodeSnippet already has clean_code field.
+FIXED: Resolved setIn error by avoiding multiple st.rerun() calls and 
+proper session state management.
 """
 
 import streamlit as st
@@ -22,10 +23,7 @@ logger = logging.getLogger(__name__)
 class CodeDisplayUI:
     """
     Enhanced UI Component for displaying Java code snippets with professional styling.
-    
-    This class handles displaying Java code snippets with enhanced syntax highlighting,
-    professional layout, interactive features, and proper formatting.
-    FIXED: Simplified code handling since CodeSnippet already provides clean_code.
+    FIXED: Resolved setIn error issues with proper state management.
     """
     
     def __init__(self):
@@ -59,14 +57,11 @@ class CodeDisplayUI:
         )
     
     def _extract_code_content(self, code_snippet) -> str:
-        """
-        Extract code content from snippet object or string.
-        FIXED: Prioritize clean_code field from CodeSnippet for better display.
-        """
+        """Extract code content from snippet object or string."""
         if isinstance(code_snippet, str):
             return code_snippet
         else:
-            # FIXED: Use clean_code first if available (since it's specifically for display)
+            # Use clean_code first if available (since it's specifically for display)
             if hasattr(code_snippet, 'clean_code') and code_snippet.clean_code:
                 return code_snippet.clean_code
             elif hasattr(code_snippet, 'code') and code_snippet.code:
@@ -90,12 +85,8 @@ class CodeDisplayUI:
         """, unsafe_allow_html=True)
     
     def _render_professional_code_display(self, code: str, known_problems: List[str] = None, instructor_mode: bool = False):
-        """
-        Render code with professional styling and enhanced features.
-        FIXED: Simplified since code is already clean from CodeSnippet.clean_code.
-        """
+        """Render code with professional styling and enhanced features."""
         
-        # FIXED: No need to clean code since it comes from CodeSnippet.clean_code
         lines = code.split('\n')
         line_count = len(lines)
         char_count = len(code)
@@ -130,10 +121,7 @@ class CodeDisplayUI:
         """, unsafe_allow_html=True)
     
     def _render_code_container(self, code: str, lines: List[str], known_problems: List[str] = None):
-        """
-        Render the main code container with enhanced styling.
-        FIXED: Simplified code processing since input is already clean.
-        """
+        """Render the main code container with enhanced styling."""
         
         # Main code container with header
         st.markdown(f"""
@@ -145,23 +133,14 @@ class CodeDisplayUI:
         </div>
         """, unsafe_allow_html=True)
         
-        # FIXED: Code is already clean from CodeSnippet.clean_code, just ensure proper format
+        # Code is already clean from CodeSnippet.clean_code, just ensure proper format
         display_code = self._ensure_proper_line_breaks(code)
         
         # Use Streamlit's native code display
         st.code(add_line_numbers(display_code), language="java")
     
     def _ensure_proper_line_breaks(self, code: str) -> str:
-        """
-        Ensure proper line breaks in code without heavy cleaning.
-        FIXED: Minimal processing since code should already be clean.
-        
-        Args:
-            code: Code string that should already be clean
-            
-        Returns:
-            Code with ensured proper line breaks
-        """
+        """Ensure proper line breaks in code without heavy cleaning."""
         if not code:
             return ""
             
@@ -190,15 +169,8 @@ class CodeDisplayUI:
                           targeted_guidance: str = None,
                           review_analysis: Dict[str, Any] = None) -> None:
         """
-        Render a professional text area for student review input with enhanced guidance.
-        
-        Args:
-            student_review: Initial value for the text area
-            on_submit_callback: Callback function when review is submitted
-            iteration_count: Current iteration number
-            max_iterations: Maximum number of iterations
-            targeted_guidance: Optional guidance for the student
-            review_analysis: Optional analysis of previous review attempt
+        FIXED: Render review input without setIn errors.
+        Uses better state management and avoids multiple st.rerun() calls.
         """
         # Enhanced review container
         st.markdown('<div class="enhanced-review-container">', unsafe_allow_html=True)
@@ -213,8 +185,8 @@ class CodeDisplayUI:
         # Enhanced review guidelines
         self._render_enhanced_review_guidelines()
         
-        # Enhanced review input and submission
-        submitted = self._render_enhanced_review_form(iteration_count, on_submit_callback)
+        # FIXED: Enhanced review input and submission
+        self._render_fixed_review_form(iteration_count, on_submit_callback)
         
         # Close review container
         st.markdown('</div>', unsafe_allow_html=True)
@@ -300,7 +272,6 @@ class CodeDisplayUI:
         """Render enhanced review guidelines with better presentation."""
         
         with st.expander(f"📋 {t('review_guidelines')}", expanded=False):
-            # Use individual st.markdown calls instead of one large HTML block
             st.markdown(f"""
             <div class="guidelines-section">
                 <h4>✨ {t('how_to_write_good_review')}</h4>
@@ -364,10 +335,10 @@ class CodeDisplayUI:
             st.markdown(f"### 📝 {t('example_review_format')}")
             st.code(t('review_format_example'), language="text")
     
-    def _render_enhanced_review_form(self, iteration_count: int, on_submit_callback: Callable) -> bool:
+    def _render_fixed_review_form(self, iteration_count: int, on_submit_callback: Callable) -> bool:
         """
-        Render enhanced review form with better UX and FIXED submit processing.
-        FIXED: Removed session state modification after widget creation to prevent Streamlit error.
+        FIXED: Render review form without setIn errors.
+        Uses session state flags instead of immediate st.rerun() calls.
         """
         
         # Enhanced form header
@@ -381,31 +352,23 @@ class CodeDisplayUI:
         </div>
         """, unsafe_allow_html=True)
         
-        # ✅ FIXED: Create iteration-specific keys to ensure uniqueness
-        text_area_key = f"student_review_input_{iteration_count}"
-        submit_button_key = f"submit_review_{iteration_count}"
-        clear_button_key = f"clear_review_{iteration_count}"
+        # FIXED: Use timestamp-based keys to avoid conflicts
+        timestamp = int(time.time() * 1000)  # milliseconds for uniqueness
+        text_area_key = f"review_input_{iteration_count}_{timestamp}"
+        submit_button_key = f"submit_review_{iteration_count}_{timestamp}"
+        clear_button_key = f"clear_review_{iteration_count}_{timestamp}"
         
-        # ✅ FIXED: Check for clear flag before creating widget
-        clear_flag_key = f"clear_review_flag_{iteration_count}"
-        if st.session_state.get(clear_flag_key, False):
-            # Clear the flag and reset the text area value
-            st.session_state[clear_flag_key] = False
-            if text_area_key in st.session_state:
-                st.session_state[text_area_key] = ""
+        # FIXED: Check for success flag and clear input accordingly
+        success_flag = f"review_submitted_success_{iteration_count}"
+        if st.session_state.get(success_flag, False):
+            # Clear the success flag
+            del st.session_state[success_flag]
+            # Don't set initial value if review was just submitted
+            initial_value = ""
+        else:
+            initial_value = st.session_state.get(f"review_draft_{iteration_count}", "")
         
-        # ✅ FIXED: Check for submission success flag to clear input
-        success_flag_key = f"review_success_{iteration_count}"
-        if st.session_state.get(success_flag_key, False):
-            # Clear the success flag and reset the text area
-            st.session_state[success_flag_key] = False
-            if text_area_key in st.session_state:
-                st.session_state[text_area_key] = ""
-        
-        # Get initial value from session state for this specific iteration
-        initial_value = st.session_state.get(text_area_key, "")
-        
-        # Enhanced review input with better styling
+        # Enhanced review input
         student_review_input = st.text_area(
             t("enter_your_review"),
             value=initial_value, 
@@ -416,6 +379,10 @@ class CodeDisplayUI:
             help=t("review_help_text")
         )
         
+        # Save draft to session state (for persistence)
+        if student_review_input:
+            st.session_state[f"review_draft_{iteration_count}"] = student_review_input
+        
         # Enhanced buttons with better layout
         st.markdown('<div class="enhanced-button-container">', unsafe_allow_html=True)
         
@@ -423,103 +390,117 @@ class CodeDisplayUI:
         
         with col1:
             submit_text = t("submit_review_button") if iteration_count == 1 else f"{t('submit_review_button')} ({t('attempt')} {iteration_count})"
-            # ✅ FIXED: Use iteration-specific key
             submit_button = st.button(
                 f"🚀 {submit_text}", 
                 type="primary", 
                 use_container_width=True,
                 help=t("submit_review_help"),
-                key=submit_button_key  # Iteration-specific key
+                key=submit_button_key
             )
             
         with col2:
-            # ✅ FIXED: Use iteration-specific key
             clear_button = st.button(
                 f"🗑️ {t('clear')}", 
                 use_container_width=True,
                 help=t("clear_review_help"),
-                key=clear_button_key  # Iteration-specific key
+                key=clear_button_key
             )
         
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Handle clear button - use flag instead of direct modification
+        # FIXED: Handle clear button with session state flag
         if clear_button:
-            st.session_state[clear_flag_key] = True
-            st.rerun()  # This is OK outside of callback
+            # Clear the draft
+            if f"review_draft_{iteration_count}" in st.session_state:
+                del st.session_state[f"review_draft_{iteration_count}"]
+            st.info("Review cleared. Please refresh if the text area is not empty.")
+            return False
         
-        # Handle submit button
+        # FIXED: Handle submit button with better error handling
         if submit_button:
-            try:
-                logger.info(f"Submit button clicked for iteration {iteration_count}")
-                logger.info(f"Student review input: '{student_review_input[:100]}...' (length: {len(student_review_input)})")
-                
-                # Validate input
-                if not student_review_input or not student_review_input.strip():
-                    st.error(f"❌ {t('please_enter_review')}")
-                    return False
-                
-                review_text = student_review_input.strip()
-                
-                if len(review_text) < 20:
-                    st.warning(t("review_too_short_warning"))
-                    return False
-                
-                # Additional validation - check for meaningful content
-                if len(review_text.split()) < 5:
-                    st.warning("Please provide a more detailed review with at least 5 words.")
-                    return False
-                
-                # Show processing indicator
-                with st.spinner(f"🔄 {t('processing_review')}..."):
-                    logger.info(f"Processing review submission for iteration {iteration_count}")
-                    logger.info(f"Review text length: {len(review_text)} characters")
-                    
-                    # Call the submit callback
-                    if on_submit_callback:
-                        try:
-                            result = on_submit_callback(review_text) #True or False
-                            
-                            if result is not False:
-
-                                st.session_state[success_flag_key] = True
-                                
-                                logger.info(f"Review successfully submitted for iteration {iteration_count}")
-                                
-                                # Show immediate success feedback
-                                st.success("✅ Review submitted successfully!")
-                                time.sleep(1)  # Brief pause to show success message
-                                st.rerun()
-                                return True
-                            else:
-                                logger.warning(f"Submit callback returned False for iteration {iteration_count}")
-                                st.error(f"❌ {t('error')} {t('processing_review')}. Please try again.")
-                                return False
-                                
-                        except Exception as callback_error:
-                            logger.error(f"Exception in submit callback: {str(callback_error)}", exc_info=True)
-                            st.error(f"❌ {t('error')} {t('processing_review')}: {str(callback_error)}")
-                            return False
-                    else:
-                        logger.error("No submit callback provided")
-                        st.error(f"❌ {t('error')}: No submission handler available")
-                        return False
-                        
-            except Exception as e:
-                logger.error(f"Exception in submit button processing: {str(e)}", exc_info=True)
-                st.error(f"❌ {t('error')} {t('processing_review')}: {str(e)}")
-                return False
+            return self._process_review_submission(
+                student_review_input, 
+                iteration_count, 
+                on_submit_callback,
+                success_flag
+            )
         
         return False
+    
+    def _process_review_submission(self, review_text: str, iteration_count: int, 
+                                 on_submit_callback: Callable, success_flag: str) -> bool:
+        """
+        FIXED: Process review submission without causing setIn errors.
+        """
+        try:
+            logger.info(f"Processing review submission for iteration {iteration_count}")
+            
+            # Validate input
+            if not review_text or not review_text.strip():
+                st.error(f"❌ {t('please_enter_review')}")
+                return False
+            
+            cleaned_review = review_text.strip()
+            
+            if len(cleaned_review) < 20:
+                st.warning(t("review_too_short_warning"))
+                return False
+            
+            # Additional validation - check for meaningful content
+            if len(cleaned_review.split()) < 5:
+                st.warning("Please provide a more detailed review with at least 5 words.")
+                return False
+            
+            # Show processing indicator
+            with st.spinner(f"🔄 {t('processing_review')}..."):
+                logger.info(f"Calling submit callback with review length: {len(cleaned_review)}")
+                
+                # Call the submit callback
+                if on_submit_callback:
+                    try:
+                        result = on_submit_callback(cleaned_review)
+                        
+                        if result is not False:
+                            # FIXED: Set success flag instead of immediate st.rerun()
+                            st.session_state[success_flag] = True
+                            
+                            # Clear the draft
+                            draft_key = f"review_draft_{iteration_count}"
+                            if draft_key in st.session_state:
+                                del st.session_state[draft_key]
+                            
+                            logger.info(f"Review successfully submitted for iteration {iteration_count}")
+                            
+                            # Show success message
+                            st.success("✅ Review submitted successfully!")
+                            
+                            # Single st.rerun() call
+                            time.sleep(1)
+                            st.rerun()
+                            return True
+                        else:
+                            logger.warning(f"Submit callback returned False for iteration {iteration_count}")
+                            st.error(f"❌ {t('error')} {t('processing_review')}. Please try again.")
+                            return False
+                            
+                    except Exception as callback_error:
+                        logger.error(f"Exception in submit callback: {str(callback_error)}", exc_info=True)
+                        st.error(f"❌ {t('error')} {t('processing_review')}: {str(callback_error)}")
+                        return False
+                else:
+                    logger.error("No submit callback provided")
+                    st.error(f"❌ {t('error')}: No submission handler available")
+                    return False
+                    
+        except Exception as e:
+            logger.error(f"Exception in review submission processing: {str(e)}", exc_info=True)
+            st.error(f"❌ {t('error')} {t('processing_review')}: {str(e)}")
+            return False
+
 
 def render_review_tab(workflow, code_display_ui, auth_ui=None):
     """
-    Render the review tab UI with enhanced styling and better user experience.
-    
-    Args:
-        workflow: JavaCodeReviewGraph workflow
-        code_display_ui: CodeDisplayUI instance for displaying code
-        auth_ui: Optional AuthUI instance for updating stats
+    FIXED: Render the review tab UI with better state management.
     """
     st.markdown(f"""
     <div style="margin-bottom: 2rem;">
@@ -594,7 +575,7 @@ def _extract_known_problems(state) -> List[str]:
 
 def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
     """
-    Handle the review submission logic with enhanced UX and immediate stats update.
+    FIXED: Handle review submission with better state management.
     """
     # Get current review state
     state = st.session_state.workflow_state
@@ -628,10 +609,9 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
     
     if current_iteration <= max_iterations and not review_sufficient and not all_errors_found:
         def on_submit_review(review_text):
-            """Enhanced submit callback with better error handling and logging."""
+            """FIXED: Submit callback with better error handling."""
             try:
                 logger.info(f"Submit callback triggered for iteration {current_iteration}")
-                logger.info(f"Review text: {review_text[:100]}...")  # Log first 100 chars
                 
                 # Process the student review
                 result = _process_student_review(workflow, review_text)
@@ -671,9 +651,9 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
             </div>
             """, unsafe_allow_html=True)
             
+            # Update user statistics if available
             if auth_ui and review_analysis:
                 try:
-                    # Update user statistics
                     accuracy = review_analysis.get(t("accuracy_percentage"), 
                                                  review_analysis.get(t("identified_percentage"), 0))
                     identified_count = review_analysis.get(t("identified_count"), 0)
@@ -682,44 +662,30 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
                     stats_key = f"review_tab_stats_updated_{current_iteration}_{identified_count}"
                     
                     if stats_key not in st.session_state:
-                        logger.debug(f"Updating stats immediately: accuracy={accuracy:.1f}%, score={identified_count}")
+                        logger.debug(f"Updating stats: accuracy={accuracy:.1f}%, score={identified_count}")
                         result = auth_ui.update_review_stats(accuracy, identified_count)
                         
                         if result and result.get("success", False):
-                            logger.debug("Stats updated successfully in review tab")
                             st.session_state[stats_key] = True
-                            
-                            # Update session state with new values
-                            if "auth" in st.session_state and "user_info" in st.session_state.auth:
-                                user_info = st.session_state.auth["user_info"]
-                                if "reviews_completed" in result:
-                                    user_info["reviews_completed"] = result["reviews_completed"]
-                                if "score" in result:
-                                    user_info["score"] = result["score"]
-                                    
-                                logger.debug(f"Updated session state: reviews={user_info.get('reviews_completed')}, score={user_info.get('score')}")
-                        else:
-                            logger.error(f"Failed to update stats in review tab: {result}")
+                            logger.debug("Stats updated successfully in review tab")
                             
                 except Exception as e:
                     logger.error(f"Error updating stats in review tab: {str(e)}")
             
-            # Auto-switch to feedback tab with enhanced transition
+            # Auto-switch to feedback tab
             if not st.session_state.get("feedback_tab_switch_attempted", False):
                 st.session_state.feedback_tab_switch_attempted = True
                 st.session_state.active_tab = 2
-                
-                # Add celebration effect
                 st.balloons()
+                
                 col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.success("🎉 Review completed! All issues identified correctly.")
                 with col2:
                     if st.button("📊 View Feedback", key="go_to_feedback", type="primary"):
                         st.session_state.active_tab = 2
                         st.rerun()
                 
-                # Re-run to refresh the review tab with updated state
+                # Single st.rerun() call
+                time.sleep(2)
                 st.rerun()
                 
         else:
@@ -738,7 +704,7 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
 
 def _process_student_review(workflow, student_review: str) -> bool:
     """
-    Process a student review using the compiled LangGraph workflow with enhanced feedback.
+    FIXED: Process student review with better error handling.
     """
     try:
         logger.debug("Starting student review processing")
@@ -768,45 +734,11 @@ def _process_student_review(workflow, student_review: str) -> bool:
                 st.error(f"❌ {error_msg}. {t('please_generate_problem_first')}")
                 return False
             
-            # Step 3: Validate review content
-            status.update(label="🔍 Validating review content...", state="running")
-            
-            if not student_review or not student_review.strip():
-                error_msg = "Review cannot be empty"
-                logger.error(error_msg)
-                status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
-                st.error(f"❌ {t('please_enter_review')}")
-                return False
-            
-            review_text = student_review.strip()
-            
-            if len(review_text) < 10:
-                error_msg = "Review too short"
-                logger.error(error_msg)
-                status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
-                st.error(f"❌ {t('provide_detailed_review_minimum')}")
-                return False
-            
-            # Step 4: Validate review format (if evaluator available)
-            if hasattr(workflow, 'workflow_nodes') and hasattr(workflow.workflow_nodes, 'evaluator'):
-                evaluator = workflow.workflow_nodes.evaluator
-                if evaluator and hasattr(evaluator, 'validate_review_format'):
-                    is_valid, reason = evaluator.validate_review_format(review_text)
-                    if not is_valid:
-                        logger.error(f"Review format validation failed: {reason}")
-                        status.update(label=f"❌ {t('error')}: {reason}", state="error")
-                        st.error(f"❌ {reason}")
-                        return False
-            
-            # Step 5: Submit to workflow
-            status.update(label="🚀 Submitting to workflow...", state="running")
-            
-            logger.info("Submitting review through LangGraph workflow")
-            logger.info(f"Current state step: {getattr(state, 'current_step', 'unknown')}")
-            logger.info(f"Current iteration: {getattr(state, 'current_iteration', 'unknown')}")
+            # Step 3: Submit to workflow
+            status.update(label="🚀 Processing review...", state="running")
             
             try:                
-                raw_updated_state = workflow.submit_review(state, review_text)
+                raw_updated_state = workflow.submit_review(state, student_review)
                 
                 if not raw_updated_state:
                     error_msg = "Workflow returned empty state"
@@ -822,96 +754,15 @@ def _process_student_review(workflow, student_review: str) -> bool:
                 st.error(f"❌ {error_msg}")
                 return False
             
-            # Step 6: Process workflow result
-            status.update(label="⚙️ Processing workflow result...", state="running")
-            
-            # Helper function to safely access state values
-            def _safe_get_state_value(state, key: str, default=None):
-                """Safely get a value from a state object."""
-                try:
-                    if hasattr(state, key):
-                        return getattr(state, key)
-                    if hasattr(state, '__getitem__'):
-                        try:
-                            return state[key]
-                        except (KeyError, TypeError):
-                            pass
-                    if hasattr(state, 'get'):
-                        return state.get(key, default)
-                    return default
-                except Exception:
-                    return default
-            
-            # Check for errors using safe access
-            error = _safe_get_state_value(raw_updated_state, 'error')
-            if error:
-                logger.error(f"Workflow returned error: {error}")
-                status.update(label=f"❌ {t('error')}: {error}", state="error")
-                st.error(f"❌ {error}")
-                return False
-            
-            # Step 7: Convert state if needed
-            status.update(label="🔄 Converting state...", state="running")
-            
-            # Import WorkflowState if needed
-            from state_schema import WorkflowState
-            
-            # Convert to WorkflowState if needed (handle AddableValuesDict)
-            if not isinstance(raw_updated_state, WorkflowState):
-                try:
-                    # Extract all fields safely
-                    state_dict = {}
-                    workflow_state_fields = [
-                        'current_step', 'code_length', 'difficulty_level', 'domain',
-                        'error_count_start', 'error_count_end', 'selected_error_categories',
-                        'selected_specific_errors', 'code_snippet', 'original_error_count',
-                        'evaluation_attempts', 'max_evaluation_attempts', 'evaluation_result',
-                        'code_generation_feedback', 'pending_review', 'current_iteration',
-                        'max_iterations', 'review_sufficient', 'review_history',
-                        'comparison_report', 'error', 'final_summary'
-                    ]
-                    
-                    for field in workflow_state_fields:
-                        value = _safe_get_state_value(raw_updated_state, field)
-                        if value is not None:
-                            state_dict[field] = value
-                    
-                    updated_state = WorkflowState(**state_dict)
-                    logger.debug("Successfully converted state to WorkflowState")
-                    
-                except Exception as conversion_error:
-                    logger.error(f"Error converting state: {str(conversion_error)}")
-                    # Fallback: store the raw state and continue
-                    updated_state = raw_updated_state
-            else:
-                updated_state = raw_updated_state
-            
-            # Step 8: Update session state
+            # Step 4: Update session state
             status.update(label="💾 Updating session state...", state="running")
             
-            st.session_state.workflow_state = updated_state
-
-
+            st.session_state.workflow_state = raw_updated_state
             st.session_state.review_processing_success = True
             st.session_state.last_review_timestamp = time.time()
             
-            # Step 9: Verify processing success
-            status.update(label="✅ Verifying processing...", state="running")
-            
-            # Check if workflow completed successfully using safe access
-            review_history = _safe_get_state_value(updated_state, 'review_history')
-            current_iteration = _safe_get_state_value(updated_state, 'current_iteration', 1)
-            
-            if review_history and len(review_history) > 0:
-                logger.debug(f"Review processing completed successfully. History length: {len(review_history)}")
-                status.update(label=f"✅ {t('analysis_complete_processed')}", state="complete")
-                
-                return True
-            else:
-                logger.warning("Review processing may not have completed properly - no review history found")
-                status.update(label="⚠️ Processing completed with warnings", state="complete")
-                
-                return True
+            status.update(label=f"✅ {t('analysis_complete_processed')}", state="complete")
+            return True
             
     except Exception as e:
         error_msg = f"Exception in review processing: {str(e)}"

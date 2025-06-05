@@ -1,3 +1,5 @@
+# ui/components/error_explorer_ui.py - Enhanced version
+
 import streamlit as st
 import os
 import logging
@@ -19,33 +21,48 @@ class ErrorExplorerUI:
         self.repository = DatabaseErrorRepository()
         self.workflow = workflow  # JavaCodeReviewGraph instance
         
+        # Log workflow initialization for debugging
+        if workflow:
+            logger.info(f"ErrorExplorerUI initialized with workflow: {type(workflow)}")
+        else:
+            logger.warning("ErrorExplorerUI initialized without workflow - practice mode will not work")
+        
         # Initialize session state
         if "selected_error_code" not in st.session_state:
             st.session_state.selected_error_code = None
         if "user_progress" not in st.session_state:
             st.session_state.user_progress = {}
+        if "practice_mode_active" not in st.session_state:
+            st.session_state.practice_mode_active = False
         
         self._load_styles()
-      
     
     def _load_styles(self):
         """Load CSS styles for the Error Explorer UI with safe encoding handling."""
         try:
-            # Get the current directory and construct path to CSS files
             current_dir = os.path.dirname(os.path.abspath(__file__))
             css_dir = os.path.join(current_dir, "..", "..", "static", "css", "error_explorer")
             from static.css_utils import load_css_safe
             result = load_css_safe(css_directory=css_dir)
         except Exception as e:
             logger.error(f"Error loading Error Explorer CSS: {str(e)}")
-            # Continue without CSS - the app should still work
             st.warning(t("css_loading_warning"))
 
     def render(self, workflow=None):
         """Render the complete error explorer interface."""
+        # Only update workflow if one is provided, otherwise keep the existing one
+        if workflow is not None:
+            self.workflow = workflow
+        
+        # Check if we're in practice mode
+        if st.session_state.get("practice_mode_active", False):
+            self._render_practice_mode()
+        else:
+            self._render_exploration_mode()
+    
+    def _render_exploration_mode(self):
+        """Render the normal exploration mode."""
         # Professional header
-        self.workflow = workflow
-
         self._render_header()
         
         # Search and filter section
@@ -53,6 +70,315 @@ class ErrorExplorerUI:
         
         # Main content area
         self._render_error_content()
+    
+    def _render_practice_mode(self):
+        """Render the streamlined practice mode."""
+        practice_error = st.session_state.get("practice_error_data", {})
+        error_name = practice_error.get("error_name", "Unknown Error")
+        
+        # Practice mode header
+        st.markdown(f"""
+        <div style="background: linear-gradient(90deg, #4CAF50, #45a049); color: white; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h2 style="margin: 0; color: white;">🎯 Practice Mode: {error_name}</h2>
+                    <p style="margin: 0.5rem 0 0 0; color: white;">Focused practice session with this specific error type</p>
+                </div>
+                <div>
+                    <button onclick="window.location.reload()" style="background: rgba(255,255,255,0.2); border: 1px solid white; color: white; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">
+                        Exit Practice Mode
+                    </button>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Practice workflow status
+        workflow_status = st.session_state.get("practice_workflow_status", "setup")
+        
+        if workflow_status == "setup":
+            self._render_practice_setup(practice_error)
+        elif workflow_status == "code_ready":
+            self._render_practice_review_interface()
+        elif workflow_status == "review_complete":
+            self._render_practice_feedback()
+        
+        # Exit practice mode button
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("🏠 Exit Practice Mode", key="exit_practice", use_container_width=True):
+                self._exit_practice_mode()
+    
+    def _render_practice_setup(self, practice_error):
+        """Render the practice setup phase."""
+        st.subheader("🔧 Generating Practice Code...")
+        
+        # Show error details
+        with st.expander("📋 Error Details", expanded=True):
+            st.markdown(f"**Error:** {practice_error.get('error_name', 'Unknown')}")
+            st.markdown(f"**Description:** {practice_error.get('description', 'No description available')}")
+            if practice_error.get('implementation_guide'):
+                st.markdown(f"**How to Identify:** {practice_error.get('implementation_guide')}")
+        
+        # Debug info for workflow
+        if not self.workflow:
+            st.error("❌ No workflow available for practice mode")
+            st.info("Debug: Workflow is not initialized. Please check the application setup.")
+            
+            # Show diagnostic info
+            with st.expander("🔧 Diagnostic Information", expanded=False):
+                st.code(f"""
+Workflow Status: {self.workflow}
+Session State Keys: {list(st.session_state.keys())}
+Practice Mode Active: {st.session_state.get('practice_mode_active', False)}
+                """)
+            return
+        
+        # Auto-generate code (this runs once when practice mode starts)
+        if "practice_code_generated" not in st.session_state:
+            self._generate_practice_code(practice_error)
+    
+    def _generate_practice_code(self, practice_error):
+        """Generate practice code in the background."""
+        if not self.workflow:
+            logger.error("No workflow available for practice mode")
+            st.error("❌ Practice mode requires workflow to be initialized. Please refresh the page and try again.")
+            st.info("Debug info: Workflow is None. Check that the JavaCodeReviewGraph is properly initialized.")
+            return
+        
+        try:
+            with st.spinner("🔧 Generating your practice code..."):
+                # Prepare workflow state
+                workflow_state = self._prepare_practice_workflow_state(practice_error)
+                
+                if not workflow_state:
+                    st.error("❌ Failed to prepare practice session")
+                    return
+                
+                # Execute code generation
+                logger.info(f"Executing code generation with workflow: {type(self.workflow)}")
+                updated_state = self.workflow.execute_code_generation(workflow_state)
+                
+                # Validate result
+                if hasattr(updated_state, 'error') and updated_state.error:
+                    st.error(f"❌ {t('failed_to_generate_practice_code')}: {updated_state.error}")
+                    return
+                
+                if not hasattr(updated_state, 'code_snippet') or not updated_state.code_snippet:
+                    st.error(f"❌ {t('failed_to_generate_practice_code')}: No code generated")
+                    return
+                
+                # Store results
+                st.session_state.practice_workflow_state = updated_state
+                st.session_state.practice_code_generated = True
+                st.session_state.practice_workflow_status = "code_ready"
+                
+                # Track usage
+                try:
+                    error_code = practice_error.get('error_code', '')
+                    if error_code:
+                        self.repository.update_error_usage(
+                            error_code=error_code,
+                            action_type='practiced',
+                            context={'source': 'practice_mode', 'method': 'streamlined'}
+                        )
+                except Exception as e:
+                    logger.debug(f"Could not track error usage: {str(e)}")
+                
+                st.success("✅ Practice code generated successfully!")
+                time.sleep(1)
+                st.rerun()
+                
+        except Exception as e:
+            logger.error(f"Error generating practice code: {str(e)}", exc_info=True)
+            st.error(f"❌ {t('error_setting_up_practice_session')}: {str(e)}")
+            st.info("Please try refreshing the page and starting the practice session again.")
+    
+    def _render_practice_review_interface(self):
+        """Render the integrated review interface for practice mode."""
+        workflow_state = st.session_state.get("practice_workflow_state")
+        
+        if not workflow_state or not hasattr(workflow_state, 'code_snippet'):
+            st.error("No practice code available")
+            return
+        
+        # Display the code
+        st.subheader("☕ Review This Java Code")
+        st.info("🎯 Look for the specific error you're practicing with. Provide detailed comments about what you find.")
+        
+        # Code display
+        code_to_display = workflow_state.code_snippet.clean_code
+        st.code(code_to_display, language="java")
+        
+        # Review input section
+        st.subheader("📝 Your Review")
+        
+        # Get current iteration info
+        current_iteration = getattr(workflow_state, 'current_iteration', 1)
+        max_iterations = getattr(workflow_state, 'max_iterations', 3)
+        
+        # Show previous review if exists
+        review_history = getattr(workflow_state, 'review_history', [])
+        if review_history:
+            latest_review = review_history[-1]
+            if hasattr(latest_review, 'targeted_guidance') and latest_review.targeted_guidance:
+                st.markdown(f"""
+                <div style="background: #e3f2fd; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                    <h4>💡 Guidance for Improvement</h4>
+                    <p>{latest_review.targeted_guidance}</p>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # Review input
+        review_key = f"practice_review_{current_iteration}"
+        student_review = st.text_area(
+            f"Enter your review (Attempt {current_iteration}/{max_iterations})",
+            height=200,
+            key=review_key,
+            placeholder="Example: Line 15: The array access arr[i] could cause IndexOutOfBoundsException because..."
+        )
+        
+        # Submit review
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            submit_disabled = not student_review or len(student_review.strip()) < 10
+            if st.button(
+                f"🚀 Submit Review (Attempt {current_iteration})", 
+                disabled=submit_disabled,
+                key=f"submit_practice_review_{current_iteration}",
+                use_container_width=True
+            ):
+                self._process_practice_review(student_review.strip())
+        
+        with col2:
+            if st.button("🔄 Generate New Code", key="regenerate_practice"):
+                self._regenerate_practice_code()
+    
+    def _process_practice_review(self, student_review):
+        """Process the submitted practice review."""
+        try:
+            workflow_state = st.session_state.practice_workflow_state
+            
+            with st.spinner("🔄 Analyzing your review..."):
+                # Submit review through workflow
+                updated_state = self.workflow.submit_review(workflow_state, student_review)
+                
+                # Update stored state
+                st.session_state.practice_workflow_state = updated_state
+                
+                # Check if review is complete
+                review_sufficient = getattr(updated_state, 'review_sufficient', False)
+                current_iteration = getattr(updated_state, 'current_iteration', 1)
+                max_iterations = getattr(updated_state, 'max_iterations', 3)
+                
+                if review_sufficient or current_iteration > max_iterations:
+                    st.session_state.practice_workflow_status = "review_complete"
+                    st.success("✅ Review analysis complete!")
+                else:
+                    st.info(f"📝 Review submitted! Try again to improve your analysis.")
+                
+                time.sleep(1)
+                st.rerun()
+                
+        except Exception as e:
+            logger.error(f"Error processing practice review: {str(e)}")
+            st.error(f"❌ Error processing review: {str(e)}")
+    
+    def _render_practice_feedback(self):
+        """Render the practice session feedback."""
+        workflow_state = st.session_state.get("practice_workflow_state")
+        
+        if not workflow_state:
+            st.error("No practice session data available")
+            return
+        
+        st.subheader("🎉 Practice Session Complete!")
+        
+        # Get analysis results
+        review_history = getattr(workflow_state, 'review_history', [])
+        if review_history:
+            latest_review = review_history[-1]
+            if hasattr(latest_review, 'analysis') and latest_review.analysis:
+                analysis = latest_review.analysis
+                
+                # Performance metrics
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    identified = analysis.get(t('identified_count'), 0)
+                    total = analysis.get(t('total_problems'), 1)
+                    st.metric("Issues Found", f"{identified}/{total}")
+                
+                with col2:
+                    accuracy = analysis.get(t('identified_percentage'), 0)
+                    st.metric("Accuracy", f"{accuracy:.1f}%")
+                
+                with col3:
+                    attempts = len(review_history)
+                    st.metric("Attempts Used", attempts)
+                
+                # Show comparison report if available
+                comparison_report = getattr(workflow_state, 'comparison_report', None)
+                if comparison_report:
+                    st.subheader("📊 Detailed Feedback")
+                    st.markdown(comparison_report)
+        
+        # Action buttons
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("🔄 Practice This Error Again", use_container_width=True):
+                self._restart_practice_session()
+        
+        with col2:
+            if st.button("🎯 Practice Different Error", use_container_width=True):
+                self._exit_practice_mode()
+        
+        with col3:
+            if st.button("📈 View Progress Dashboard", use_container_width=True):
+                self._exit_practice_mode()
+                st.session_state.active_tab = 4  # Dashboard tab
+    
+    def _restart_practice_session(self):
+        """Restart the practice session with the same error."""
+        # Clear practice session state but keep error data
+        practice_error = st.session_state.get("practice_error_data", {})
+        
+        keys_to_clear = [
+            "practice_code_generated",
+            "practice_workflow_state", 
+            "practice_workflow_status"
+        ]
+        
+        for key in keys_to_clear:
+            if key in st.session_state:
+                del st.session_state[key]
+        
+        st.session_state.practice_workflow_status = "setup"
+        st.rerun()
+    
+    def _regenerate_practice_code(self):
+        """Regenerate practice code with the same error."""
+        practice_error = st.session_state.get("practice_error_data", {})
+        
+        # Clear code generation state
+        if "practice_code_generated" in st.session_state:
+            del st.session_state["practice_code_generated"]
+        if "practice_workflow_state" in st.session_state:
+            del st.session_state["practice_workflow_state"]
+        
+        st.session_state.practice_workflow_status = "setup"
+        st.rerun()
+    
+    def _exit_practice_mode(self):
+        """Exit practice mode and return to exploration."""
+        # Clear all practice-related session state
+        practice_keys = [key for key in st.session_state.keys() if key.startswith("practice_")]
+        for key in practice_keys:
+            del st.session_state[key]
+        
+        st.session_state.practice_mode_active = False
+        st.rerun()
     
     def _render_header(self):
         """Render an enhanced professional header with branding and statistics."""
@@ -279,143 +605,55 @@ class ErrorExplorerUI:
             
             col1, col2, col3 = st.columns([1, 5, 1])
             with col2:
+                # Fixed: Use unique key to avoid setIn error
+                practice_key = f"practice_{error_code}_{hash(error_name) % 1000}"
                 if st.button(
                     f"🚀 {t('start_practice_session')}", 
-                    key=f"practice_{error_code}", 
+                    key=practice_key, 
                     use_container_width=True,
                     type="primary",
                     help=t('generate_practice_code_with_error_type')
                 ):
-                    self._handle_practice_error(error)
-            
-            # Close wrapper
-            st.markdown('</div>', unsafe_allow_html=True)
+                    # FIXED: Avoid multiple st.rerun() calls that cause setIn error
+                    self._start_practice_session(error)
 
-    def _handle_practice_error(self, error: Dict[str, Any]):
+    def _start_practice_session(self, error: Dict[str, Any]):
         """
-        REVISED: Handle practice error by generating code with LangGraph workflow.
-        This method properly integrates with the LangGraph workflow system.
+        FIXED: Start practice session without causing setIn error.
+        Uses session state flags instead of immediate st.rerun() calls.
         """
-        if not self.workflow:
-            st.error(t("practice_mode_requires_workflow"))
-            return
-        
-        error_name = error.get(t("error_name_variable"), "unknown_error")
-        error_code = error.get('error_code', '')
-       
-        
         try:
+            error_name = error.get(t("error_name_variable"), "unknown_error")
             logger.info(f"Starting practice session for error: {error_name}")
             
-            # Show immediate feedback
-            st.success(f"🎯 {t('generating_practice_code_with')} {error_name}...")
+            # Set session state flags (no st.rerun() yet)
+            st.session_state.practice_mode_active = True
+            st.session_state.practice_error_data = error
+            st.session_state.practice_workflow_status = "setup"
             
-            # Create a progress indicator
-            progress_container = st.empty()
+            # Clear any existing practice state
+            practice_keys = [key for key in st.session_state.keys() 
+                           if key.startswith("practice_") and key not in 
+                           ["practice_mode_active", "practice_error_data", "practice_workflow_status"]]
+            for key in practice_keys:
+                if key in st.session_state:
+                    del st.session_state[key]
             
-            with progress_container.container():
-                progress_bar = st.progress(0)
-                status_text = st.empty()
-                
-                # Step 1: Prepare WorkflowState for practice session
-                progress_bar.progress(20)
-                status_text.text(t("preparing_practice_session"))
-                
-                # Create a fresh WorkflowState with the specific error
-                workflow_state = self._prepare_practice_workflow_state(error)
-                
-                if not workflow_state:
-                    st.error("❌ Failed to prepare practice session")
-                    return
-                
-                # Step 2: Execute code generation through LangGraph workflow
-                progress_bar.progress(40)
-                status_text.text(t("generating_code_with_error"))
-                
-                logger.debug(f"Executing code generation workflow for error: {error_name}")
-                updated_state = self.workflow.execute_code_generation(workflow_state)
-                
-                # Step 3: Validate code generation result
-                progress_bar.progress(60)
-                status_text.text(t("validating_generated_code"))
-                
-                if hasattr(updated_state, 'error') and updated_state.error:
-                    st.error(f"❌ {t('failed_to_generate_practice_code')}: {updated_state.error}")
-                    return
-                
-                if not hasattr(updated_state, 'code_snippet') or not updated_state.code_snippet:
-                    st.error(f"❌ {t('failed_to_generate_practice_code')}: No code generated")
-                    return
-                
-                # Step 4: Store the state in session for the main workflow tabs
-                progress_bar.progress(80)
-                status_text.text(t("setting_up_practice_environment"))
-                
-                # Store the practice session state
-                st.session_state.workflow_state = updated_state
-                
-                # Mark this as a practice session from error explorer
-                st.session_state.practice_session_active = True
-                st.session_state.practice_error_name = error_name
-                
-                # Track usage in database
-                try:
-                    self.repository.update_error_usage(
-                        error_code=error_code,
-                        action_type='practiced',
-                        context={
-                            'source': 'error_explorer', 
-                            'method': 'practice_button',
-                            'generated_code': True
-                        }
-                    )
-                except Exception as e:
-                    logger.debug(f"Could not track error usage: {str(e)}")
-                
-                # Step 5: Complete setup and redirect
-                progress_bar.progress(100)
-                status_text.text(t("practice_session_ready"))
-                
-                # Clear progress indicators
-                time.sleep(1)  # Brief pause to show completion
-                progress_container.empty()
-                
-                # Show success message
-                st.success(f"✅ {t('practice_code_generated_successfully')}")
-                st.info(f"💡 {t('navigate_to_review_tab_to_start_analyzing')} **{error_name}**")
-                
-                # Redirect to review tab
-                st.session_state.active_tab = 1  # Review tab
-                st.session_state["force_tab_switch"] = True
-                
-                # Add a button for immediate navigation
-                col1, col2, col3 = st.columns([1, 2, 1])
-                with col2:
-                    if st.button("📋 Go to Review Tab", key="go_to_review_now", type="primary", use_container_width=True):
-                        st.session_state.active_tab = 1
-                        st.rerun()
-                
-                # Auto-redirect after a short delay
-                time.sleep(2)
-                st.rerun()
-                
+            # Show immediate feedback without st.rerun()
+            st.success(f"🎯 Starting practice session with **{error_name}**!")
+            st.info("✨ Practice mode activated! The interface will reload shortly...")
+            
+            # Single st.rerun() call at the end
+            time.sleep(0.5)  # Brief pause for user to see the message
+            st.rerun()
+            
         except Exception as e:
-            logger.error(f"Error in practice session setup: {str(e)}", exc_info=True)
+            logger.error(f"Error starting practice session: {str(e)}", exc_info=True)
             st.error(f"❌ {t('error_setting_up_practice_session')}: {str(e)}")
-            st.info(t("please_try_again_or_contact_support"))
-    
+
     def _prepare_practice_workflow_state(self, error: Dict[str, Any]) -> Optional[WorkflowState]:
-        """
-        Prepare a WorkflowState specifically for practice sessions with a single error.
-        
-        Args:
-            error: The specific error to practice with
-            
-        Returns:
-            Configured WorkflowState or None if preparation fails
-        """
+        """Prepare a WorkflowState specifically for practice sessions with a single error."""
         try:
-            # Extract error details
             error_name = error.get(t("error_name_variable"), t("unknown_error"))
             difficulty_level = error.get('difficulty_level', 'medium')
             category = error.get('category', 'Other')
@@ -565,9 +803,3 @@ class ErrorExplorerUI:
             </div>
         </div>
         """, unsafe_allow_html=True)
-
-
-def render_error_explorer(workflow=None):
-    """Main function to render the error explorer with workflow integration."""
-    explorer = ErrorExplorerUI(workflow=workflow)
-    explorer.render()
