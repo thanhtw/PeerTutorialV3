@@ -845,10 +845,39 @@ def _get_category_icon(category_name: str) -> str:
     if category_name in icon_mapping:
         return icon_mapping[category_name]
         
-        # Try case-insensitive match
+    # Try case-insensitive match
     category_lower = category_name.lower()
     for key, icon in icon_mapping.items():
         if key.lower() == category_lower:
+            return icon
+        
+        # Default fallback icon
+    return "🐛"
+
+def _get_difficulty_icon(difficulty_name: str) -> str:
+        
+    """Get icon for category based on name (language-aware)."""
+    # Map both English and Chinese category names to icons
+    icon_mapping = {
+            # English category names (from database)
+            "easy": "⭐",
+            "medium": "⭐⭐", 
+            "hard": "⭐⭐⭐",           
+            
+            # Chinese category names (from database)
+            "简单": "⭐",
+            "中等": "⭐⭐",
+            "困難": "⭐⭐⭐"  
+        }
+        
+    # Try exact match first (case-sensitive)
+    if difficulty_name in icon_mapping:
+        return icon_mapping[difficulty_name]
+        
+    # Try case-insensitive match
+    difficulty_name_lower = difficulty_name.lower()
+    for key, icon in icon_mapping.items():
+        if key.lower() == difficulty_name_lower:
             return icon
         
         # Default fallback icon

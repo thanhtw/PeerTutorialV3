@@ -12,9 +12,9 @@ from typing import Dict, List, Any, Optional
 from data.database_error_repository import DatabaseErrorRepository
 from utils.language_utils import get_current_language, t
 from state_schema import WorkflowState
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+from utils.code_utils import _get_category_icon
+# Configure logging 
+logging.basicConfig(level=logging.INFO) 
 logger = logging.getLogger(__name__)
 
 class CodeGeneratorUI:
@@ -151,7 +151,7 @@ class CodeGeneratorUI:
                 st.markdown(
                     f"<div class='selected-categories'>"
                     + "".join(
-                        f"<span class='selected-category-item'>{self._get_category_icon(cat)} {cat}</span>"
+                        f"<span class='selected-category-item'>{_get_category_icon(cat)} {cat}</span>"
                         for cat in selected_categories
                     )
                     + "</div>",
@@ -215,7 +215,7 @@ class CodeGeneratorUI:
 
         # Display all categories and their errors
         for category in all_categories:
-            icon = self._get_category_icon(category)
+            icon = _get_category_icon(category)
             with st.expander(f"{icon} {category}", expanded=False):
                 errors = repository.get_category_errors(category)  # Use repository method
                 
@@ -425,44 +425,7 @@ class CodeGeneratorUI:
         # Keep for backward compatibility but redirect
         self._render_advanced_error_selection()
 
-    def _get_category_icon(self, category_name: str) -> str:
-        """Get icon for category based on name (language-aware)."""
-        # Map both English and Chinese category names to icons
-        icon_mapping = {
-            # English category names (from database)
-            "logical errors": "🧠",
-            "syntax errors": "🔤", 
-            "code quality": "⭐",
-            "standard violation": "📋",
-            "java specific": "☕",
-            
-            # Chinese category names (from database)
-            "邏輯錯誤": "🧠",
-            "語法錯誤": "🔤",
-            "程式碼品質": "⭐", 
-            "標準違規": "📋",
-            "java 特定錯誤": "☕",
-            
-            # Category codes (fallback)
-            "logical": "🧠",
-            "syntax": "🔤",
-            "code_quality": "⭐",
-            "standard_violation": "📋", 
-            "java_specific": "☕"
-        }
-        
-        # Try exact match first (case-sensitive)
-        if category_name in icon_mapping:
-            return icon_mapping[category_name]
-        
-        # Try case-insensitive match
-        category_lower = category_name.lower()
-        for key, icon in icon_mapping.items():
-            if key.lower() == category_lower:
-                return icon
-        
-        # Default fallback icon
-        return "🐛"
+    
 
     def _toggle_category(self, category_name: str):
         """Toggle category selection."""
@@ -500,7 +463,7 @@ class CodeGeneratorUI:
         # Distribute categories across three columns
         for i, category_name in enumerate(categories):
             description = f"{t('practice_with')} {category_name} {t('related_errors')}"
-            icon = self._get_category_icon(category_name)
+            icon = _get_category_icon(category_name)
             is_selected = category_name in selected
             
             # Current column (cycle through 0, 1, 2)

@@ -570,17 +570,6 @@ INSERT INTO java_errors (
  '["exceptions", "checked", "design"]',
  '[{"advice": "Use checked exceptions sparingly, prefer unchecked for programming errors"}]'),
 
-('java_specific_not_using_diamond_operator', 
- (SELECT id FROM error_categories WHERE category_code = 'java_specific'),
- 'Not using diamond operator',
- 'Not using the diamond operator (<>) for generic instance creation, making code more verbose.',
- 'Use ''Map<String, List<Integer>> map = new HashMap<String, List<Integer>>();'' instead of ''Map<String, List<Integer>> map = new HashMap<>();''',
- '未使用菱形運算子',
- '在泛型實例建立時未使用菱形運算子（<>），使程式碼更冗長。',
- '使用''Map<String, List<Integer>> map = new HashMap<String, List<Integer>>();''而非''Map<String, List<Integer>> map = new HashMap<>();''',
- 'easy', 2,
- '["generics", "diamond", "verbosity"]',
- '[{"wrong": "Map<String, List<Integer>> map = new HashMap<String, List<Integer>>();", "correct": "Map<String, List<Integer>> map = new HashMap<>();"}]'),
 
 ('java_specific_missing_override_annotation', 
  (SELECT id FROM error_categories WHERE category_code = 'java_specific'),
