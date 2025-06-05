@@ -192,7 +192,7 @@ class DatabaseErrorRepository:
             formatted_errors = []
             for error in errors or []:
                 formatted_errors.append({
-                    t("error_name"): error['error_name'],
+                    t("error_name_variable"): error['error_name'],
                     t("description"): error['description'],
                     t("implementation_guide"): error.get('implementation_guide', ''),
                     "difficulty_level": error.get('difficulty_level', 'medium'),
@@ -261,7 +261,7 @@ class DatabaseErrorRepository:
             
             if error:
                 return {
-                    t("error_name"): error['error_name'],
+                    t("error_name_variable"): error['error_name'],
                     t("description"): error['description'],
                     t("implementation_guide"): error.get('implementation_guide', ''),
                     "difficulty_level": error.get('difficulty_level', 'medium'),

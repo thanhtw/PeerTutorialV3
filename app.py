@@ -40,7 +40,7 @@ from ui.utils.main_ui import (
 # Import UI components
 from ui.components.code_generator import CodeGeneratorUI
 from ui.components.code_display import CodeDisplayUI, render_review_tab  
-from ui.components.feedback_system import render_feedback_tab
+from ui.components.feedback_system import render_feedback_tab, render_enhanced_feedback_tab
 from ui.components.auth_ui import AuthUI
 from ui.components.enhanced_tutorial import EnhancedTutorialUI
 from ui.components.learning_dashboard import LearningDashboardUI
@@ -188,16 +188,20 @@ def main():
 
     # Tab content
     with tabs[0]:
+        if st.session_state.get("practice_session_active", False):
+            error_name = st.session_state.get("practice_error_name", "")
+            st.info(f"🎯 **Practice Session Active** - Practicing with error: **{error_name}**")
+            st.info("💡 A code snippet has been generated for this error. Go to the **Review** tab to start analyzing!")
+        
         code_generator_ui.render(user_level)
     
     with tabs[1]:
-        render_review_tab(workflow, code_display_ui, auth_ui)
+        render_enhanced_review_tab(workflow, code_display_ui, auth_ui)
     
     with tabs[2]:
-        render_feedback_tab(workflow, auth_ui)
+        render_enhanced_feedback_tab(workflow, auth_ui)  # Use the enhanced v
         
     with tabs[3]: # Tutorial Tab
-        # Make tutorial optional - no user authentication required
         user_id = st.session_state.auth.get("user_id")
         if user_id:
             enhanced_tutorial_ui.render(user_id=user_id, on_complete=lambda: st.session_state.update({"active_tab": 0}))
@@ -205,17 +209,52 @@ def main():
             st.info(t("tutorial_available_after_login"))
 
     with tabs[4]: # Dashboard Tab
-        user_id = st.session_state.auth.get("user_id") # Corrected line
+        user_id = st.session_state.auth.get("user_id")
         if user_id:
             learning_dashboard_ui.render(user_id=user_id)
         else:
             st.warning(t("user_not_authenticated_dashboard")) # Message for user not found
         
     with tabs[5]: # Error Explorer Tab
-        error_explorer_ui.render()
+        error_explorer_ui.render(workflow)
         
     # with tabs[3]:  # This should be tabs[6] if logs are re-enabled
     #     render_llm_logs_tab()
+
+def render_enhanced_review_tab(workflow, code_display_ui, auth_ui=None):
+    """
+    Enhanced review tab that supports both regular and practice sessions.
+    """
+    # Check if this is a practice session
+    practice_session = st.session_state.get("practice_session_active", False)
+    practice_error_name = st.session_state.get("practice_error_name", "")
+    
+    if practice_session:
+        st.markdown(f"""
+        <div style="background: linear-gradient(90deg, #4CAF50, #45a049); color: white; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+            <h3 style="margin: 0; color: white;">🎯 Practice Session: {practice_error_name}</h3>
+            <p style="margin: 0.5rem 0 0 0; color: white;">Review the generated code below and identify the specific error you're practicing with.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Add option to end practice session
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("🔄 End Practice Session", help="Return to normal workflow"):
+                # Clear practice session flags
+                if "practice_session_active" in st.session_state:
+                    del st.session_state["practice_session_active"]
+                if "practice_error_name" in st.session_state:
+                    del st.session_state["practice_error_name"]
+                
+                # Reset workflow state
+                st.session_state.workflow_state = WorkflowState()
+                st.session_state.active_tab = 0
+                st.rerun()
+    
+    # Use the original render_review_tab function
+    from ui.components.code_display import render_review_tab
+    render_review_tab(workflow, code_display_ui, auth_ui)
 
 if __name__ == "__main__":
     main()

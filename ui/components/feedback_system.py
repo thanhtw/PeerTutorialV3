@@ -907,7 +907,98 @@ class FeedbackSystem:
                     
         except Exception as e:
             logger.error(f"Error refreshing user profile data: {str(e)}")
+       
+def render_enhanced_feedback_tab(workflow, auth_ui=None):
+        """
+        Enhanced feedback tab that properly handles both regular and practice sessions.
+        """
+        from ui.components.feedback_system import FeedbackSystem
+        
+        # Check if this is a practice session
+        practice_session = st.session_state.get("practice_session_active", False)
+        practice_error_name = st.session_state.get("practice_error_name", "")
+        
+        if practice_session:
+            # Special header for practice sessions
+            st.markdown(f"""
+            <div style="background: linear-gradient(90deg, #2196F3, #1976D2); color: white; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;">
+                <h2 style="margin: 0; color: white;">🎯 Practice Session Complete: {practice_error_name}</h2>
+                <p style="margin: 0.5rem 0 0 0; color: white;">Here's your detailed feedback on practicing with this specific error type.</p>
+            </div>
+            """, unsafe_allow_html=True)
             
+            # Add practice-specific information
+            col1, col2 = st.columns([3, 1])
+            
+            with col1:
+                st.markdown(f"""
+                ### 📚 What You Practiced
+                - **Error Type**: {practice_error_name}
+                - **Session Type**: Targeted Practice (Single Error Focus)
+                - **Learning Goal**: Identify and understand this specific error pattern
+                """)
+            
+            with col2:
+                # Option to practice again or try a different error
+                if st.button("🔄 Practice Another Error", help="Go back to Error Explorer"):
+                    st.session_state.active_tab = 5  # Error Explorer tab
+                    st.rerun()
+                
+                if st.button("🏠 Return to Main Workflow", help="End practice and return to regular workflow"):
+                    # Clear practice session flags
+                    if "practice_session_active" in st.session_state:
+                        del st.session_state["practice_session_active"]
+                    if "practice_error_name" in st.session_state:
+                        del st.session_state["practice_error_name"]
+                    
+                    st.session_state.active_tab = 0
+                    st.rerun()
+            
+            st.markdown("---")
+        
+        # Create the feedback system instance and render
+        feedback_system = FeedbackSystem(workflow, auth_ui)
+        feedback_system.render_feedback_tab()
+        
+        # Add practice session completion actions
+        if practice_session:
+            st.markdown("---")
+            st.markdown("### 🎯 Practice Session Actions")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                if st.button("📚 Practice Same Error Again", use_container_width=True):
+                    # Reset the workflow state but keep the same error
+                    if hasattr(st.session_state, 'workflow_state') and st.session_state.workflow_state:
+                        current_state = st.session_state.workflow_state
+                        if hasattr(current_state, 'selected_specific_errors') and current_state.selected_specific_errors:
+                            # Get the current error for re-practice
+                            current_error = current_state.selected_specific_errors[0]
+                            
+                            # Reset state for new practice
+                            from state_schema import WorkflowState
+                            new_state = WorkflowState()
+                            new_state.selected_specific_errors = [current_error]
+                            new_state.difficulty_level = current_error.get('difficulty_level', 'medium')
+                            new_state.code_length = "medium"
+                            new_state.error_count_start = 1
+                            new_state.error_count_end = 1
+                            
+                            st.session_state.workflow_state = new_state
+                            st.session_state.active_tab = 0  # Go to generate tab
+                            st.rerun()
+            
+            with col2:
+                if st.button("🔍 Explore Related Errors", use_container_width=True):
+                    st.session_state.active_tab = 5  # Go to Error Explorer
+                    st.rerun()
+            
+            with col3:
+                if st.button("🏆 View Progress Dashboard", use_container_width=True):
+                    st.session_state.active_tab = 4  # Go to Dashboard
+                    st.rerun()
+
 def render_feedback_tab(workflow, auth_ui=None):
     """
     Render the feedback and analysis tab with enhanced visualization 

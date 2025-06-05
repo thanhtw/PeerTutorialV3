@@ -7,6 +7,7 @@ from data.database_error_repository import DatabaseErrorRepository
 from utils.language_utils import t, get_current_language
 from static.css_utils import load_css
 from utils.code_utils import _get_category_icon, _get_difficulty_icon
+from state_schema import WorkflowState
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ class ErrorExplorerUI:
     def __init__(self, workflow=None):
         """Initialize the Error Explorer UI."""
         self.repository = DatabaseErrorRepository()
-        self.workflow = workflow  # Add workflow for practice functionality
+        self.workflow = workflow  # JavaCodeReviewGraph instance
         
         # Initialize session state
         if "selected_error_code" not in st.session_state:
@@ -40,9 +41,11 @@ class ErrorExplorerUI:
             # Continue without CSS - the app should still work
             st.warning(t("css_loading_warning"))
 
-    def render(self):
+    def render(self, workflow=None):
         """Render the complete error explorer interface."""
         # Professional header
+        self.workflow = workflow
+
         self._render_header()
         
         # Search and filter section
@@ -177,7 +180,7 @@ class ErrorExplorerUI:
 
     def _render_consecutive_error_card(self, error: Dict[str, Any]):
         """Render error card using a clean expander format with integrated title."""
-        error_name = error.get(t("error_name"), t("unknown_error"))
+        error_name = error.get(t("error_name_variable"), t("unknown_error"))
         description = error.get(t("description"), "")
         implementation_guide = error.get(t("implementation_guide"), "")
         difficulty = error.get('difficulty_level', 'medium')
@@ -289,83 +292,71 @@ class ErrorExplorerUI:
             st.markdown('</div>', unsafe_allow_html=True)
 
     def _handle_practice_error(self, error: Dict[str, Any]):
-        """Handle practice error by generating code with LangGraph and starting review workflow."""
+        """
+        REVISED: Handle practice error by generating code with LangGraph workflow.
+        This method properly integrates with the LangGraph workflow system.
+        """
         if not self.workflow:
             st.error(t("practice_mode_requires_workflow"))
             return
         
-        error_name = error.get(t("error_name"), t("unknown_error"))
+        error_name = error.get(t("error_name_variable"), "unknown_error")
         error_code = error.get('error_code', '')
+       
         
         try:
+            logger.info(f"Starting practice session for error: {error_name}")
+            
             # Show immediate feedback
             st.success(f"🎯 {t('generating_practice_code_with')} {error_name}...")
             
-            # Create a progress bar for user feedback
-            progress_bar = st.progress(0)
-            status_text = st.empty()
+            # Create a progress indicator
+            progress_container = st.empty()
             
-            # Step 1: Reset workflow state for new practice session
-            progress_bar.progress(20)
-            status_text.text(t("preparing_practice_session"))
-            
-            # Reset workflow state
-            from state_schema import WorkflowState
-            st.session_state.workflow_state = WorkflowState()
-            
-            # Step 2: Set up error-specific generation
-            progress_bar.progress(40)
-            status_text.text(t("configuring_error_parameters"))
-            
-            # Configure the workflow for this specific error
-            state = st.session_state.workflow_state
-            
-            # Set up the error selection for targeted generation
-            state.selected_categories = {"java_errors": [error.get('category', 'Other')]}
-            state.specific_errors = [error]  # Focus on this specific error
-            state.difficulty_level = error.get('difficulty_level', 'medium')
-            state.current_step = 'generate'
-            
-            # Step 3: Generate code with the specific error
-            progress_bar.progress(60)
-            status_text.text(t("generating_code_with_error"))
-            
-            # Use the workflow to generate code
-            result = self.workflow.generate_code_with_errors(
-                selected_categories=state.selected_categories,
-                specific_errors=state.specific_errors,
-                difficulty=state.difficulty_level
-            )
-            
-            if result.get('success', False):
-                # Step 4: Set up the generated code in workflow state
+            with progress_container.container():
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                # Step 1: Prepare WorkflowState for practice session
+                progress_bar.progress(20)
+                status_text.text(t("preparing_practice_session"))
+                
+                # Create a fresh WorkflowState with the specific error
+                workflow_state = self._prepare_practice_workflow_state(error)
+                
+                if not workflow_state:
+                    st.error("❌ Failed to prepare practice session")
+                    return
+                
+                # Step 2: Execute code generation through LangGraph workflow
+                progress_bar.progress(40)
+                status_text.text(t("generating_code_with_error"))
+                
+                logger.debug(f"Executing code generation workflow for error: {error_name}")
+                updated_state = self.workflow.execute_code_generation(workflow_state)
+                
+                # Step 3: Validate code generation result
+                progress_bar.progress(60)
+                status_text.text(t("validating_generated_code"))
+                
+                if hasattr(updated_state, 'error') and updated_state.error:
+                    st.error(f"❌ {t('failed_to_generate_practice_code')}: {updated_state.error}")
+                    return
+                
+                if not hasattr(updated_state, 'code_snippet') or not updated_state.code_snippet:
+                    st.error(f"❌ {t('failed_to_generate_practice_code')}: No code generated")
+                    return
+                
+                # Step 4: Store the state in session for the main workflow tabs
                 progress_bar.progress(80)
                 status_text.text(t("setting_up_practice_environment"))
                 
-                code_content = result.get('code_content', '')
-                known_errors = result.get('known_errors', [])
+                # Store the practice session state
+                st.session_state.workflow_state = updated_state
                 
-                # Create code snippet object
-                from dataclasses import dataclass
-                from typing import List as ListType
-                
-                @dataclass
-                class CodeSnippet:
-                    content: str
-                    known_errors: ListType[Dict[str, Any]]
-                    language: str = "java"
-                    difficulty: str = "medium"
-                
-                state.code_snippet = CodeSnippet(
-                    content=code_content,
-                    known_errors=known_errors,
-                    language="java",
-                    difficulty=state.difficulty_level
-                )
-                
-                # Step 5: Complete setup
-                progress_bar.progress(100)
-                status_text.text(t("practice_session_ready"))
+                # Mark this as a practice session from error explorer
+                st.session_state.practice_session_active = True
+                st.session_state.practice_error_name = error_name
                 
                 # Track usage in database
                 try:
@@ -381,31 +372,105 @@ class ErrorExplorerUI:
                 except Exception as e:
                     logger.debug(f"Could not track error usage: {str(e)}")
                 
+                # Step 5: Complete setup and redirect
+                progress_bar.progress(100)
+                status_text.text(t("practice_session_ready"))
+                
                 # Clear progress indicators
-                progress_bar.empty()
-                status_text.empty()
+                time.sleep(1)  # Brief pause to show completion
+                progress_container.empty()
                 
-                # Show success message and navigate
+                # Show success message
                 st.success(f"✅ {t('practice_code_generated_successfully')}")
-                st.info(f"💡 {t('navigate_to_review_tab_to_start_analyzing')} {error_name}")
+                st.info(f"💡 {t('navigate_to_review_tab_to_start_analyzing')} **{error_name}**")
                 
-                # Set the active tab to review (index 1)
-                st.session_state.active_tab = 1
+                # Redirect to review tab
+                st.session_state.active_tab = 1  # Review tab
                 st.session_state["force_tab_switch"] = True
                 
-                # Brief pause for user to read the message
+                # Add a button for immediate navigation
+                col1, col2, col3 = st.columns([1, 2, 1])
+                with col2:
+                    if st.button("📋 Go to Review Tab", key="go_to_review_now", type="primary", use_container_width=True):
+                        st.session_state.active_tab = 1
+                        st.rerun()
+                
+                # Auto-redirect after a short delay
                 time.sleep(2)
                 st.rerun()
                 
-            else:
-                progress_bar.empty()
-                status_text.empty()
-                st.error(f"❌ {t('failed_to_generate_practice_code')}: {result.get('error', t('unknown_error'))}")
-                
         except Exception as e:
-            logger.error(f"Error in practice mode: {str(e)}")
+            logger.error(f"Error in practice session setup: {str(e)}", exc_info=True)
             st.error(f"❌ {t('error_setting_up_practice_session')}: {str(e)}")
             st.info(t("please_try_again_or_contact_support"))
+    
+    def _prepare_practice_workflow_state(self, error: Dict[str, Any]) -> Optional[WorkflowState]:
+        """
+        Prepare a WorkflowState specifically for practice sessions with a single error.
+        
+        Args:
+            error: The specific error to practice with
+            
+        Returns:
+            Configured WorkflowState or None if preparation fails
+        """
+        try:
+            # Extract error details
+            error_name = error.get(t("error_name_variable"), t("unknown_error"))
+            difficulty_level = error.get('difficulty_level', 'medium')
+            category = error.get('category', 'Other')
+            
+            logger.debug(f"Preparing practice state for error: {error_name}, difficulty: {difficulty_level}")
+            
+            # Create a new WorkflowState
+            state = WorkflowState()
+            
+            # Set basic parameters optimized for single error practice
+            state.code_length = "medium"  # Good balance for practice
+            state.difficulty_level = difficulty_level
+            state.error_count_start = 1
+            state.error_count_end = 1
+            
+            # Set domain based on error category if available
+            domain_mapping = {
+                "logical errors": "calculation",
+                "logical_errors": "calculation", 
+                "syntax errors": "user_management",
+                "syntax_errors": "user_management",
+                "code quality": "file_processing",
+                "code_quality": "file_processing",
+                "standard violation": "data_validation",
+                "standard_violation": "data_validation",
+                "java specific": "banking",
+                "java_specific": "banking"
+            }
+            state.domain = domain_mapping.get(category.lower(), "student_management")
+            
+            # Configure for specific error mode
+            state.selected_error_categories = {"java_errors": []}  # Empty for specific mode
+            state.selected_specific_errors = [error]  # Focus on this single error
+            
+            # Set workflow control parameters
+            state.current_step = "generate"
+            state.max_evaluation_attempts = 3
+            state.max_iterations = 3
+            
+            # Reset all other state fields to defaults
+            state.evaluation_attempts = 0
+            state.current_iteration = 1
+            state.review_sufficient = False
+            state.review_history = []
+            state.evaluation_result = None
+            state.code_snippet = None
+            state.comparison_report = None
+            state.error = None
+            
+            logger.debug(f"Practice state prepared successfully for {error_name}")
+            return state
+            
+        except Exception as e:
+            logger.error(f"Error preparing practice workflow state: {str(e)}")
+            return None
     
     def _get_categories(self) -> List[str]:
         """Get all available categories."""
@@ -450,7 +515,7 @@ class ErrorExplorerUI:
         if search_term:
             filtered = [
                 error for error in filtered
-                if search_term in error.get(t("error_name"), "").lower() or
+                if search_term in error.get(t("implementation_guide"), "").lower() or
                    search_term in error.get(t("description"), "").lower()
             ]
         
