@@ -814,6 +814,46 @@ def _format_progress_info(review_history: Optional[List]) -> str:
     return f"This is attempt {len(review_history)} of the review process."
 
 
+def _get_category_icon(category_name: str) -> str:
+        
+    """Get icon for category based on name (language-aware)."""
+    # Map both English and Chinese category names to icons
+    icon_mapping = {
+            # English category names (from database)
+            "logical errors": "🧠",
+            "syntax errors": "🔤", 
+            "code quality": "⭐",
+            "standard violation": "📋",
+            "java specific": "☕",
+            
+            # Chinese category names (from database)
+            "邏輯錯誤": "🧠",
+            "語法錯誤": "🔤",
+            "程式碼品質": "⭐", 
+            "標準違規": "📋",
+            "java 特定錯誤": "☕",
+            
+            # Category codes (fallback)
+            "logical": "🧠",
+            "syntax": "🔤",
+            "code_quality": "⭐",
+            "standard_violation": "📋", 
+            "java_specific": "☕"
+        }
+        
+    # Try exact match first (case-sensitive)
+    if category_name in icon_mapping:
+        return icon_mapping[category_name]
+        
+        # Try case-insensitive match
+    category_lower = category_name.lower()
+    for key, icon in icon_mapping.items():
+        if key.lower() == category_lower:
+            return icon
+        
+        # Default fallback icon
+    return "🐛"
+
 # =============================================================================
 # Validation Functions
 # =============================================================================
