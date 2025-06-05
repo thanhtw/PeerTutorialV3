@@ -718,6 +718,13 @@
     "most_used_errors": "Most Used Errors",
     "database_statistics_unavailable": "Database statistics unavailable",
     "practice_with": "Practice with",
-    "generate_code_problem": "Generate Code Problem"
+    "generate_code_problem": "Generate Code Problem",
+    "error_description": "Error Description",    
+    "code_example": "Code Example",  
+    "start_practice_session": "Start Practice Session",
+    "generate_practice_code_with_error_type": "Generate practice code with this error type",
+    "find_specific_errors_or_browse": "Find specific errors or browse our error library",
+    "search_and_filter_errors": "Search and Filter Errors",
+    "search_errors_placeholder": "Search errors by name, description, or keywords..."
   }
 }

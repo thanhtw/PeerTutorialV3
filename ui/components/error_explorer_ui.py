@@ -38,7 +38,7 @@ class ErrorExplorerUI:
         except Exception as e:
             logger.error(f"Error loading Error Explorer CSS: {str(e)}")
             # Continue without CSS - the app should still work
-            st.warning("Some styling may not be available due to CSS loading issues.")
+            st.warning(t("css_loading_warning"))
 
     def render(self):
         """Render the complete error explorer interface."""
@@ -72,11 +72,11 @@ class ErrorExplorerUI:
                 <div class="stats-section-compact">
                     <div class="stat-card-compact">
                         <div class="stat-number-compact">{total_errors}</div>
-                        <div class="stat-label-compact">Errors</div>
+                        <div class="stat-label-compact">{t('errors')}</div>
                     </div>
                     <div class="stat-card-compact">
                         <div class="stat-number-compact">{total_categories}</div>
-                        <div class="stat-label-compact">Categories</div>
+                        <div class="stat-label-compact">{t('categories')}</div>
                     </div>
                 </div>
             </div>
@@ -88,11 +88,11 @@ class ErrorExplorerUI:
         st.markdown('<div class="search-filter-container">', unsafe_allow_html=True)
         
         # Search section header
-        st.markdown("""
+        st.markdown(f"""
         <div class="section-header">           
             <div>
-                <div class="section-title">Search & Filter Errors</div>
-                <div class="section-subtitle">Find specific errors or browse by category and difficulty</div>
+                <div class="section-title">{t('search_and_filter_errors')}</div>
+                <div class="section-subtitle">{t('find_specific_errors_or_browse')}</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -103,27 +103,27 @@ class ErrorExplorerUI:
         with col1:
             search_term = st.text_input(
                 "",
-                placeholder="🔍 Search errors by name or description...",
+                placeholder=f"🔍 {t('search_errors_placeholder')}",
                 key="error_search",
-                help="Search for specific error patterns, keywords, or descriptions"
+                help=t('search_help_text')
             )
         
         with col2:
             categories = self._get_categories()
             selected_category = st.selectbox(
-                "📂 Category",
-                options=["All Categories"] + categories,
+                f"📂 {t('category')}",
+                options=[t('all_categories')] + categories,
                 key="category_filter",
-                help="Filter by error category"
+                help=t('category_filter_help')
             )
         
         with col3:
-            difficulty_levels = ["All Levels", "Easy", "Medium", "Hard"]
+            difficulty_levels = [t('all_levels'), t('easy'), t('medium'), t('hard')]
             selected_difficulty = st.selectbox(
-                "⚡ Difficulty",
+                f"⚡ {t('difficulty')}",
                 options=difficulty_levels,
                 key="difficulty_filter",
-                help="Filter by difficulty level"
+                help=t('difficulty_filter_help')
             )
         
         st.markdown('</div>', unsafe_allow_html=True)        
@@ -177,7 +177,7 @@ class ErrorExplorerUI:
 
     def _render_consecutive_error_card(self, error: Dict[str, Any]):
         """Render error card using a clean expander format with integrated title."""
-        error_name = error.get(t("error_name"), "Unknown Error")
+        error_name = error.get(t("error_name"), t("unknown_error"))
         description = error.get(t("description"), "")
         implementation_guide = error.get(t("implementation_guide"), "")
         difficulty = error.get('difficulty_level', 'medium')
@@ -192,17 +192,17 @@ class ErrorExplorerUI:
             if description or implementation_guide:
               
                 if description:
-                    st.markdown("""
+                    st.markdown(f"""
                     <div class="section-header-inline">
-                        <h4 class="section-title">📋 Error Description</h4>
+                        <h4 class="section-title">📋 {t('error_description')}</h4>
                     </div>
                     """, unsafe_allow_html=True)
                     st.markdown(f'<div class="description-content">{description}</div>', unsafe_allow_html=True)
                 
                 if implementation_guide:
-                    st.markdown("""
+                    st.markdown(f"""
                     <div class="section-header-inline">
-                        <h4 class="section-title">💡 How to Fix</h4>
+                        <h4 class="section-title">💡 {t('how_to_fix')}</h4>
                     </div>
                     """, unsafe_allow_html=True)
                     st.markdown(f'<div class="solution-content">{implementation_guide}</div>', unsafe_allow_html=True)
@@ -210,9 +210,9 @@ class ErrorExplorerUI:
             # Code examples section with improved layout
             if examples.get("wrong_examples") or examples.get("correct_examples"):
                
-                st.markdown("""
+                st.markdown(f"""
                     <div class="section-header-inline">
-                        <h4 class="section-title">💻 Code Example</h4>
+                        <h4 class="section-title">💻 {t('code_example')}</h4>
                     </div>
                     """, unsafe_allow_html=True)
                 # Create columns for side-by-side comparison when both exist
@@ -220,9 +220,9 @@ class ErrorExplorerUI:
                     col1, col2 = st.columns(2)
                     
                     with col1:
-                        st.markdown("""
+                        st.markdown(f"""
                         <div class="code-section-header error-header">
-                            <h4 class="code-section-title">❌ Problematic Code</h4>
+                            <h4 class="code-section-title">❌ {t('problematic_code')}</h4>
                         </div>
                         """, unsafe_allow_html=True)
                         
@@ -232,9 +232,9 @@ class ErrorExplorerUI:
                             st.code(example, language="java")
                     
                     with col2:
-                        st.markdown("""
+                        st.markdown(f"""
                         <div class="code-section-header solution-header">
-                            <h4 class="code-section-title">✅ Corrected Code</h4>
+                            <h4 class="code-section-title">✅ {t('corrected_code')}</h4>
                         </div>
                         """, unsafe_allow_html=True)
                         
@@ -246,29 +246,29 @@ class ErrorExplorerUI:
                 else:
                     # Single column layout when only one type exists
                     if examples.get("wrong_examples"):
-                        st.markdown("""
+                        st.markdown(f"""
                         <div class="code-section-header error-header">
-                            <h4 class="code-section-title">❌ Problematic Code Examples</h4>
+                            <h4 class="code-section-title">❌ {t('problematic_code')} {t('examples')}</h4>
                         </div>
                         """, unsafe_allow_html=True)
                         
                         for i, example in enumerate(examples["wrong_examples"][:3], 1):
                             if len(examples["wrong_examples"]) > 1:
-                                st.markdown(f'<div class="example-label">Example {i}:</div>', unsafe_allow_html=True)
+                                st.markdown(f'<div class="example-label">{t("example")} {i}:</div>', unsafe_allow_html=True)
                             st.code(example, language="java")
                             if i < len(examples["wrong_examples"][:3]):
                                 st.markdown('<hr class="example-divider">', unsafe_allow_html=True)
                     
                     if examples.get("correct_examples"):
-                        st.markdown("""
+                        st.markdown(f"""
                         <div class="code-section-header solution-header">
-                            <h4 class="code-section-title">✅ Corrected Code Examples</h4>
+                            <h4 class="code-section-title">✅ {t('corrected_code')} {t('examples')}</h4>
                         </div>
                         """, unsafe_allow_html=True)
                         
                         for i, example in enumerate(examples["correct_examples"][:3], 1):
                             if len(examples["correct_examples"]) > 1:
-                                st.markdown(f'<div class="example-label">Example {i}:</div>', unsafe_allow_html=True)
+                                st.markdown(f'<div class="example-label">{t("example")} {i}:</div>', unsafe_allow_html=True)
                             st.code(example, language="java")
                             if i < len(examples["correct_examples"][:3]):
                                 st.markdown('<hr class="example-divider">', unsafe_allow_html=True)
@@ -277,11 +277,11 @@ class ErrorExplorerUI:
             col1, col2, col3 = st.columns([1, 5, 1])
             with col2:
                 if st.button(
-                    "🚀 Start Practice Session", 
+                    f"🚀 {t('start_practice_session')}", 
                     key=f"practice_{error_code}", 
                     use_container_width=True,
                     type="primary",
-                    help="Generate practice code with this error type"
+                    help=t('generate_practice_code_with_error_type')
                 ):
                     self._handle_practice_error(error)
             
@@ -291,15 +291,15 @@ class ErrorExplorerUI:
     def _handle_practice_error(self, error: Dict[str, Any]):
         """Handle practice error by generating code with LangGraph and starting review workflow."""
         if not self.workflow:
-            st.error("Practice mode requires workflow integration. Please contact administrator.")
+            st.error(t("practice_mode_requires_workflow"))
             return
         
-        error_name = error.get(t("error_name"), "Unknown Error")
+        error_name = error.get(t("error_name"), t("unknown_error"))
         error_code = error.get('error_code', '')
         
         try:
             # Show immediate feedback
-            st.success(f"🎯 Generating practice code with {error_name}...")
+            st.success(f"🎯 {t('generating_practice_code_with')} {error_name}...")
             
             # Create a progress bar for user feedback
             progress_bar = st.progress(0)
@@ -307,7 +307,7 @@ class ErrorExplorerUI:
             
             # Step 1: Reset workflow state for new practice session
             progress_bar.progress(20)
-            status_text.text("Preparing practice session...")
+            status_text.text(t("preparing_practice_session"))
             
             # Reset workflow state
             from state_schema import WorkflowState
@@ -315,7 +315,7 @@ class ErrorExplorerUI:
             
             # Step 2: Set up error-specific generation
             progress_bar.progress(40)
-            status_text.text("Configuring error parameters...")
+            status_text.text(t("configuring_error_parameters"))
             
             # Configure the workflow for this specific error
             state = st.session_state.workflow_state
@@ -328,7 +328,7 @@ class ErrorExplorerUI:
             
             # Step 3: Generate code with the specific error
             progress_bar.progress(60)
-            status_text.text("Generating code with error...")
+            status_text.text(t("generating_code_with_error"))
             
             # Use the workflow to generate code
             result = self.workflow.generate_code_with_errors(
@@ -340,7 +340,7 @@ class ErrorExplorerUI:
             if result.get('success', False):
                 # Step 4: Set up the generated code in workflow state
                 progress_bar.progress(80)
-                status_text.text("Setting up practice environment...")
+                status_text.text(t("setting_up_practice_environment"))
                 
                 code_content = result.get('code_content', '')
                 known_errors = result.get('known_errors', [])
@@ -365,7 +365,7 @@ class ErrorExplorerUI:
                 
                 # Step 5: Complete setup
                 progress_bar.progress(100)
-                status_text.text("Practice session ready!")
+                status_text.text(t("practice_session_ready"))
                 
                 # Track usage in database
                 try:
@@ -386,8 +386,8 @@ class ErrorExplorerUI:
                 status_text.empty()
                 
                 # Show success message and navigate
-                st.success(f"✅ Practice code generated successfully!")
-                st.info(f"💡 Navigate to the **Review** tab to start analyzing the code with {error_name}")
+                st.success(f"✅ {t('practice_code_generated_successfully')}")
+                st.info(f"💡 {t('navigate_to_review_tab_to_start_analyzing')} {error_name}")
                 
                 # Set the active tab to review (index 1)
                 st.session_state.active_tab = 1
@@ -400,12 +400,12 @@ class ErrorExplorerUI:
             else:
                 progress_bar.empty()
                 status_text.empty()
-                st.error(f"❌ Failed to generate practice code: {result.get('error', 'Unknown error')}")
+                st.error(f"❌ {t('failed_to_generate_practice_code')}: {result.get('error', t('unknown_error'))}")
                 
         except Exception as e:
             logger.error(f"Error in practice mode: {str(e)}")
-            st.error(f"❌ Error setting up practice session: {str(e)}")
-            st.info("Please try again or contact support if the problem persists.")
+            st.error(f"❌ {t('error_setting_up_practice_session')}: {str(e)}")
+            st.info(t("please_try_again_or_contact_support"))
     
     def _get_categories(self) -> List[str]:
         """Get all available categories."""
@@ -420,8 +420,9 @@ class ErrorExplorerUI:
         """Get errors based on current filters."""
         try:
             # Get all categories if no specific filter
-            selected_category = st.session_state.get('selected_category', 'All Categories')
-            if selected_category == 'All Categories':
+            selected_category = st.session_state.get('selected_category', t('all_categories'))
+            
+            if selected_category == t('all_categories'):                
                 categories = self._get_categories()
             else:
                 categories = [selected_category]
@@ -483,18 +484,18 @@ class ErrorExplorerUI:
     
     def _render_no_results(self):
         """Render enhanced no results message."""
-        st.markdown("""
+        st.markdown(f"""
         <div class="no-results">
             <div class="no-results-icon">🔍</div>
-            <h3>No Errors Found</h3>
-            <p>We couldn't find any errors matching your search criteria.</p>
+            <h3>{t('no_errors_found')}</h3>
+            <p>{t('no_errors_found_message')}</p>
             <div class="no-results-suggestions">
-                <h4>Try these suggestions:</h4>
+                <h4>{t('try_these_suggestions')}:</h4>
                 <ul>
-                    <li>Check your spelling and try different keywords</li>
-                    <li>Broaden your search by selecting "All Categories"</li>
-                    <li>Try searching for common terms like "null", "loop", or "syntax"</li>
-                    <li>Clear the search box to browse all errors</li>
+                    <li>{t('check_spelling_try_different_keywords')}</li>
+                    <li>{t('broaden_search_select_all_categories')}</li>
+                    <li>{t('try_searching_common_terms')}</li>
+                    <li>{t('clear_search_box_browse_all')}</li>
                 </ul>
             </div>
         </div>
