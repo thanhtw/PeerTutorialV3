@@ -170,7 +170,7 @@ class ErrorExplorerUI:
         difficulty_order = {'easy': 1, 'medium': 2, 'hard': 3}
         
         def get_difficulty_sort_key(error):
-            difficulty = error.get('difficulty_level', 'medium').lower()
+            difficulty = error.get('difficulty_level', 'medium')
             return difficulty_order.get(difficulty, 2)  # Default to medium if unknown
         
         return sorted(errors, key=get_difficulty_sort_key)
@@ -183,7 +183,7 @@ class ErrorExplorerUI:
         difficulty = error.get('difficulty_level', 'medium')
         error_code = error.get('error_code', f"error_{hash(error_name) % 10000}")
         difficulty_text = difficulty.title()        
-        examples = self.repository.get_error_examples(error_name)        
+        examples = self.repository.get_error_examples(error_name)              
         expander_title = f" {_get_difficulty_icon(difficulty_text)} **{error_name}**"
         
         # Single professional expander with all content
@@ -444,8 +444,7 @@ class ErrorExplorerUI:
     
     def _apply_filters(self, errors: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Apply search and difficulty filters to errors."""
-        filtered = errors
-        
+        filtered = errors       
         # Search filter
         search_term = st.session_state.get('search_term', '').lower()
         if search_term:
@@ -456,17 +455,18 @@ class ErrorExplorerUI:
             ]
         
         # Difficulty filter
-        selected_difficulty = st.session_state.get('selected_difficulty', 'All Levels')
-        if selected_difficulty != 'All Levels':
+        selected_difficulty = st.session_state.get('selected_difficulty', t('all_levels'))
+        
+        if selected_difficulty != t('all_levels'):
             difficulty_map = {
-                "Easy": "easy",
-                "Medium": "medium", 
-                "Hard": "hard"
+               t("easy"): "easy",
+               t("medium"): "medium", 
+               t("hard"): "hard"
             }
             db_difficulty = difficulty_map.get(selected_difficulty, "medium")
             
             filtered = [
-                error for error in filtered
+                error for error in filtered   
                 if error.get('difficulty_level') == db_difficulty
             ]
         
