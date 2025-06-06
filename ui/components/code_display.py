@@ -760,7 +760,7 @@ def _process_student_review(workflow, student_review: str) -> bool:
     """
     try:
         logger.debug("Starting student review processing")
-        logger.info(f"Processing review: '{student_review[:100]}...' (length: {len(student_review)})")
+        logger.debug(f"Processing review: '{student_review[:100]}...' (length: {len(student_review)})")
         
         # Enhanced status tracking
         with st.status(t("processing_review"), expanded=True) as status:
@@ -786,7 +786,7 @@ def _process_student_review(workflow, student_review: str) -> bool:
                 return False
                 
             state = st.session_state.workflow_state
-            logger.info(f"Current workflow state: step={getattr(state, 'current_step', 'unknown')}, iteration={getattr(state, 'current_iteration', 'unknown')}")
+            logger.debug(f"Current workflow state: step={getattr(state, 'current_step', 'unknown')}, iteration={getattr(state, 'current_iteration', 'unknown')}")
             
             # Step 3: Validate code snippet
             status.update(label="🔍 Validating code snippet...", state="running")
@@ -820,13 +820,13 @@ def _process_student_review(workflow, student_review: str) -> bool:
             # Step 5: Submit to workflow
             status.update(label="🚀 Submitting to workflow...", state="running")
             
-            logger.info("Submitting review through LangGraph workflow")
-            logger.info(f"Workflow type: {type(workflow)}")
-            logger.info(f"Calling workflow.submit_review with state and review text")
+            logger.debug("Submitting review through LangGraph workflow")
+            logger.debug(f"Workflow type: {type(workflow)}")
+            logger.debug(f"Calling workflow.submit_review with state and review text")
             
             try:                
                 raw_updated_state = workflow.submit_review(state, review_text)
-                logger.info(f"Workflow.submit_review returned: {type(raw_updated_state)}")
+                logger.debug(f"Workflow.submit_review returned: {type(raw_updated_state)}")
                 
                 if not raw_updated_state:
                     error_msg = "Workflow returned empty state"
@@ -861,7 +861,7 @@ def _process_student_review(workflow, student_review: str) -> bool:
             st.session_state.review_processing_success = True
             st.session_state.last_review_timestamp = time.time()
             
-            logger.info("Session state updated successfully")
+            logger.debug("Session state updated successfully")
             
             # Step 8: Verify processing success
             status.update(label="✅ Verifying processing...", state="running")
@@ -871,8 +871,8 @@ def _process_student_review(workflow, student_review: str) -> bool:
             current_iteration = getattr(raw_updated_state, 'current_iteration', 1)
             
             if review_history and len(review_history) > 0:
-                logger.info(f"Review processing completed successfully. History length: {len(review_history)}")
-                logger.info(f"Current iteration: {current_iteration}")
+                logger.debug(f"Review processing completed successfully. History length: {len(review_history)}")
+                logger.debug(f"Current iteration: {current_iteration}")
                 status.update(label=f"✅ {t('analysis_complete_processed')}", state="complete")
                 
                 return True

@@ -1,7 +1,7 @@
 """
 Enhanced Workflow Manager for Java Peer Review Training System.
 
-FIXED: CodeSnippet validation issue and enhanced state management for submit button processing.
+FIXED: Removed _sanitize_workflow_state method and rely on Pydantic validation.
 """
 
 import logging
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 class WorkflowManager:
     """
     Enhanced manager class for the Java Code Review workflow system.
-    FIXED: Better state management and CodeSnippet validation handling.
+    FIXED: Simplified state management by removing manual sanitization.
     """
     def __init__(self, llm_manager):
         """
@@ -118,22 +118,14 @@ class WorkflowManager:
     
     def _safe_get_state_value(self, state, key: str, default=None):
         """
-        Safely get a value from a state object, handling both dict-like and attribute access.
-        FIXED: Enhanced error handling and type checking.
+        Safely get a value from AddableValuesDict or other state objects.
+        COMPREHENSIVE: Try all possible access methods to avoid data loss.
         """
         try:
-            # Handle None state
             if state is None:
-                logger.debug(f"State is None when accessing key '{key}'")
                 return default
             
-            # Try attribute access first (for WorkflowState objects)
-            if hasattr(state, key):
-                value = getattr(state, key)
-                if value is not None:
-                    return value
-            
-            # Try dictionary access (for dict-like objects)
+            # Method 1: Dictionary-style access (for AddableValuesDict)
             if hasattr(state, '__getitem__'):
                 try:
                     value = state[key]
@@ -142,38 +134,50 @@ class WorkflowManager:
                 except (KeyError, TypeError, AttributeError):
                     pass
             
-            # Try get method (for dict-like objects)
+            # Method 2: Attribute access (for objects)
+            if hasattr(state, key):
+                try:
+                    value = getattr(state, key)
+                    if value is not None:
+                        return value
+                except AttributeError:
+                    pass
+            
+            # Method 3: get() method (for dict-like objects)
             if hasattr(state, 'get'):
-                value = state.get(key, default)
-                if value is not None:
-                    return value
+                try:
+                    value = state.get(key)
+                    if value is not None:
+                        return value
+                except (TypeError, AttributeError):
+                    pass
+            
+            # Method 4: Check if it's in __dict__ (for some objects)
+            if hasattr(state, '__dict__') and key in state.__dict__:
+                try:
+                    value = state.__dict__[key]
+                    if value is not None:
+                        return value
+                except (KeyError, AttributeError):
+                    pass
             
             return default
             
         except Exception as e:
-            logger.warning(f"Error accessing key '{key}' from state: {str(e)}")
+            logger.warning(f"Error accessing key '{key}' from state {type(state)}: {str(e)}")
             return default
 
     def _create_clean_code_snippet(self, value) -> Optional[CodeSnippet]:
         """
-        FIXED: Create a clean CodeSnippet instance that passes Pydantic validation.
-        
-        Args:
-            value: Raw code snippet value (could be CodeSnippet, dict, or other)
-            
-        Returns:
-            Clean CodeSnippet instance or None
+        Create a clean CodeSnippet instance, preserving all data.
         """
         try:
             if value is None:
                 return None
             
-            # Extract data safely regardless of input type
+            # Extract data based on input type
             if isinstance(value, CodeSnippet):
-                code = getattr(value, 'code', '')
-                clean_code = getattr(value, 'clean_code', '')
-                raw_errors = getattr(value, 'raw_errors', {})
-                expected_error_count = getattr(value, 'expected_error_count', 0)
+                return value  # Already clean
             elif isinstance(value, dict):
                 code = value.get('code', '')
                 clean_code = value.get('clean_code', '')
@@ -185,38 +189,19 @@ class WorkflowManager:
                 raw_errors = getattr(value, 'raw_errors', {})
                 expected_error_count = getattr(value, 'expected_error_count', 0)
             else:
-                logger.warning(f"Cannot convert value to CodeSnippet: {type(value)}")
+                logger.warning(f"Cannot convert {type(value)} to CodeSnippet")
                 return None
             
-            # Ensure all values are properly typed and serializable
+            # Ensure proper types
             clean_code_val = str(code) if code else ''
-            clean_clean_code_val = str(clean_code) if clean_code else ''
+            clean_clean_code_val = str(clean_code) if clean_code else clean_code_val
+            clean_expected_count = int(expected_error_count) if isinstance(expected_error_count, (int, float, str)) and str(expected_error_count).replace('.', '').isdigit() else 0
             
-            # Clean raw_errors to ensure it's JSON serializable
+            # Preserve raw_errors structure
             clean_raw_errors = {}
             if isinstance(raw_errors, dict):
-                for key, val in raw_errors.items():
-                    if isinstance(val, list):
-                        clean_list = []
-                        for item in val:
-                            if isinstance(item, dict):
-                                # Create a clean dict with only JSON-serializable values
-                                clean_item = {}
-                                for item_key, item_val in item.items():
-                                    if isinstance(item_val, (str, int, float, bool, type(None))):
-                                        clean_item[item_key] = item_val
-                                    else:
-                                        clean_item[item_key] = str(item_val)
-                                clean_list.append(clean_item)
-                            else:
-                                clean_list.append(str(item))
-                        clean_raw_errors[key] = clean_list
-                    else:
-                        clean_raw_errors[key] = str(val) if val is not None else ''
+                clean_raw_errors = raw_errors.copy()  # Preserve structure
             
-            clean_expected_count = int(expected_error_count) if isinstance(expected_error_count, (int, float, str)) and str(expected_error_count).isdigit() else 0
-            
-            # Create new CodeSnippet with clean data
             return CodeSnippet(
                 code=clean_code_val,
                 clean_code=clean_clean_code_val,
@@ -225,53 +210,50 @@ class WorkflowManager:
             )
             
         except Exception as e:
-            logger.error(f"Error creating clean code snippet: {str(e)}")
+            logger.error(f"Error creating CodeSnippet: {str(e)}")
             return None
 
     def _create_clean_review_history(self, value) -> List[ReviewAttempt]:
         """
-        FIXED: Create clean review history list that passes Pydantic validation.
-        
-        Args:
-            value: Raw review history value
-            
-        Returns:
-            Clean list of ReviewAttempt instances
+        Create clean review history, preserving all review data.
         """
         try:
-            if not value or not isinstance(value, list):
+            if not value:
+                return []
+            
+            if not isinstance(value, list):
+                logger.warning(f"Expected list for review_history, got {type(value)}")
                 return []
             
             clean_history = []
             for item in value:
-                if isinstance(item, ReviewAttempt):
-                    # Extract and clean the data
-                    student_review = getattr(item, 'student_review', '')
-                    iteration_number = getattr(item, 'iteration_number', 1)
-                    analysis = getattr(item, 'analysis', {})
-                    targeted_guidance = getattr(item, 'targeted_guidance', None)
-                elif isinstance(item, dict):
-                    student_review = item.get('student_review', '')
-                    iteration_number = item.get('iteration_number', 1)
-                    analysis = item.get('analysis', {})
-                    targeted_guidance = item.get('targeted_guidance', None)
-                elif hasattr(item, 'student_review'):
-                    student_review = getattr(item, 'student_review', '')
-                    iteration_number = getattr(item, 'iteration_number', 1)
-                    analysis = getattr(item, 'analysis', {})
-                    targeted_guidance = getattr(item, 'targeted_guidance', None)
-                else:
-                    logger.warning(f"Cannot convert review history item: {type(item)}")
-                    continue
-                
-                # Ensure proper types
-                clean_student_review = str(student_review) if student_review else ''
-                clean_iteration_number = int(iteration_number) if isinstance(iteration_number, (int, float, str)) and str(iteration_number).isdigit() else 1
-                clean_analysis = analysis if isinstance(analysis, dict) else {}
-                clean_targeted_guidance = str(targeted_guidance) if targeted_guidance else None
-                
-                # Create clean ReviewAttempt
                 try:
+                    if isinstance(item, ReviewAttempt):
+                        clean_history.append(item)  # Already clean
+                        continue
+                    
+                    # Extract data from dict or object
+                    if isinstance(item, dict):
+                        student_review = item.get('student_review', '')
+                        iteration_number = item.get('iteration_number', 1)
+                        analysis = item.get('analysis', {})
+                        targeted_guidance = item.get('targeted_guidance', None)
+                    elif hasattr(item, 'student_review'):
+                        student_review = getattr(item, 'student_review', '')
+                        iteration_number = getattr(item, 'iteration_number', 1)
+                        analysis = getattr(item, 'analysis', {})
+                        targeted_guidance = getattr(item, 'targeted_guidance', None)
+                    else:
+                        logger.warning(f"Cannot convert review item: {type(item)}")
+                        continue
+                    
+                    # Ensure proper types
+                    clean_student_review = str(student_review) if student_review else ''
+                    clean_iteration_number = int(iteration_number) if str(iteration_number).isdigit() else 1
+                    clean_analysis = analysis if isinstance(analysis, dict) else {}
+                    clean_targeted_guidance = str(targeted_guidance) if targeted_guidance else None
+                    
+                    # Create ReviewAttempt
                     review_attempt = ReviewAttempt(
                         student_review=clean_student_review,
                         iteration_number=clean_iteration_number,
@@ -279,176 +261,159 @@ class WorkflowManager:
                         targeted_guidance=clean_targeted_guidance
                     )
                     clean_history.append(review_attempt)
-                except Exception as review_error:
-                    logger.warning(f"Error creating ReviewAttempt: {str(review_error)}")
+                    
+                except Exception as item_error:
+                    logger.warning(f"Error processing review item: {str(item_error)}")
                     continue
             
             return clean_history
             
         except Exception as e:
-            logger.error(f"Error creating clean review history: {str(e)}")
+            logger.error(f"Error creating review history: {str(e)}")
             return []
-
-    def _sanitize_workflow_state(self, state: WorkflowState) -> WorkflowState:
-        """
-        FIXED: Sanitize WorkflowState to ensure all fields pass Pydantic validation.
-        
-        Args:
-            state: WorkflowState that might have validation issues
-            
-        Returns:
-            Clean WorkflowState that will pass LangGraph validation
-        """
-        try:
-            logger.debug("Sanitizing WorkflowState for LangGraph compatibility")
-            
-            # Create a new state dict with clean values
-            clean_state_dict = {}
-            
-            # Basic string fields
-            string_fields = ['current_step', 'code_length', 'difficulty_level', 'domain', 
-                           'code_generation_feedback', 'pending_review', 'comparison_report', 
-                           'error', 'final_summary']
-            
-            for field in string_fields:
-                value = getattr(state, field, None)
-                clean_state_dict[field] = str(value) if value is not None else None
-            
-            # Integer fields
-            int_fields = ['error_count_start', 'error_count_end', 'original_error_count', 
-                         'evaluation_attempts', 'max_evaluation_attempts', 'current_iteration', 'max_iterations']
-            
-            for field in int_fields:
-                value = getattr(state, field, 0)
-                try:
-                    clean_state_dict[field] = int(value) if value is not None else 0
-                except (ValueError, TypeError):
-                    clean_state_dict[field] = 0
-            
-            # Boolean fields
-            clean_state_dict['review_sufficient'] = bool(getattr(state, 'review_sufficient', False))
-            
-            # Dict fields
-            selected_error_categories = getattr(state, 'selected_error_categories', {})
-            clean_state_dict['selected_error_categories'] = selected_error_categories if isinstance(selected_error_categories, dict) else {}
-            
-            evaluation_result = getattr(state, 'evaluation_result', None)
-            clean_state_dict['evaluation_result'] = evaluation_result if isinstance(evaluation_result, dict) else None
-            
-            # List fields
-            selected_specific_errors = getattr(state, 'selected_specific_errors', [])
-            clean_state_dict['selected_specific_errors'] = selected_specific_errors if isinstance(selected_specific_errors, list) else []
-            
-            # Special handling for CodeSnippet
-            code_snippet = getattr(state, 'code_snippet', None)
-            clean_state_dict['code_snippet'] = self._create_clean_code_snippet(code_snippet)
-            
-            # Special handling for review_history
-            review_history = getattr(state, 'review_history', [])
-            clean_state_dict['review_history'] = self._create_clean_review_history(review_history)
-            
-            # Create new WorkflowState with clean data
-            return WorkflowState(**clean_state_dict)
-            
-        except Exception as e:
-            logger.error(f"Error sanitizing WorkflowState: {str(e)}", exc_info=True)
-            # Return a minimal valid state in case of error
-            return WorkflowState(error=f"State sanitization failed: {str(e)}")
 
     def _convert_state_to_workflow_state(self, state) -> WorkflowState:
         """
-        Convert a state object (potentially AddableValuesDict) to a WorkflowState object.
-        FIXED: Enhanced state conversion with improved CodeSnippet handling.
+        Convert AddableValuesDict to WorkflowState without losing data.
+        COMPREHENSIVE: Extract all fields systematically to prevent data loss.
         """
         try:
-            # If it's already a WorkflowState, sanitize and return
+            # If already WorkflowState, return as-is
             if isinstance(state, WorkflowState):
-                logger.debug("State is already a WorkflowState, sanitizing")
-                return self._sanitize_workflow_state(state)
+                logger.debug("State is already WorkflowState")
+                return state
             
-            # Extract fields safely
+            logger.debug(f"Converting {type(state)} to WorkflowState")
+            
+            # Extract all fields systematically
             state_dict = {}
             
-            # Define all possible WorkflowState fields with their defaults
-            workflow_state_fields = {
+            # Define all WorkflowState fields (from state_schema.py)
+            all_fields = {
+                # Basic workflow control
                 'current_step': 'generate',
                 'code_length': 'medium',
-                'difficulty_level': 'medium', 
+                'difficulty_level': 'medium',
                 'domain': None,
                 'error_count_start': 1,
                 'error_count_end': 2,
+                
+                # Error selection
                 'selected_error_categories': {},
                 'selected_specific_errors': [],
+                
+                # Code generation state
                 'code_snippet': None,
                 'original_error_count': 0,
+                
+                # Code evaluation state
                 'evaluation_attempts': 0,
                 'max_evaluation_attempts': 3,
                 'evaluation_result': None,
                 'code_generation_feedback': None,
+                
+                # Review state
                 'pending_review': None,
                 'current_iteration': 1,
                 'max_iterations': 3,
                 'review_sufficient': False,
                 'review_history': [],
+                
+                # Final output
                 'comparison_report': None,
                 'error': None,
                 'final_summary': None
             }
             
-            # Extract each field safely
-            for field, default_value in workflow_state_fields.items():
-                value = self._safe_get_state_value(state, field, default_value)
+            # Extract each field systematically
+            for field_name, default_value in all_fields.items():
+                extracted_value = self._safe_get_state_value(state, field_name, default_value)
                 
-                # Type-specific handling
-                if field == 'code_snippet':
-                    state_dict[field] = self._create_clean_code_snippet(value)
-                elif field == 'review_history':
-                    state_dict[field] = self._create_clean_review_history(value)
-                elif field in ['error_count_start', 'error_count_end', 'original_error_count', 
-                             'evaluation_attempts', 'max_evaluation_attempts', 'current_iteration', 'max_iterations']:
-                    try:
-                        state_dict[field] = int(value) if value is not None else default_value
-                    except (ValueError, TypeError):
-                        state_dict[field] = default_value
-                elif field == 'review_sufficient':
-                    try:
-                        state_dict[field] = bool(value) if value is not None else default_value
-                    except (ValueError, TypeError):
-                        state_dict[field] = default_value
-                elif field in ['selected_error_categories', 'evaluation_result']:
-                    if isinstance(value, dict):
-                        state_dict[field] = value
+                # Handle special objects that need conversion
+                if field_name == 'code_snippet':
+                    state_dict[field_name] = self._create_clean_code_snippet(extracted_value)
+                elif field_name == 'review_history':
+                    state_dict[field_name] = self._create_clean_review_history(extracted_value)
+                elif field_name in ['selected_error_categories', 'evaluation_result']:
+                    # Preserve dict structure
+                    if isinstance(extracted_value, dict):
+                        state_dict[field_name] = extracted_value
                     else:
-                        state_dict[field] = default_value
-                elif field == 'selected_specific_errors':
-                    if isinstance(value, list):
-                        state_dict[field] = value
+                        state_dict[field_name] = default_value
+                elif field_name == 'selected_specific_errors':
+                    # Preserve list structure
+                    if isinstance(extracted_value, list):
+                        state_dict[field_name] = extracted_value
                     else:
-                        state_dict[field] = default_value
+                        state_dict[field_name] = default_value
+                elif field_name in ['error_count_start', 'error_count_end', 'original_error_count', 
+                                  'evaluation_attempts', 'max_evaluation_attempts', 'current_iteration', 'max_iterations']:
+                    # Ensure integers
+                    try:
+                        state_dict[field_name] = int(extracted_value) if extracted_value is not None else default_value
+                    except (ValueError, TypeError):
+                        state_dict[field_name] = default_value
+                elif field_name == 'review_sufficient':
+                    # Ensure boolean
+                    try:
+                        state_dict[field_name] = bool(extracted_value) if extracted_value is not None else default_value
+                    except (ValueError, TypeError):
+                        state_dict[field_name] = default_value
                 else:
-                    state_dict[field] = value
+                    # String fields and others
+                    state_dict[field_name] = extracted_value
             
-            # Create and return new WorkflowState
+            # Check for any additional fields in the source state that we might have missed
+            try:
+                if hasattr(state, 'keys'):
+                    source_keys = set(state.keys())
+                elif hasattr(state, '__dict__'):
+                    source_keys = set(state.__dict__.keys())
+                else:
+                    source_keys = set()
+                
+                known_keys = set(all_fields.keys())
+                missing_keys = source_keys - known_keys
+                
+                if missing_keys:
+                    logger.debug(f"Found additional fields in source state: {missing_keys}")
+                    # Add any missing fields to preserve data
+                    for key in missing_keys:
+                        if key not in state_dict:
+                            additional_value = self._safe_get_state_value(state, key)
+                            if additional_value is not None:
+                                logger.debug(f"Preserving additional field: {key}")
+                                # Note: These won't be part of WorkflowState schema, but we log them
+                                
+            except Exception as e:
+                logger.debug(f"Could not check for additional fields: {str(e)}")
+            
+            # Create WorkflowState with all extracted data
             try:
                 new_state = WorkflowState(**state_dict)
-                logger.debug("Successfully created WorkflowState from converted data")
+                logger.debug(f"Successfully converted to WorkflowState with {len(state_dict)} fields")
                 return new_state
+                
             except Exception as validation_error:
-                logger.error(f"WorkflowState validation failed: {str(validation_error)}")
-                # Return a minimal valid WorkflowState
-                return WorkflowState(error=f"State conversion validation failed: {str(validation_error)}")
+                logger.error(f"Pydantic validation failed: {str(validation_error)}")
+                logger.error(f"Failed state_dict keys: {list(state_dict.keys())}")
+                
+                # Return minimal valid state with error info
+                return WorkflowState(
+                    error=f"State conversion validation failed: {str(validation_error)}"
+                )
             
         except Exception as e:
-            logger.error(f"Error converting state to WorkflowState: {str(e)}", exc_info=True)
+            logger.error(f"Error converting {type(state)} to WorkflowState: {str(e)}", exc_info=True)
             return WorkflowState(error=f"State conversion failed: {str(e)}")
 
     def execute_code_generation_workflow(self, workflow_state: WorkflowState) -> WorkflowState:
         """
         Execute code generation workflow using LangGraph execution.
-        FIXED: Enhanced error handling and state sanitization.
+        FIXED: Removed manual sanitization, rely on Pydantic validation.
         """
         try:
-            logger.debug("Starting enhanced code generation workflow")
+            logger.debug("Starting code generation workflow")
             
             # Set initial step
             workflow_state.current_step = "generate"
@@ -462,9 +427,6 @@ class WorkflowManager:
                 workflow_state.error = error_msg
                 return workflow_state
             
-            # FIXED: Sanitize state before passing to LangGraph
-            clean_state = self._sanitize_workflow_state(workflow_state)
-            
             # Get the compiled workflow
             compiled_workflow = self.get_compiled_workflow()
             
@@ -472,10 +434,15 @@ class WorkflowManager:
             config = {"recursion_limit": 50}  # Reasonable limit for code generation
             
             logger.debug("Invoking LangGraph workflow for code generation")
-            raw_result = compiled_workflow.invoke(clean_state, config)
+            raw_result = compiled_workflow.invoke(workflow_state, config)
             
-            # Convert the result back to a WorkflowState object
-            result = self._convert_state_to_workflow_state(raw_result)
+            # Convert result (LangGraph returns AddableValuesDict, not WorkflowState)
+            if isinstance(raw_result, WorkflowState):
+                result = raw_result
+                logger.debug("LangGraph returned WorkflowState directly")
+            else:
+                logger.debug(f"LangGraph returned {type(raw_result)}, converting to WorkflowState")
+                result = self._convert_state_to_workflow_state(raw_result)
             
             # Validate the result
             if hasattr(result, 'error') and result.error:
@@ -492,13 +459,14 @@ class WorkflowManager:
 
     def execute_review_workflow(self, workflow_state: WorkflowState, student_review: str) -> WorkflowState:
         """
-        Execute review analysis workflow using LangGraph execution.        .
+        Execute review analysis workflow using LangGraph execution.
+        FIXED: Removed manual sanitization, rely on Pydantic validation.
         """
         try:
-            logger.debug("Starting enhanced review workflow")
+            logger.debug("Starting review workflow")
             logger.debug(f"Processing review: {student_review[:100]}...")  # Log first 100 chars
             
-            # FIXED: Enhanced review validation
+            # Enhanced review validation
             if not student_review or not student_review.strip():
                 error_msg = "Student review cannot be empty"
                 logger.error(error_msg)
@@ -515,7 +483,8 @@ class WorkflowManager:
             # Set the pending review and current step
             workflow_state.pending_review = review_text
             workflow_state.current_step = "review"
-            print(f"Pending review set: {workflow_state.pending_review[:100]}...")  # Log first 100 chars
+            logger.debug(f"Pending review set: {workflow_state.pending_review[:100]}...")  # Log first 100 chars
+            
             # Ensure max iterations are set
             if not hasattr(workflow_state, 'max_iterations') or int(workflow_state.max_iterations) <= 0:
                 workflow_state.max_iterations = 3
@@ -537,31 +506,24 @@ class WorkflowManager:
                 workflow_state.error = error_msg
                 return workflow_state
             
-            # FIXED: Sanitize state before passing to LangGraph to prevent validation errors
-            logger.debug("Sanitizing workflow state before LangGraph execution")
-            clean_state = self._sanitize_workflow_state(workflow_state)
-            print(f"Clean state prepared for review processing: {workflow_state}")  # Log clean state
             # Get the compiled workflow
             compiled_workflow = self.get_compiled_workflow()
             
-            # FIXED: Execute the workflow with proper configuration
+            # Execute the workflow with proper configuration
             config = {"recursion_limit": 30}  # Reasonable limit for review processing
             
             logger.info("Invoking LangGraph workflow for review processing")
-            raw_result = compiled_workflow.invoke(clean_state, config)
-            #print(f"Raw result received: {raw_result}")  # Log raw result
-            # FIXED: Enhanced state conversion with better error handling
-            try:
-                result = self._convert_state_to_workflow_state(raw_result)
-                logger.debug("State conversion completed successfully")
-            except Exception as conversion_error:
-                logger.error(f"State conversion failed: {str(conversion_error)}", exc_info=True)
-                # Create a fallback result
-                result = WorkflowState()
-                result.error = f"State conversion failed: {str(conversion_error)}"
-                return result
+            raw_result = compiled_workflow.invoke(workflow_state, config)
             
-            # FIXED: Enhanced result validation
+            # Convert result (LangGraph returns AddableValuesDict, not WorkflowState)
+            if isinstance(raw_result, WorkflowState):
+                result = raw_result
+                logger.debug("LangGraph returned WorkflowState directly")
+            else:
+                logger.debug(f"LangGraph returned {type(raw_result)}, converting to WorkflowState")
+                result = self._convert_state_to_workflow_state(raw_result)
+            
+            # Enhanced result validation
             if hasattr(result, 'error') and result.error:
                 logger.error(f"Review workflow returned error: {result.error}")
             else:
@@ -586,10 +548,10 @@ class WorkflowManager:
     def execute_full_workflow(self, workflow_state: WorkflowState) -> WorkflowState:
         """
         Execute the complete workflow using LangGraph execution.
-        FIXED: Enhanced workflow execution with state sanitization.
+        FIXED: Removed manual sanitization, rely on Pydantic validation.
         """
         try:
-            logger.debug("Executing enhanced full workflow")
+            logger.debug("Executing full workflow")
             
             # Set initial step
             workflow_state.current_step = "generate"
@@ -606,9 +568,6 @@ class WorkflowManager:
                 workflow_state.error = error_msg
                 return workflow_state
             
-            # FIXED: Sanitize state before passing to LangGraph
-            clean_state = self._sanitize_workflow_state(workflow_state)
-            
             # Get the compiled workflow
             compiled_workflow = self.get_compiled_workflow()
             
@@ -616,10 +575,15 @@ class WorkflowManager:
             config = {"recursion_limit": 100}  # Higher limit for full workflow
             
             logger.debug("Invoking LangGraph workflow for full execution")
-            raw_result = compiled_workflow.invoke(clean_state, config)
+            raw_result = compiled_workflow.invoke(workflow_state, config)
             
-            # Convert the result back to a WorkflowState object
-            result = self._convert_state_to_workflow_state(raw_result)
+            # Convert result (LangGraph returns AddableValuesDict, not WorkflowState)
+            if isinstance(raw_result, WorkflowState):
+                result = raw_result
+                logger.debug("LangGraph returned WorkflowState directly")
+            else:
+                logger.debug(f"LangGraph returned {type(raw_result)}, converting to WorkflowState")
+                result = self._convert_state_to_workflow_state(raw_result)
             
             # Validate completion
             if hasattr(result, 'error') and result.error:
@@ -660,7 +624,6 @@ class WorkflowManager:
     def validate_workflow_state(self, state: WorkflowState) -> Tuple[bool, str]:
         """
         Validate that the workflow state is ready for execution.
-        FIXED: Enhanced validation with better error messages.
         """
         try:
             # Check required parameters
@@ -705,7 +668,7 @@ class WorkflowManager:
             if hasattr(state, 'max_evaluation_attempts') and int(state.max_evaluation_attempts)  <= 0:
                 return False, "Max evaluation attempts must be a positive integer"
             
-            logger.debug("Enhanced workflow state validation passed")
+            logger.debug("Workflow state validation passed")
             return True, ""
             
         except Exception as e:
@@ -715,7 +678,6 @@ class WorkflowManager:
     def get_workflow_status(self, state: WorkflowState) -> Dict[str, Any]:
         """
         Get the current status of the workflow with enhanced information.
-        FIXED: Better status reporting for debugging submit issues.
         """
         try:
             # Basic status information

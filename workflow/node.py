@@ -306,50 +306,27 @@ class WorkflowNodes:
     
     def review_code_node(self, state: WorkflowState) -> WorkflowState:
         """
-        PHASE 2: Enhanced review node that handles both initial setup and review continuation.
-        FIXED: Better state management and submit processing integration.
+        PHASE 2: Enhanced review node with FIXED logic.
+        CORRECTED: Proper state management for all scenarios.
         """
         try:
-            logger.debug("PHASE 2: Review code node - Enhanced processing")
+            logger.info("PHASE 2: Review code node - Enhanced processing")
             
             # Get current state information
             current_iteration = getattr(state, "current_iteration", 1)
+            max_iterations = getattr(state, "max_iterations", 3)
             review_history = getattr(state, "review_history", [])
             pending_review = getattr(state, "pending_review", None)
+            review_sufficient = getattr(state, "review_sufficient", False)
             
-            logger.debug(f"PHASE 2: Current iteration: {current_iteration}, "
+            logger.info(f"PHASE 2: Current iteration: {current_iteration}/{max_iterations}, "
                         f"Review history count: {len(review_history)}, "
-                        f"Pending review: {'Yes' if pending_review else 'No'}")
+                        f"Pending review: {'Yes' if pending_review else 'No'}, "
+                        f"Review sufficient: {review_sufficient}")
             
-            # SCENARIO 1: Initial review setup (no review history yet)
-            if not review_history:
-                logger.debug("PHASE 2: Setting up initial review phase")
-                
-                # Validate code snippet exists
-                if not hasattr(state, 'code_snippet') or state.code_snippet is None:
-                    state.error = "No code snippet available for review"
-                    return state
-                
-                # Initialize review state with proper defaults
-                if not hasattr(state, 'max_iterations') or state.max_iterations <= 0:
-                    state.max_iterations = 3
-                if not hasattr(state, 'review_sufficient'):
-                    state.review_sufficient = False
-                if not hasattr(state, 'review_history'):
-                    state.review_history = []
-                if not hasattr(state, 'current_iteration') or state.current_iteration <= 0:
-                    state.current_iteration = 1
-                
-                # Clear any pending review from previous sessions
-                state.pending_review = None
-                state.current_step = "review"
-                
-                logger.debug(f"PHASE 2: Ready for review iteration {state.current_iteration}/{state.max_iterations}")
-                return state
-            
-            # SCENARIO 2: Processing submitted review (pending review exists)
-            elif pending_review and pending_review.strip():
-                logger.debug(f"PHASE 2: Processing submitted review for iteration {current_iteration}")
+            # SCENARIO 1: Processing submitted review (highest priority)
+            if pending_review and pending_review.strip():
+                logger.info(f"PHASE 2: Processing submitted review for iteration {current_iteration}")
                 
                 # Validate the pending review
                 review_text = pending_review.strip()
@@ -358,7 +335,7 @@ class WorkflowNodes:
                     state.error = "Review is too short. Please provide a more detailed review."
                     return state
                 
-                # FIXED: Create review attempt with proper initialization
+                # Create review attempt
                 try:
                     review_attempt = ReviewAttempt(
                         student_review=review_text,
@@ -373,8 +350,8 @@ class WorkflowNodes:
                     logger.debug(f"PHASE 2: Review attempt created and added to history (iteration {current_iteration})")
                     logger.debug(f"PHASE 2: Review history now has {len(state.review_history)} entries")
                     
-                    # IMPORTANT: Keep pending_review set so the conditional edge can detect it
-                    # It will be cleared in the analyze_review_node
+                    # Keep pending_review set for conditional edge detection
+                    # It will be cleared in analyze_review_node
                     
                 except Exception as review_error:
                     logger.error(f"Error creating review attempt: {str(review_error)}")
@@ -383,25 +360,65 @@ class WorkflowNodes:
                 
                 return state
             
-            # SCENARIO 3: Continuation after analysis (no pending review, but has history)
+            # SCENARIO 2: Initial setup OR continuation (no pending review)
             else:
-                logger.debug("PHASE 2: Review continuation or waiting state")
-                
-                # Check if we should continue or if we're done
-                if hasattr(state, 'review_sufficient') and state.review_sufficient:
+                # Check if workflow should end
+                if review_sufficient:
                     logger.debug("PHASE 2: Review marked as sufficient")
+                    state.current_step = "review"
                     return state
                 
-                # Check if we've reached max iterations
-                if current_iteration > getattr(state, 'max_iterations', 3):
+                if current_iteration > max_iterations:
                     logger.debug("PHASE 2: Max iterations reached")
+                    state.current_step = "review" 
                     return state
                 
-                # Waiting for next review submission
-                state.current_step = "review"
-                logger.debug("PHASE 2: Waiting for next student review submission...")
-                return state
-            
+                # Check if all errors found in latest review
+                if review_history and len(review_history) > 0:
+                    latest_review = review_history[-1]
+                    if hasattr(latest_review, 'analysis') and latest_review.analysis:
+                        analysis = latest_review.analysis
+                        identified_count = analysis.get(t('identified_count'), 0)
+                        total_problems = analysis.get(t('total_problems'), 0)
+                        
+                        if identified_count >= total_problems and total_problems > 0:
+                            logger.debug(f"PHASE 2: All {total_problems} errors found in latest review")
+                            state.review_sufficient = True
+                            state.current_step = "review"
+                            return state
+                
+                # SCENARIO 2A: Initial setup (first time)
+                if not review_history:
+                    logger.debug("PHASE 2: Setting up initial review phase")
+                    
+                    # Validate code snippet exists
+                    if not hasattr(state, 'code_snippet') or state.code_snippet is None:
+                        state.error = "No code snippet available for review"
+                        return state
+                    
+                    # Initialize review state with proper defaults
+                    if not hasattr(state, 'max_iterations') or state.max_iterations <= 0:
+                        state.max_iterations = 3
+                    if not hasattr(state, 'review_sufficient'):
+                        state.review_sufficient = False
+                    if not hasattr(state, 'review_history'):
+                        state.review_history = []
+                    if not hasattr(state, 'current_iteration') or state.current_iteration <= 0:
+                        state.current_iteration = 1
+                    
+                    # Clear any pending review from previous sessions
+                    state.pending_review = None
+                    state.current_step = "review"
+                    
+                    logger.debug(f"PHASE 2: Ready for review iteration {state.current_iteration}/{state.max_iterations}")
+                    return state
+                
+                # SCENARIO 2B: Continuation (waiting for next review)
+                else:
+                    logger.debug("PHASE 2: Waiting for next student review submission...")
+                    state.current_step = "review"
+                    return state
+                
         except Exception as e:
             logger.error(f"Error in review_code_node: {str(e)}", exc_info=True)
             state.error = f"Error in review phase: {str(e)}"
@@ -413,7 +430,7 @@ class WorkflowNodes:
         FIXED: Better error handling and state management for submit processing.
         """
         try:
-            logger.debug("PHASE 2: Starting enhanced review analysis")
+            logger.info("PHASE 2: Starting enhanced review analysis")
             
             # FIXED: Clear the pending review FIRST to prevent infinite loops
             if hasattr(state, 'pending_review'):
@@ -441,8 +458,7 @@ class WorkflowNodes:
                     
             code_snippet = state.code_snippet.code
             raw_errors = state.code_snippet.raw_errors
-            
-            # Extract known problems from raw errors
+           
             known_problems = []
             original_error_count = getattr(state, "original_error_count", 0)
 
@@ -451,13 +467,13 @@ class WorkflowNodes:
                     for error_type, errors in raw_errors.items():
                         for error in errors:
                             if isinstance(error, dict):
-                                error_name = error.get('error_name', error.get('name', ''))
-                                category = error.get('category', error.get('type', ''))
-                                description = error.get('description', '')
+                                error_name = error.get(t('error_name_variable'), error.get('name', ''))
+                                category = error.get(t('category'), error.get('type', ''))
+                                description = error.get(t('description'), '')   
                                 known_problems.append(f"{category} - {error_name}: {description}")
-                                
-                logger.debug(f"PHASE 2: Extracted {len(known_problems)} known problems")
-                                
+
+                logger.info(f"PHASE 2: Extracted {len(known_problems)} known problems")
+
             except Exception as extraction_error:
                 logger.error(f"Error extracting known problems: {str(extraction_error)}")
                 # Continue with empty known_problems - better than failing completely
@@ -519,7 +535,7 @@ class WorkflowNodes:
                     
                     # Mark review as sufficient if all errors are found
                     if identified_count >= original_error_count:
-                        analysis[t("review_sufficient")] = True
+                        analysis["review_sufficient"] = True
                         state.review_sufficient = True
                         logger.debug("PHASE 2: All errors found! Marking review as sufficient.")
                 else:

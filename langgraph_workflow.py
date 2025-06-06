@@ -250,34 +250,6 @@ class JavaCodeReviewGraph:
                     f"{t('check_review_history')}."
                 )
 
-    def execute_full_workflow(self, state: WorkflowState) -> WorkflowState:
-        """
-        Execute the complete workflow from start to finish.
-        
-        Args:
-            state: Initial workflow state
-            
-        Returns:
-            Final workflow state after complete execution
-        """
-        try:
-            logger.debug("Executing full workflow")
-            
-            # Use the workflow manager execution method
-            result = self.workflow_manager.execute_full_workflow(state)
-            
-            logger.debug("Full workflow execution completed")
-            return result
-            
-        except Exception as e:
-            logger.error(f"Error executing full workflow: {str(e)}")
-            state.error = f"Full workflow execution failed: {str(e)}"
-            return state
-    
-    def get_all_error_categories(self) -> Dict[str, List[str]]:
-        """Get all available error categories."""
-        return self.workflow_manager.get_all_error_categories()
-    
     def validate_state(self, state: WorkflowState) -> tuple[bool, str]:
         """Validate the workflow state."""
         return self.workflow_manager.validate_workflow_state(state)
