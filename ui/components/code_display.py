@@ -353,10 +353,10 @@ class CodeDisplayUI:
         """, unsafe_allow_html=True)
         
         # FIXED: Use timestamp-based keys to avoid conflicts
-        timestamp = int(time.time() * 1000)  # milliseconds for uniqueness
-        text_area_key = f"review_input_{iteration_count}_{timestamp}"
-        submit_button_key = f"submit_review_{iteration_count}_{timestamp}"
-        clear_button_key = f"clear_review_{iteration_count}_{timestamp}"
+        #timestamp = int(time.time() * 1000)  # milliseconds for uniqueness
+        text_area_key = f"review_input"
+        submit_button_key = f"submit_review"
+        clear_button_key = f"clear_review"
         
         # FIXED: Check for success flag and clear input accordingly
         success_flag = f"review_submitted_success_{iteration_count}"

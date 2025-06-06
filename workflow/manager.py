@@ -515,7 +515,7 @@ class WorkflowManager:
             # Set the pending review and current step
             workflow_state.pending_review = review_text
             workflow_state.current_step = "review"
-            
+            print(f"Pending review set: {workflow_state.pending_review[:100]}...")  # Log first 100 chars
             # Ensure max iterations are set
             if not hasattr(workflow_state, 'max_iterations') or int(workflow_state.max_iterations) <= 0:
                 workflow_state.max_iterations = 3
@@ -540,20 +540,20 @@ class WorkflowManager:
             # FIXED: Sanitize state before passing to LangGraph to prevent validation errors
             logger.debug("Sanitizing workflow state before LangGraph execution")
             clean_state = self._sanitize_workflow_state(workflow_state)
-            
+            print(f"Clean state prepared for review processing: {workflow_state}")  # Log clean state
             # Get the compiled workflow
             compiled_workflow = self.get_compiled_workflow()
             
             # FIXED: Execute the workflow with proper configuration
             config = {"recursion_limit": 30}  # Reasonable limit for review processing
             
-            logger.debug("Invoking LangGraph workflow for review processing")
+            logger.info("Invoking LangGraph workflow for review processing")
             raw_result = compiled_workflow.invoke(clean_state, config)
-            
+            #print(f"Raw result received: {raw_result}")  # Log raw result
             # FIXED: Enhanced state conversion with better error handling
             try:
                 result = self._convert_state_to_workflow_state(raw_result)
-                logger.info("State conversion completed successfully")
+                logger.debug("State conversion completed successfully")
             except Exception as conversion_error:
                 logger.error(f"State conversion failed: {str(conversion_error)}", exc_info=True)
                 # Create a fallback result

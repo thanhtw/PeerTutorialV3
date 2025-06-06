@@ -3,6 +3,7 @@ Simplified LangGraph Workflow for Java Peer Review Training System.
 
 This module implements the code review workflow as a LangGraph graph
 by leveraging the modular components from the workflow package.
+FIXED: Submit button now properly uses LangGraph workflow execution.
 """
 
 __all__ = ['JavaCodeReviewGraph']
@@ -33,6 +34,7 @@ class JavaCodeReviewGraph:
     
     This class provides a clean interface to the LangGraph workflow
     with straightforward execution methods.
+    FIXED: Now properly uses LangGraph workflow execution for review processing.
     """
     
     def __init__(self, llm_manager=None):
@@ -97,7 +99,8 @@ class JavaCodeReviewGraph:
     
     def submit_review(self, state: WorkflowState, student_review: str) -> WorkflowState:
         """
-        Submit a student review and update the state.
+        Submit a student review and update the state using proper LangGraph workflow execution.
+        FIXED: Now uses workflow manager instead of directly calling nodes.
         
         Args:
             state: Current workflow state
@@ -106,29 +109,39 @@ class JavaCodeReviewGraph:
         Returns:
             Updated workflow state with analysis
         """
-        logger.debug(f"Submitting review for iteration {state.current_iteration}")
-        
-        # Create a new review attempt
-        review_attempt = ReviewAttempt(
-            student_review=student_review,
-            iteration_number=state.current_iteration,
-            analysis={},
-            targeted_guidance=None
-        )
-        
-        # Add to review history
-        state.review_history.append(review_attempt)
-        
-        # Run the state through the analyze_review node
-        updated_state = self.workflow_nodes.analyze_review_node(state)
-        
-        # Check if this is the last iteration or review is sufficient
-        if (updated_state.current_iteration > updated_state.max_iterations or 
-            updated_state.review_sufficient):
-            # Generate comparison report for feedback tab
-            self._generate_review_feedback(updated_state)
-        
-        return updated_state
+        try:
+            logger.debug(f"Submitting review for iteration {state.current_iteration}")
+            logger.debug(f"Review text length: {len(student_review)} characters")
+            
+            # Validate input
+            if not student_review or not student_review.strip():
+                logger.error("Student review cannot be empty")
+                state.error = "Student review cannot be empty"
+                return state
+            
+            review_text = student_review.strip()
+            if len(review_text) < 10:
+                logger.error("Student review too short")
+                state.error = "Student review too short (minimum 10 characters)"
+                return state
+            
+            # FIXED: Use workflow manager to execute review workflow instead of direct node call
+            logger.debug("Executing review workflow through WorkflowManager")
+            updated_state = self.workflow_manager.execute_review_workflow(state, review_text)
+            
+            # Check if this is the last iteration or review is sufficient
+            if (updated_state.current_iteration > updated_state.max_iterations or 
+                updated_state.review_sufficient):
+                # Generate comparison report for feedback tab
+                self._generate_review_feedback(updated_state)
+            
+            logger.debug("Review submission completed successfully")
+            return updated_state
+            
+        except Exception as e:
+            logger.error(f"Error in submit_review: {str(e)}", exc_info=True)
+            state.error = f"Review submission failed: {str(e)}"
+            return state
     
     def _generate_review_feedback(self, state: WorkflowState) -> None:
         """
