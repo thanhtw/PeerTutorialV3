@@ -309,6 +309,8 @@ Provide ONLY the guidance text with no introduction or explanation.
 """
 
 # Comparison Report Prompt Template
+# Replace the comparison_report_template in prompts/en.py with this:
+
 comparison_report_template = """You are an educational assessment expert creating a detailed, informative code review feedback report for a Java programming student.
 
 CONTEXT:
@@ -325,27 +327,75 @@ CORRECTLY IDENTIFIED ISSUES:
 MISSED ISSUES:
 {missed_text}
 
-
 {progress_info}
 
 REPORT REQUIREMENTS:
-1. Create a comprehensive educational report in markdown format
-2. Include these sections:
-- Performance Summary (with metrics and overall assessment)
-- Correctly Identified Issues (with praise for what they found correctly)
-- Missed Issues (with educational explanations of why they matter)
-- Tips for Improvement (specific, actionable advice based on their performance)
+1. Create a comprehensive educational report in JSON format
+2. Be educational and constructive, not just evaluative
+3. Use a warm, encouraging tone while maintaining honesty about areas for improvement
+4. Focus on helping them become a better code reviewer, not just scoring this attempt
+5. Highlight patterns in what they missed or found to help them improve systematically
+6. Include specific Java code review tips relevant to their performance
+7. Provide actionable guidance for improvement
 
-3. Be educational and constructive, not just evaluative
-4. Use a warm, encouraging tone while maintaining honesty about areas for improvement
-5. Focus on helping them become a better code reviewer, not just scoring this attempt
-6. Highlight patterns in what they missed or found to help them improve systematically
-7. Include specific Java code review tips relevant to their performance
-8. Make the report visually readable with appropriate markdown formatting
+RESPONSE FORMAT:
+You must respond with a valid JSON object containing these exact fields:
 
-IMPORTANT FORMATTING:
-- Use markdown for clear organization (headers, bullet points, etc.)
-- Format code snippets in markdown code blocks if referring to specific code
-- Use bold or italic text for emphasis where appropriate
-- Keep paragraphs reasonably short for readability
-"""
+```json
+{{
+  "performance_summary": {{
+    "total_issues": {total_problems},
+    "identified_count": {identified_count},
+    "accuracy_percentage": {accuracy:.1f},
+    "missed_count": {len_missed_str},
+    "overall_assessment": "Brief overall assessment of the student's performance",
+    "completion_status": "Current status of the review (e.g., 'Excellent work', 'Good progress', 'Needs improvement')"
+  }},
+  "correctly_identified_issues": [
+    {{
+      "issue_description": "Description of the correctly identified issue",
+      "praise_comment": "Specific praise for finding this issue and what it shows about their skills"
+    }}
+  ],
+  "missed_issues": [
+    {{
+      "issue_description": "Description of the missed issue",
+      "why_important": "Educational explanation of why this issue matters",
+      "how_to_find": "Specific guidance on how to identify this type of issue in the future"
+    }}
+  ],
+  "tips_for_improvement": [
+    {{
+      "category": "Area for improvement (e.g., 'Logic Analysis', 'Syntax Review', 'Code Quality')",
+      "tip": "Specific, actionable advice",
+      "example": "Brief example or technique to illustrate the tip"
+    }}
+  ],
+  "java_specific_guidance": [
+    {{
+      "topic": "Java-specific area (e.g., 'Null Pointer Safety', 'Exception Handling', 'Type Safety')",
+      "guidance": "Specific advice for Java code review in this area"
+    }}
+  ],
+  "encouragement_and_next_steps": {{
+    "positive_feedback": "Encouraging comments about their progress and strengths",
+    "next_focus_areas": "What they should focus on in their next review attempt",
+    "learning_objectives": "Key learning goals based on their current performance"
+  }},
+  "detailed_feedback": {{
+    "strengths_identified": ["List of specific strengths shown in their review"],
+    "improvement_patterns": ["Patterns in what they missed that suggest areas for focused learning"],
+    "review_approach_feedback": "Feedback on their overall approach to code review"
+  }}
+}}
+```
+
+IMPORTANT INSTRUCTIONS:
+- Return ONLY the JSON object, no additional text or markdown formatting
+- Ensure all JSON strings are properly escaped
+- Keep individual text fields concise but informative (2-3 sentences max per field)
+- Base all feedback on the actual performance data provided
+- Be specific and constructive in all feedback elements
+- If there are no correctly identified issues, use an empty array []
+- If there are no missed issues, use an empty array []
+- Ensure the JSON is valid and parseable"""

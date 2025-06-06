@@ -311,6 +311,8 @@ feedback_template = """作為Java導師提供針對性的代碼審查指導，�
 """
 
 # Comparison Report Prompt Template
+# Replace the comparison_report_template in prompts/zh.py with this:
+
 comparison_report_template = """您是一位教育評估專家，正在為Java程式設計學生創建詳細、有信息量的代碼審查反饋報告。
 
 背景：
@@ -327,27 +329,75 @@ comparison_report_template = """您是一位教育評估專家，正在為Java�
 遺漏的問題：
 {missed_text}
 
-
 {progress_info}
 
 報告要求：
-1. 創建一份全面的教育報告，使用markdown格式
-2. 包含以下部分：
-- 績效摘要（包含指標和整體評估）
-- 正確識別的問題（讚揚他們正確找到的內容）
-- 遺漏的問題（解釋為什麼這些問題很重要）
-- 改進提示（基於他們的表現提供具體、可行的建議）
+1. 創建一份全面的教育報告，使用JSON格式
+2. 具有教育性和建設性，而不僅僅是評估性
+3. 使用溫暖、鼓勵的語調，同時誠實面對需要改進的地方
+4. 專注於幫助他們成為更好的代碼審查者，而不僅僅是評分這次嘗試
+5. 突出他們遺漏或發現的模式，以幫助他們系統性地改進
+6. 包含與他們表現相關的具體Java代碼審查提示
+7. 提供可行的改進指導
 
-3. 具有教育性和建設性，而不僅僅是評估性
-4. 使用溫暖、鼓勵的語調，同時誠實面對需要改進的地方
-5. 專注於幫助他們成為更好的代碼審查者，而不僅僅是評分這次嘗試
-6. 突出他們遺漏或發現的模式，以幫助他們系統性地改進
-7. 包含與他們表現相關的具體Java代碼審查提示
-8. 使報告在視覺上易於閱讀，使用適當的markdown格式
+回應格式：
+您必須回應一個包含以下確切字段的有效JSON物件：
 
-重要格式說明：
-- 使用markdown進行清晰的組織（標題、項目符號等）
-- 如果引用特定代碼，使用markdown代碼塊格式化代碼片段
-- 使用粗體或斜體文本進行強調
-- 保持段落合理簡短，便於閱讀
-"""
+```json
+{{
+  "performance_summary": {{
+    "total_issues": {total_problems},
+    "identified_count": {identified_count},
+    "accuracy_percentage": {accuracy:.1f},
+    "missed_count": {len_missed_str},
+    "overall_assessment": "學生表現的簡要整體評估",
+    "completion_status": "審查的目前狀態（如：'優秀表現'、'進步良好'、'需要改進'）"
+  }},
+  "correctly_identified_issues": [
+    {{
+      "issue_description": "正確識別問題的描述",
+      "praise_comment": "對發現此問題的具體讚揚以及這顯示了他們的哪些技能"
+    }}
+  ],
+  "missed_issues": [
+    {{
+      "issue_description": "遺漏問題的描述",
+      "why_important": "為什麼這個問題很重要的教育性解釋",
+      "how_to_find": "關於未來如何識別這類問題的具體指導"
+    }}
+  ],
+  "tips_for_improvement": [
+    {{
+      "category": "改進領域（如：'邏輯分析'、'語法審查'、'代碼品質'）",
+      "tip": "具體、可行的建議",
+      "example": "說明提示的簡要範例或技巧"
+    }}
+  ],
+  "java_specific_guidance": [
+    {{
+      "topic": "Java特定領域（如：'空指針安全'、'異常處理'、'類型安全'）",
+      "guidance": "在此領域進行Java代碼審查的具體建議"
+    }}
+  ],
+  "encouragement_and_next_steps": {{
+    "positive_feedback": "關於他們進步和優勢的鼓勵性評論",
+    "next_focus_areas": "他們在下次審查嘗試中應該專注的內容",
+    "learning_objectives": "基於他們目前表現的關鍵學習目標"
+  }},
+  "detailed_feedback": {{
+    "strengths_identified": ["他們在審查中顯示的具體優勢列表"],
+    "improvement_patterns": ["他們遺漏的模式，建議重點學習的領域"],
+    "review_approach_feedback": "對他們整體代碼審查方法的反饋"
+  }}
+}}
+```
+
+重要指示：
+- 僅返回JSON物件，無額外文字或markdown格式
+- 確保所有JSON字串都正確轉義
+- 保持各個文字字段簡潔但有信息量（每個字段最多2-3句話）
+- 基於提供的實際表現數據提供所有反饋
+- 在所有反饋元素中要具體且建設性
+- 如果沒有正確識別的問題，使用空陣列[]
+- 如果沒有遺漏的問題，使用空陣列[]
+- 確保JSON有效且可解析"""
