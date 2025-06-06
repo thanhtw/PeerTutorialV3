@@ -8,7 +8,7 @@ from typing import Dict, List, Any, Optional
 from data.database_error_repository import DatabaseErrorRepository
 from utils.language_utils import t, get_current_language
 from static.css_utils import load_css
-from utils.code_utils import _get_category_icon, _get_difficulty_icon
+from utils.code_utils import _get_category_icon, _get_difficulty_icon, add_line_numbers
 from state_schema import WorkflowState
 
 logger = logging.getLogger(__name__)
@@ -71,189 +71,6 @@ class ErrorExplorerUI:
         # Main content area
         self._render_error_content()
     
-    def _render_practice_mode(self):
-        """Render the streamlined practice mode."""
-        practice_error = st.session_state.get("practice_error_data", {})
-        error_name = practice_error.get("error_name", t("unknown_error"))
-        
-        # Practice mode header
-        st.markdown(f"""
-        <div style="background: linear-gradient(90deg, #4CAF50, #45a049); color: white; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <h2 style="margin: 0; color: white;">🎯 {t('practice_mode')}: {error_name}</h2>
-                    <p style="margin: 0.5rem 0 0 0; color: white;">{t('focused_practice_session_error_type')}</p>
-                </div>
-                <div>
-                    <button onclick="window.location.reload()" style="background: rgba(255,255,255,0.2); border: 1px solid white; color: white; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">
-                        {t('exit_practice_mode')}
-                    </button>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Practice workflow status
-        workflow_status = st.session_state.get("practice_workflow_status", "setup")
-        
-        if workflow_status == "setup":
-            self._render_practice_setup(practice_error)
-        elif workflow_status == "code_ready":
-            self._render_practice_review_interface()
-        elif workflow_status == "review_complete":
-            self._render_practice_feedback()
-        
-        # Exit practice mode button
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            if st.button(f"🏠 {t('exit_practice_mode')}", key="exit_practice", use_container_width=True):
-                self._exit_practice_mode()
-    
-    def _render_practice_setup(self, practice_error):
-        """Render the practice setup phase."""
-        st.subheader(f"🔧 {t('generating_practice_code')}")
-        
-        # Show error details
-        with st.expander(f"📋 {t('error_details')}", expanded=True):
-            st.markdown(f"**{t('error')}:** {practice_error.get('error_name', t('unknown_error'))}")
-            st.markdown(f"**{t('description')}:** {practice_error.get('description', t('no_description_available'))}")
-            if practice_error.get('implementation_guide'):
-                st.markdown(f"**{t('how_to_identify')}:** {practice_error.get('implementation_guide')}")
-        
-        # Debug info for workflow
-        if not self.workflow:
-            st.error(f"❌ {t('no_workflow_available_practice')}")
-            st.info(t('debug_workflow_not_initialized'))
-            
-            # Show diagnostic info
-            with st.expander(f"🔧 {t('diagnostic_information')}", expanded=False):
-                st.code(f"""
-{t('workflow_status')}: {self.workflow}
-{t('session_state_keys')}: {list(st.session_state.keys())}
-{t('practice_mode_active')}: {st.session_state.get('practice_mode_active', False)}
-                """)
-            return
-        
-        # Auto-generate code (this runs once when practice mode starts)
-        if "practice_code_generated" not in st.session_state:
-            self._generate_practice_code(practice_error)
-    
-    def _generate_practice_code(self, practice_error):
-        """Generate practice code in the background."""
-        if not self.workflow:
-            logger.error("No workflow available for practice mode")
-            st.error(f"❌ {t('practice_mode_requires_workflow_refresh')}")
-            st.info(t('debug_info_workflow_none'))
-            return
-        
-        try:
-            with st.spinner(f"🔧 {t('generating_your_practice_code')}"):
-                # Prepare workflow state
-                workflow_state = self._prepare_practice_workflow_state(practice_error)
-                
-                if not workflow_state:
-                    st.error(f"❌ {t('failed_prepare_practice_session')}")
-                    return
-                
-                # Execute code generation
-                logger.info(f"Executing code generation with workflow: {type(self.workflow)}")
-                updated_state = self.workflow.execute_code_generation(workflow_state)
-                
-                # Validate result
-                if hasattr(updated_state, 'error') and updated_state.error:
-                    st.error(f"❌ {t('failed_to_generate_practice_code')}: {updated_state.error}")
-                    return
-                
-                if not hasattr(updated_state, 'code_snippet') or not updated_state.code_snippet:
-                    st.error(f"❌ {t('failed_to_generate_practice_code')}: No code generated")
-                    return
-                
-                # Store results
-                st.session_state.practice_workflow_state = updated_state
-                st.session_state.practice_code_generated = True
-                st.session_state.practice_workflow_status = "code_ready"
-                
-                # Track usage
-                try:
-                    error_code = practice_error.get('error_code', '')
-                    if error_code:
-                        self.repository.update_error_usage(
-                            error_code=error_code,
-                            action_type='practiced',
-                            context={'source': 'practice_mode', 'method': 'streamlined'}
-                        )
-                except Exception as e:
-                    logger.debug(f"Could not track error usage: {str(e)}")
-                
-                st.success(f"✅ {t('practice_code_generated_successfully_rerun')}")
-                time.sleep(1)
-                st.rerun()
-                
-        except Exception as e:
-            logger.error(f"Error generating practice code: {str(e)}", exc_info=True)
-            st.error(f"❌ {t('error_setting_up_practice_session')}: {str(e)}")
-            st.info(t('please_refresh_start_again'))
-    
-    def _render_practice_review_interface(self):
-        """Render the integrated review interface for practice mode."""
-        workflow_state = st.session_state.get("practice_workflow_state")
-        
-        if not workflow_state or not hasattr(workflow_state, 'code_snippet'):
-            st.error(t('no_practice_session_data'))
-            return
-        
-        # Display the code
-        st.subheader(f"☕ {t('review_this_java_code')}")
-        st.info(f"🎯 {t('look_for_specific_error_practicing')}")
-        
-        # Code display
-        code_to_display = workflow_state.code_snippet.clean_code
-        st.code(code_to_display, language="java")
-        
-        # Review input section
-        st.subheader(f"📝 {t('your_review')}")
-        
-        # Get current iteration info
-        current_iteration = getattr(workflow_state, 'current_iteration', 1)
-        max_iterations = getattr(workflow_state, 'max_iterations', 3)
-        
-        # Show previous review if exists
-        review_history = getattr(workflow_state, 'review_history', [])
-        if review_history:
-            latest_review = review_history[-1]
-            if hasattr(latest_review, 'targeted_guidance') and latest_review.targeted_guidance:
-                st.markdown(f"""
-                <div style="background: #e3f2fd; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-                    <h4>💡 {t('guidance_for_improvement')}</h4>
-                    <p>{latest_review.targeted_guidance}</p>
-                </div>
-                """, unsafe_allow_html=True)
-        
-        # Review input
-        review_key = f"practice_review_{current_iteration}"
-        student_review = st.text_area(
-            t('enter_your_review_attempt').format(current_iteration=current_iteration, max_iterations=max_iterations),
-            height=200,
-            key=review_key,
-            placeholder=t('example_review_format_line')
-        )
-        
-        # Submit review
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            submit_disabled = not student_review or len(student_review.strip()) < 10
-            if st.button(
-                f"🚀 {t('submit_review_attempt').format(current_iteration=current_iteration)}", 
-                disabled=submit_disabled,
-                key=f"submit_practice_review_{current_iteration}",
-                use_container_width=True
-            ):
-                self._process_practice_review(student_review.strip())
-        
-        with col2:
-            if st.button(f"🔄 {t('generate_new_code')}", key="regenerate_practice"):
-                self._regenerate_practice_code()
-    
     def _process_practice_review(self, student_review):
         """Process the submitted practice review."""
         try:
@@ -283,61 +100,6 @@ class ErrorExplorerUI:
         except Exception as e:
             logger.error(f"Error processing practice review: {str(e)}")
             st.error(f"❌ {t('error_processing_review')}: {str(e)}")
-    
-    def _render_practice_feedback(self):
-        """Render the practice session feedback."""
-        workflow_state = st.session_state.get("practice_workflow_state")
-        
-        if not workflow_state:
-            st.error(t('no_practice_session_data'))
-            return
-        
-        st.subheader(f"🎉 {t('practice_session_complete')}")
-        
-        # Get analysis results
-        review_history = getattr(workflow_state, 'review_history', [])
-        if review_history:
-            latest_review = review_history[-1]
-            if hasattr(latest_review, 'analysis') and latest_review.analysis:
-                analysis = latest_review.analysis
-                
-                # Performance metrics
-                col1, col2, col3 = st.columns(3)
-                
-                with col1:
-                    identified = analysis.get(t('identified_count'), 0)
-                    total = analysis.get(t('total_problems'), 1)
-                    st.metric(t('issues_found'), f"{identified}/{total}")
-                
-                with col2:
-                    accuracy = analysis.get(t('identified_percentage'), 0)
-                    st.metric(t('accuracy'), f"{accuracy:.1f}%")
-                
-                with col3:
-                    attempts = len(review_history)
-                    st.metric(t('attempts_used'), attempts)
-                
-                # Show comparison report if available
-                comparison_report = getattr(workflow_state, 'comparison_report', None)
-                if comparison_report:
-                    st.subheader(f"📊 {t('detailed_feedback')}")
-                    st.markdown(comparison_report)
-        
-        # Action buttons
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if st.button(f"🔄 {t('practice_this_error_again')}", use_container_width=True):
-                self._restart_practice_session()
-        
-        with col2:
-            if st.button(f"🎯 {t('practice_different_error')}", use_container_width=True):
-                self._exit_practice_mode()
-        
-        with col3:
-            if st.button(f"📈 {t('view_progress_dashboard')}", use_container_width=True):
-                self._exit_practice_mode()
-                st.session_state.active_tab = 4  # Dashboard tab
     
     def _restart_practice_session(self):
         """Restart the practice session with the same error."""
@@ -603,19 +365,17 @@ class ErrorExplorerUI:
                                 st.markdown('<hr class="example-divider">', unsafe_allow_html=True)
                 
             
-            col1, col2, col3 = st.columns([1, 5, 1])
-            with col2:
-                # Fixed: Use unique key to avoid setIn error
-                practice_key = f"practice_{error_code}_{hash(error_name) % 1000}"
-                if st.button(
+            
+            practice_key = f"practice_{error_code}_{hash(error_name) % 1000}"
+            if st.button(
                     f"🚀 {t('start_practice_session')}", 
                     key=practice_key, 
                     use_container_width=True,
                     type="primary",
                     help=t('generate_practice_code_with_error_type')
-                ):
+            ):
                     # FIXED: Avoid multiple st.rerun() calls that cause setIn error
-                    self._start_practice_session(error)
+                self._start_practice_session(error)
 
     def _start_practice_session(self, error: Dict[str, Any]):
         """
@@ -803,3 +563,553 @@ class ErrorExplorerUI:
             </div>
         </div>
         """, unsafe_allow_html=True)
+
+
+
+    def _render_practice_mode(self):
+        """Render the enhanced professional practice mode interface."""
+        practice_error = st.session_state.get("practice_error_data", {})
+        error_name = practice_error.get("error_name", t("unknown_error"))
+        error_code = practice_error.get("error_code", "")
+        difficulty = practice_error.get("difficulty_level", "medium")
+        category = practice_error.get("category", "")
+        
+        # Professional practice mode header with enhanced styling
+        self._render_professional_practice_header(error_name, difficulty, category)
+        
+        # Main practice workflow based on status
+        workflow_status = st.session_state.get("practice_workflow_status", "setup")
+        
+        if workflow_status == "setup":
+            self._render_professional_practice_setup(practice_error)
+        elif workflow_status == "code_ready":
+            self._render_professional_practice_review()
+        elif workflow_status == "review_complete":
+            self._render_professional_practice_feedback()
+
+    def _render_professional_practice_header(self, error_name: str, difficulty: str, category: str):
+        """Render enhanced professional practice mode header."""
+        # Difficulty colors and icons
+        difficulty_config = {
+            "easy": {"color": "#28a745", "icon": "🟢", "bg": "#d4edda"},
+            "medium": {"color": "#ffc107", "icon": "🟡", "bg": "#fff3cd"},
+            "hard": {"color": "#dc3545", "icon": "🔴", "bg": "#f8d7da"}
+        }
+        
+        config = difficulty_config.get(difficulty, difficulty_config["medium"])
+        category_icon = _get_category_icon(category.lower()) if category else "📚"
+        
+        st.markdown(f"""
+        <div class="professional-practice-header">
+            <div class="practice-header-content">
+                <div class="practice-title-section">
+                    <div class="practice-mode-badge">
+                        <span class="practice-icon">🎯</span>
+                        <span class="practice-label">{t('practice_mode')}</span>
+                    </div>
+                    <h1 class="practice-error-title">{error_name}</h1>
+                    <div class="practice-meta-info">
+                        <span class="practice-category">
+                            <span class="category-icon">{category_icon}</span>
+                            {category}
+                        </span>
+                        <span class="practice-difficulty" style="background: {config['bg']}; color: {config['color']};">
+                            <span class="difficulty-icon">{config['icon']}</span>
+                            {t(difficulty)}
+                        </span>
+                    </div>
+                </div>
+                <div class="practice-actions-section">
+                    <div class="practice-progress-indicator">
+                        <div class="progress-step active">1</div>
+                        <div class="progress-connector"></div>
+                        <div class="progress-step">2</div>
+                        <div class="progress-connector"></div>
+                        <div class="progress-step">3</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    def _render_professional_practice_setup(self, practice_error):
+        """Render the enhanced professional practice setup phase."""
+        st.markdown(f"""
+        <div class="professional-practice-container">
+            <div class="practice-section-header">
+                <span class="section-icon">⚙️</span>
+                <div>
+                    <h3 class="section-title">{t('preparing_practice_session')}</h3>
+                    <p class="section-subtitle">{t('generating_custom_code_challenge')}</p>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Enhanced error details with professional cards
+        self._render_enhanced_error_details(practice_error)
+        
+        # Workflow validation and generation
+        if not self.workflow:
+            self._render_workflow_error_message()
+            return
+        
+        # Auto-generate code with enhanced status
+        if "practice_code_generated" not in st.session_state:
+            self._generate_practice_code_professional(practice_error)
+
+    def _render_enhanced_error_details(self, practice_error):
+        """Render enhanced error details with professional styling."""
+        description = practice_error.get('description', t('no_description_available'))
+        implementation_guide = practice_error.get('implementation_guide', '')
+        difficulty = practice_error.get('difficulty_level', 'medium')
+        
+        st.markdown(f"""
+        <div class="enhanced-error-details-container">
+            <div class="error-details-header">
+                <h4><span class="details-icon">📋</span> {t('error_overview')}</h4>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Create columns for better layout
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            # Description card
+            st.markdown(f"""
+            <div class="detail-card description-card">
+                <div class="card-header">
+                    <span class="card-icon">📝</span>
+                    <h5>{t('what_youll_learn')}</h5>
+                </div>
+                <div class="card-content">
+                    {description}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            if implementation_guide:
+                # Implementation guide card
+                st.markdown(f"""
+                <div class="detail-card guide-card">
+                    <div class="card-header">
+                        <span class="card-icon">💡</span>
+                        <h5>{t('identification_tips')}</h5>
+                    </div>
+                    <div class="card-content">
+                        {implementation_guide}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        with col2:
+            # Session info card
+            st.markdown(f"""
+            <div class="detail-card session-info-card">
+                <div class="card-header">
+                    <span class="card-icon">⚡</span>
+                    <h5>{t('session_details')}</h5>
+                </div>
+                <div class="card-content">
+                    <div class="info-item">
+                        <span class="info-label">{t('difficulty')}:</span>
+                        <span class="info-value difficulty-{difficulty}">{t(difficulty)}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">{t('focus_area')}:</span>
+                        <span class="info-value">{t('single_error_type')}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">{t('attempts')}:</span>
+                        <span class="info-value">3 {t('maximum')}</span>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    def _render_workflow_error_message(self):
+        """Render professional workflow error message."""
+        st.markdown(f"""
+        <div class="workflow-error-container">
+            <div class="error-icon">⚠️</div>
+            <h3>{t('practice_session_unavailable')}</h3>
+            <p>{t('workflow_system_not_initialized')}</p>
+            <div class="error-actions">
+                <button onclick="window.location.reload()" class="refresh-button">
+                    🔄 {t('refresh_page')}
+                </button>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    def _generate_practice_code_professional(self, practice_error):
+        """Generate practice code with enhanced professional status display."""
+        if not self.workflow:
+            logger.error("No workflow available for practice mode")
+            st.error(f"❌ {t('practice_mode_requires_workflow_refresh')}")
+            return
+        
+        try:
+            # Enhanced status container
+            status_container = st.container()
+            
+            with status_container:
+                st.markdown(f"""
+                <div class="generation-status-container">
+                    <div class="status-header">
+                        <span class="status-icon">🚀</span>
+                        <h4>{t('generating_practice_challenge')}</h4>
+                    </div>
+                    <div class="status-content">
+                        <div class="progress-bar-container">
+                            <div class="progress-bar animated"></div>
+                        </div>
+                        <p class="status-message">{t('creating_custom_code_with_error')}</p>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Execute the generation
+            workflow_state = self._prepare_practice_workflow_state(practice_error)
+            
+            if not workflow_state:
+                st.error(f"❌ {t('failed_prepare_practice_session')}")
+                return
+            
+            logger.info(f"Executing code generation with workflow: {type(self.workflow)}")
+            updated_state = self.workflow.execute_code_generation(workflow_state)
+            
+            # Validate and handle result
+            if hasattr(updated_state, 'error') and updated_state.error:
+                st.error(f"❌ {t('failed_to_generate_practice_code')}: {updated_state.error}")
+                return
+            
+            if not hasattr(updated_state, 'code_snippet') or not updated_state.code_snippet:
+                st.error(f"❌ {t('failed_to_generate_practice_code')}: No code generated")
+                return
+            
+            # Store results and update status
+            st.session_state.practice_workflow_state = updated_state
+            st.session_state.practice_code_generated = True
+            st.session_state.practice_workflow_status = "code_ready"
+            
+            # Track usage
+            try:
+                error_code = practice_error.get('error_code', '')
+                if error_code:
+                    self.repository.update_error_usage(
+                        error_code=error_code,
+                        action_type='practiced',
+                        context={'source': 'practice_mode', 'method': 'professional'}
+                    )
+            except Exception as e:
+                logger.debug(f"Could not track error usage: {str(e)}")
+            
+            # Success message with enhanced styling
+            st.markdown(f"""
+            <div class="generation-success-container">
+                <div class="success-icon">✨</div>
+                <h4>{t('practice_challenge_ready')}</h4>
+                <p>{t('code_generated_successfully_review_time')}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            time.sleep(1)
+            st.rerun()
+            
+        except Exception as e:
+            logger.error(f"Error generating practice code: {str(e)}", exc_info=True)
+            st.error(f"❌ {t('error_setting_up_practice_session')}: {str(e)}")
+
+    def _render_professional_practice_review(self):
+        """Render the enhanced professional practice review interface."""
+        workflow_state = st.session_state.get("practice_workflow_state")
+        
+        if not workflow_state or not hasattr(workflow_state, 'code_snippet'):
+            st.error(t('no_practice_session_data'))
+            return
+        
+        # Enhanced practice review container
+        st.markdown(f"""
+        <div class="professional-practice-review-container">
+            <div class="review-phase-header">
+                <div class="phase-indicator">
+                    <span class="phase-icon">👀</span>
+                    <div class="phase-info">
+                        <h3>{t('code_review_phase')}</h3>
+                        <p>{t('analyze_code_find_specific_error')}</p>
+                    </div>
+                </div>
+                <div class="practice-tips">
+                    <span class="tip-icon">💡</span>
+                    <span>{t('look_for_specific_error_practicing')}</span>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Enhanced code display section
+        self._render_enhanced_code_display(workflow_state)
+        
+        # Enhanced review input section
+        self._render_enhanced_review_input(workflow_state)
+
+    def _render_enhanced_code_display(self, workflow_state):
+        """Render enhanced code display for practice mode."""
+        code_to_display = workflow_state.code_snippet.clean_code
+        
+        # Professional code container
+        st.markdown(f"""
+        <div class="enhanced-code-container">
+            <div class="code-header-professional">
+                <div class="code-meta">
+                    <span class="file-icon">📄</span>
+                    <span class="file-name">PracticeChallenge.java</span>
+                </div>
+                <div class="code-stats">
+                    <span class="stat-item">
+                        <span class="stat-icon">📏</span>
+                        <span>{len(code_to_display.split())} {t('lines')}</span>
+                    </span>
+                    <span class="language-badge">☕ Java</span>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Code display with professional styling
+        st.code(add_line_numbers(code_to_display), language="java")
+
+    def _render_enhanced_review_input(self, workflow_state):
+        """Render enhanced review input section for practice mode."""
+        current_iteration = getattr(workflow_state, 'current_iteration', 1)
+        max_iterations = getattr(workflow_state, 'max_iterations', 3)
+        
+        # Show guidance if available
+        review_history = getattr(workflow_state, 'review_history', [])
+        if review_history:
+            latest_review = review_history[-1]
+            if hasattr(latest_review, 'targeted_guidance') and latest_review.targeted_guidance:
+                st.markdown(f"""
+                <div class="professional-guidance-container">
+                    <div class="guidance-header">
+                        <span class="guidance-icon">🎯</span>
+                        <h4>{t('personalized_guidance')}</h4>
+                    </div>
+                    <div class="guidance-content">
+                        {latest_review.targeted_guidance}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # Enhanced review input container
+        st.markdown(f"""
+        <div class="enhanced-review-input-container">
+            <div class="input-section-header">
+                <div class="input-meta">
+                    <span class="input-icon">✍️</span>
+                    <div class="input-info">
+                        <h4>{t('submit_your_analysis')}</h4>
+                        <p>{t('attempt')} {current_iteration} {t('of')} {max_iterations}</p>
+                    </div>
+                </div>
+                <div class="attempt-progress">
+                    <div class="progress-circles">
+                        {"".join(f'<div class="circle {"active" if i < current_iteration else ""}"></div>' for i in range(1, max_iterations + 1))}
+                    </div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Review input
+        review_key = f"practice_review_{current_iteration}"
+        student_review = st.text_area(
+            "",
+            height=250,
+            key=review_key,
+            placeholder=f"🔍 {t('example_review_format_line')}",
+            label_visibility="collapsed"
+        )
+        
+        # Enhanced action buttons - REMOVED DISABLED FUNCTIONALITY
+        col1, col2, col3 = st.columns([2, 2, 1])
+        
+        with col1:
+            # REMOVED: submit_disabled = not student_review or len(student_review.strip()) < 10
+            if st.button(
+                f"🚀 {t('submit_analysis')}",
+                # REMOVED: disabled=submit_disabled,
+                key=f"submit_practice_review_{current_iteration}",
+                use_container_width=True,
+                type="primary"
+            ):
+                # Add basic validation in the processing function instead
+                if student_review and student_review.strip():
+                    self._process_practice_review(student_review.strip())
+                else:
+                    st.warning(f"⚠️ {t('please_enter_review')}")
+        
+        with col2:
+            if st.button(
+                f"🔄 {t('generate_new_challenge')}",
+                key="regenerate_practice",
+                use_container_width=True
+            ):
+                self._regenerate_practice_code()
+        
+        with col3:
+            if st.button(
+                f"🏠 {t('exit')}",
+                key="exit_practice_from_review",
+                use_container_width=True
+            ):
+                self._exit_practice_mode()
+
+    def _render_professional_practice_feedback(self):
+        """Render the enhanced professional practice feedback interface."""
+        workflow_state = st.session_state.get("practice_workflow_state")
+        
+        if not workflow_state:
+            st.error(t('no_practice_session_data'))
+            return
+        
+        # Professional feedback header
+        st.markdown(f"""
+        <div class="professional-feedback-header">
+            <div class="feedback-celebration">
+                <div class="celebration-icon">🎉</div>
+                <div class="celebration-content">
+                    <h2>{t('practice_session_complete')}</h2>
+                    <p>{t('excellent_work_analysis_complete')}</p>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Enhanced results dashboard
+        self._render_enhanced_results_dashboard(workflow_state)
+        
+        # Enhanced action panel
+        self._render_enhanced_action_panel()
+
+    def _render_enhanced_results_dashboard(self, workflow_state):
+        """Render enhanced results dashboard with detailed metrics."""
+        review_history = getattr(workflow_state, 'review_history', [])
+        
+        if review_history:
+            latest_review = review_history[-1]
+            analysis = getattr(latest_review, 'analysis', {}) if hasattr(latest_review, 'analysis') else {}
+            
+            identified = analysis.get(t('identified_count'), 0)
+            total = analysis.get(t('total_problems'), 1)
+            accuracy = analysis.get(t('identified_percentage'), 0)
+            attempts = len(review_history)
+            
+            # Enhanced metrics dashboard
+            st.markdown(f"""
+            <div class="enhanced-results-dashboard">
+                <div class="dashboard-header">
+                    <h3><span class="dashboard-icon">📊</span> {t('performance_summary')}</h3>
+                </div>
+                <div class="metrics-grid">
+                    <div class="metric-card primary">
+                        <div class="metric-icon">🎯</div>
+                        <div class="metric-content">
+                            <div class="metric-value">{identified}/{total}</div>
+                            <div class="metric-label">{t('issues_identified')}</div>
+                        </div>
+                    </div>
+                    <div class="metric-card success">
+                        <div class="metric-icon">📈</div>
+                        <div class="metric-content">
+                            <div class="metric-value">{accuracy:.1f}%</div>
+                            <div class="metric-label">{t('accuracy_score')}</div>
+                        </div>
+                    </div>
+                    <div class="metric-card info">
+                        <div class="metric-icon">🔄</div>
+                        <div class="metric-content">
+                            <div class="metric-value">{attempts}</div>
+                            <div class="metric-label">{t('attempts_used')}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Detailed feedback section
+            comparison_report = getattr(workflow_state, 'comparison_report', None)
+            if comparison_report:
+                st.markdown(f"""
+                <div class="detailed-feedback-container">
+                    <div class="feedback-header">
+                        <h4><span class="feedback-icon">💭</span> {t('detailed_analysis')}</h4>
+                    </div>
+                    <div class="feedback-content">
+                        {comparison_report}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+    def _render_enhanced_action_panel(self):
+        """Render enhanced action panel with professional styling."""
+        st.markdown(f"""
+        <div class="enhanced-action-panel">
+            <div class="action-header">
+                <h4><span class="action-icon">🚀</span> {t('what_would_you_like_to_do_next')}</h4>
+            </div>
+            <div class="action-grid">
+                <div class="action-option">
+                    <div class="option-icon">🔄</div>
+                    <div class="option-content">
+                        <h5>{t('practice_again')}</h5>
+                        <p>{t('retry_same_error_type_new_code')}</p>
+                    </div>
+                </div>
+                <div class="action-option">
+                    <div class="option-icon">🎯</div>
+                    <div class="option-content">
+                        <h5>{t('try_different_error')}</h5>
+                        <p>{t('explore_other_error_types_library')}</p>
+                    </div>
+                </div>
+                <div class="action-option">
+                    <div class="option-icon">📈</div>
+                    <div class="option-content">
+                        <h5>{t('view_progress')}</h5>
+                        <p>{t('check_overall_learning_progress')}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Action buttons
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button(
+                f"🔄 {t('practice_same_error')}",
+                use_container_width=True,
+                type="primary"
+            ):
+                self._restart_practice_session()
+        
+        with col2:
+            if st.button(
+                f"🎯 {t('explore_more_errors')}",
+                use_container_width=True,
+                type="secondary"
+            ):
+                self._exit_practice_mode()
+        
+        with col3:
+            if st.button(
+                f"📈 {t('view_dashboard')}",
+                use_container_width=True,
+                type="secondary"
+            ):
+                self._exit_practice_mode()
+                st.session_state.active_tab = 4 

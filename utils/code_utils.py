@@ -202,7 +202,6 @@ def add_line_numbers(code: str) -> str:
         logger.error(f"Error adding line numbers: {str(e)}")
         return code  # Return original code if numbering fails
 
-
 def extract_both_code_versions(response) -> Tuple[str, str]:
     """
     Extract both annotated and clean code versions from LLM response.

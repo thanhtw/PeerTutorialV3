@@ -1,5 +1,6 @@
 """
 CSS utility functions for loading and managing CSS in Streamlit applications.
+Updated to include practice mode CSS support.
 """
 import os
 import streamlit as st
@@ -44,14 +45,44 @@ def load_css(css_file=None, css_directory=None):
                     css_content += f.read()
                     loaded_files.append("components.css")
             
-            # Finally load tabs.css
+            # Then load tabs.css
             tabs_css_path = os.path.join(css_directory, "tabs.css")
             if os.path.exists(tabs_css_path):
                 with open(tabs_css_path, 'r', encoding='utf-8') as f:
                     css_content += f.read()
                     loaded_files.append("tabs.css")
             
-            # Load any remaining CSS files (except main.css which is now obsolete)
+            # Load error_explorer subdirectory CSS files in specific order
+            error_explorer_dir = os.path.join(css_directory, "error_explorer")
+            if os.path.exists(error_explorer_dir) and os.path.isdir(error_explorer_dir):
+                # Define loading order for error explorer CSS
+                error_explorer_files = ["header.css", "layout.css", "cards.css", "practice_mode.css"]
+                
+                for filename in error_explorer_files:
+                    file_path = os.path.join(error_explorer_dir, filename)
+                    if os.path.exists(file_path):
+                        try:
+                            with open(file_path, 'r', encoding='utf-8') as f:
+                                css_content += f.read()
+                                loaded_files.append(f"error_explorer/{filename}")
+                        except UnicodeDecodeError as e:
+                            # Try with different encodings as fallback
+                            try:
+                                with open(file_path, 'r', encoding='utf-8-sig') as f:
+                                    css_content += f.read()
+                                    loaded_files.append(f"error_explorer/{filename}")
+                            except UnicodeDecodeError:
+                                try:
+                                    with open(file_path, 'r', encoding='latin1') as f:
+                                        css_content += f.read()
+                                        loaded_files.append(f"error_explorer/{filename}")
+                                    st.warning(f"CSS file error_explorer/{filename} loaded with latin1 encoding")
+                                except Exception as fallback_error:
+                                    st.error(f"Could not load CSS file error_explorer/{filename}: {str(fallback_error)}")
+                        except Exception as e:
+                            st.error(f"Error loading CSS file error_explorer/{filename}: {str(e)}")
+            
+            # Finally load any remaining CSS files (except main.css which is now obsolete)
             for filename in sorted(os.listdir(css_directory)):
                 if (filename.endswith('.css') and 
                     filename not in ["base.css", "components.css", "tabs.css", "main.css"]):
@@ -91,6 +122,7 @@ def load_css(css_file=None, css_directory=None):
 def load_css_safe(css_file=None, css_directory=None, encoding='utf-8'):
     """
     Safe CSS loading function with better error handling and encoding options.
+    Updated to include practice mode CSS support.
     
     Args:
         css_file: Path to single CSS file
@@ -145,6 +177,20 @@ def load_css_safe(css_file=None, css_directory=None, encoding='utf-8'):
                     css_content += content
                     loaded_files.append(priority_file)
         
+        # Load error_explorer subdirectory CSS files
+        error_explorer_dir = os.path.join(css_directory, "error_explorer")
+        if os.path.exists(error_explorer_dir) and os.path.isdir(error_explorer_dir):
+            # Define loading order for error explorer CSS
+            error_explorer_files = ["header.css", "layout.css", "cards.css", "practice_mode.css"]
+            
+            for filename in error_explorer_files:
+                file_path = os.path.join(error_explorer_dir, filename)
+                if os.path.exists(file_path):
+                    content = safe_read_file(file_path, f"error_explorer/{filename}")
+                    if content is not None:
+                        css_content += content
+                        loaded_files.append(f"error_explorer/{filename}")
+        
         # Load remaining CSS files (except main.css which is obsolete)
         try:
             for filename in sorted(os.listdir(css_directory)):
@@ -172,3 +218,17 @@ def load_css_safe(css_file=None, css_directory=None, encoding='utf-8'):
         'loaded_files': loaded_files,
         'errors': errors
     }
+
+
+def load_error_explorer_css():
+    """
+    Convenience function to load Error Explorer CSS including practice mode styles.
+    
+    Returns:
+        Dictionary with loading results
+    """
+    import os
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    css_dir = os.path.join(current_dir, "..", "static", "css")
+    
+    return load_css_safe(css_directory=css_dir)
