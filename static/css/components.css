@@ -797,65 +797,257 @@ border-left: 3px solid #4c68d7;
 /* static/css/components.css - Feedback System UI Styles */
 
 .comparison-report {
-  padding: 1rem;
-  background-color: var(--card-bg-secondary, #f9fafb);
-  border-radius: 6px;
-  border: 1px solid var(--border-light, #eee);
+  padding: 2rem 2.5rem;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 16px;
+  border: 2px solid #4c68d7;
+  margin-bottom: 2rem;
+  line-height: 1.7;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 1.08em;
+  box-shadow: 0 8px 32px rgba(76, 104, 215, 0.08), 0 2px 8px rgba(0,0,0,0.04);
+  color: #23272f;
+  transition: box-shadow 0.2s, border-color 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.comparison-report::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 8px;
+  background: linear-gradient(180deg, #4c68d7 0%, #764ba2 100%);
+  border-radius: 16px 0 0 16px;
+  opacity: 0.9;
+}
+
+.comparison-report h2,
+.comparison-report h3,
+.comparison-report h4 {
+  color: #4c68d7;
+  margin-top: 1.2em;
+  margin-bottom: 0.5em;
+  font-weight: 700;
+}
+
+.comparison-report ul,
+.comparison-report ol {
+  margin-left: 1.5em;
+  margin-bottom: 1em;
+}
+
+.comparison-report .metric-row {
+  display: flex;
+  gap: 2.5rem;
   margin-bottom: 1.5rem;
-  line-height: 1.6;
-  white-space: pre-wrap; /* To respect formatting from the report */
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* More readable font */
+  flex-wrap: wrap;
 }
 
-.feedback-issue-item {
-  padding: 0.75rem 1rem;
-  margin: 0.75rem 0;
-  border-radius: 5px;
-  background-color: var(--card-bg-transparent, rgba(0,0,0,0.02)); /* Very subtle bg */
+.comparison-report .metric {
+  background: #fff;
+  border-radius: 10px;
+  padding: 1rem 1.5rem;
+  box-shadow: 0 2px 8px rgba(76,104,215,0.06);
+  border-left: 4px solid #4c68d7;
+  min-width: 160px;
+  margin-bottom: 0.5rem;
 }
 
-.feedback-issue-item.identified {
-  border-left: 4px solid var(--success, #4CAF50);
-  background-color: rgba(76, 175, 80, 0.07); /* Lighter green */
+.comparison-report .metric-title {
+  font-size: 0.95em;
+  color: #6c757d;
+  margin-bottom: 0.2em;
+  font-weight: 500;
 }
 
-.feedback-issue-item.missed {
-  border-left: 4px solid var(--error, #dc3545);
-  background-color: rgba(220, 53, 69, 0.07); /* Lighter red */
+.comparison-report .metric-value {
+  font-size: 1.5em;
+  font-weight: 700;
+  color: #4c68d7;
 }
 
-.feedback-issue-item div { /* Target inner divs for consistent margin */
-  margin-bottom: 0.3rem;
-}
-.feedback-issue-item div:last-child {
-  margin-bottom: 0;
-}
-
-.feedback-issue-item .issue-property { /* For "Problem:", "Hint:", "Student Comment:" */
+.comparison-report .section-title {
+  font-size: 1.15em;
+  color: #764ba2;
+  margin-top: 1.5em;
+  margin-bottom: 0.7em;
   font-weight: 600;
-  color: var(--text-heading);
+  letter-spacing: 0.5px;
 }
 
-/* Styling for matplotlib charts if needed, though usually handled by Streamlit's theme */
-.stpyplot {
-  margin-top: 1rem;
-  margin-bottom: 1.5rem;
-  background-color: var(--card-bg, white);
-  padding: 1rem;
+.comparison-report .issue-list {
+  margin: 0.5em 0 1.5em 0;
+  padding: 0;
+  list-style: none;
+}
+
+.comparison-report .issue-list li {
+  background: #f1f3fa;
+  border-left: 4px solid #28a745;
+  margin-bottom: 0.7em;
+  padding: 0.7em 1em;
+  border-radius: 6px;
+  font-size: 1em;
+  color: #23272f;
+  box-shadow: 0 1px 4px rgba(40,167,69,0.04);
+}
+
+.comparison-report .issue-list li.missed {
+  border-left-color: #dc3545;
+  background: #fff0f3;
+}
+
+.comparison-report .json-block {
+  background: #23272f;
+  color: #f8f9fa;
+  font-family: 'Fira Mono', 'Consolas', 'Menlo', monospace;
+  font-size: 0.98em;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  padding: 1.2em 1em;
+  margin: 1.5em 0;
+  overflow-x: auto;
+  box-shadow: 0 2px 8px rgba(76,104,215,0.08);
 }
 
-/* Styling for tabs in feedback section */
-.feedback-tabs .stTabs [data-baseweb="tab-list"] { /* Add a wrapper class if needed */
-    border-bottom: 2px solid var(--border-light, #eee);
+.comparison-report .tips-section {
+  background: linear-gradient(90deg, #e3f0ff 0%, #f8f9fa 100%);
+  border-left: 4px solid #4c68d7;
+  border-radius: 8px;
+  padding: 1em 1.5em;
+  margin: 1.5em 0;
+  color: #23272f;
 }
-.feedback-tabs .stTabs [data-baseweb="tab"] {
-    padding: 0.75rem 1.25rem;
+
+.comparison-report .encouragement {
+  background: linear-gradient(90deg, #eafaf1 0%, #f8f9fa 100%);
+  border-left: 4px solid #28a745;
+  border-radius: 8px;
+  padding: 1em 1.5em;
+  margin: 1.5em 0;
+  color: #155724;
+  font-weight: 500;
 }
-.feedback-tabs .stTabs [data-baseweb="tab"][aria-selected="true"] {
-    color: var(--primary);
-    border-bottom-color: var(--primary);
+
+.comparison-report .next-steps {
+  background: #fffbe6;
+  border-left: 4px solid #ffc107;
+  border-radius: 8px;
+  padding: 1em 1.5em;
+  margin: 1.5em 0;
+  color: #856404;
+  font-weight: 500;
+}
+
+.comparison-report .section-divider {
+  border: none;
+  border-top: 2px solid #e9ecef;
+  margin: 2em 0;
+}
+
+.comparison-report .json-title {
+  color: #764ba2;
+  font-size: 1.1em;
+  font-weight: 600;
+  margin-bottom: 0.5em;
+}
+
+.comparison-report .review-progress {
+  margin: 1.5em 0;
+  padding: 1em 1.5em;
+  background: linear-gradient(90deg, #e3f0ff 0%, #f8f9fa 100%);
+  border-radius: 8px;
+  border-left: 4px solid #4c68d7;
+  color: #495057;
+  font-size: 1em;
+}
+
+.comparison-report .badge {
+  display: inline-block;
+  background: #4c68d7;
+  color: #fff;
+  border-radius: 12px;
+  padding: 0.2em 0.8em;
+  font-size: 0.95em;
+  font-weight: 600;
+  margin-right: 0.5em;
+}
+
+.comparison-report .praise {
+  color: #28a745;
+  font-weight: 600;
+}
+
+.comparison-report .warning {
+  color: #dc3545;
+  font-weight: 600;
+}
+
+.comparison-report .tip {
+  color: #764ba2;
+  font-weight: 500;
+}
+
+.comparison-report .java-guidance {
+  color: #007bff;
+  font-weight: 500;
+}
+
+.comparison-report .feedback-list {
+  margin: 0.5em 0 1.5em 0;
+  padding: 0;
+  list-style: disc inside;
+}
+
+.comparison-report .feedback-list li {
+  margin-bottom: 0.5em;
+  color: #23272f;
+  font-size: 1em;
+}
+
+.comparison-report .summary-section {
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 1.2em 1.5em;
+  margin: 1.5em 0;
+  border-left: 4px solid #764ba2;
+  color: #23272f;
+  font-size: 1.05em;
+}
+
+.comparison-report .summary-title {
+  color: #764ba2;
+  font-size: 1.1em;
+  font-weight: 600;
+  margin-bottom: 0.5em;
+}
+
+.comparison-report .strengths {
+  color: #28a745;
+  font-weight: 500;
+}
+
+.comparison-report .improvements {
+  color: #dc3545;
+  font-weight: 500;
+}
+
+/* Optional: For even more professional look, add a subtle hover effect */
+.comparison-report:hover {
+  box-shadow: 0 12px 40px rgba(76, 104, 215, 0.16), 0 4px 16px rgba(0,0,0,0.08);
+  border-color: #764ba2;
+}
+
+/* Professional variant for future use */
+.comparison-report-professional {
+  /* Inherit all .comparison-report styles, but can override for special cases */
+  background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
+  border: 2.5px solid #764ba2;
+  box-shadow: 0 16px 48px rgba(76, 104, 215, 0.13), 0 4px 16px rgba(0,0,0,0.10);
+  font-size: 1.12em;
+  padding: 2.5rem 3rem;
+  border-radius: 20px;
+  /* Add more overrides as needed */
 }
 
 /* static/css/components.css - Tutorial UI Styles */

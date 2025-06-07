@@ -10,6 +10,8 @@ from utils.language_utils import t, get_current_language
 from static.css_utils import load_css
 from utils.code_utils import _get_category_icon, _get_difficulty_icon, add_line_numbers
 from state_schema import WorkflowState
+import json
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -991,8 +993,465 @@ class ErrorExplorerUI:
         # Enhanced results dashboard
         self._render_enhanced_results_dashboard(workflow_state)
         
+        # Extract and render comparison report if available
+        comparison_report = getattr(workflow_state, 'comparison_report', None)
+        if comparison_report:
+            self._render_comparison_report(comparison_report)
+        
         # Enhanced action panel
         self._render_enhanced_action_panel()
+
+    def _render_comparison_report(self, comparison_report: str):
+        """
+        Extract and render the comparison report JSON with professional layout and CSS.
+        """
+        # Extract JSON object after "=== RESPONSE ==="
+        json_text = ""
+        if "=== RESPONSE ===" in comparison_report:
+            # If the report is a full LLM log, extract after marker
+            json_text = comparison_report.split("=== RESPONSE ===", 1)[-1].strip()
+        else:
+            # Otherwise, try to find the first JSON object in the string
+            match = re.search(r'\{[\s\S]+\}', comparison_report)
+            if match:
+                json_text = match.group(0)
+            else:
+                st.warning("No valid comparison report found.")
+                return
+
+        # Try to parse JSON
+        try:
+            report_data = json.loads(json_text)
+        except Exception as e:
+            st.error(f"Failed to parse comparison report: {e}")
+            st.code(json_text)
+            return
+
+        # Enhanced CSS for professional report layout
+        st.markdown("""
+        <style>
+        .comparison-report-container {
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            padding: 2.5rem;
+            margin: 2rem 0;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            border: 1px solid #e9ecef;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .comparison-report-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #4CAF50 0%, #2196F3 50%, #FF9800 100%);
+        }
+        
+        .comparison-section-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1a202c;
+            margin: 2rem 0 1rem 0;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .comparison-section-title:first-child {
+            margin-top: 0;
+        }
+        
+        .comparison-summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            background: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+        
+        .comparison-summary-table th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 1.5rem;
+            font-weight: 600;
+            text-align: left;
+            font-size: 0.95rem;
+            letter-spacing: 0.5px;
+        }
+        
+        .comparison-summary-table td {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #f1f5f9;
+            color: #374151;
+            font-size: 1rem;
+            transition: background-color 0.2s ease;
+        }
+        
+        .comparison-summary-table tr:hover td {
+            background-color: #f8fafc;
+        }
+        
+        .comparison-summary-table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .comparison-badge {
+            display: inline-flex;
+            align-items: center;
+            background: linear-gradient(135deg, #e0f2fe 0%, #b3e5fc 100%);
+            color: #0277bd;
+            border-radius: 20px;
+            padding: 0.4rem 1rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-right: 0.75rem;
+            margin-bottom: 0.5rem;
+            box-shadow: 0 2px 4px rgba(2, 119, 189, 0.1);
+            border: 1px solid #81d4fa;
+        }
+        
+        .comparison-issue-list {
+            margin: 1rem 0;
+            padding: 0;
+            list-style: none;
+        }
+        
+        .comparison-issue-list li {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            border-left: 4px solid #e2e8f0;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .comparison-issue-list li:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        }
+        
+        .comparison-issue-list li.success-item {
+            border-left-color: #10b981;
+            background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%);
+        }
+        
+        .comparison-issue-list li.error-item {
+            border-left-color: #ef4444;
+            background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%);
+        }
+        
+        .comparison-praise {
+            color: #059669;
+            font-style: italic;
+            margin-top: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: #f0fdf4;
+            border-radius: 8px;
+            border-left: 3px solid #10b981;
+            font-size: 0.95rem;
+        }
+        
+        .comparison-missed {
+            color: #dc2626;
+            margin-top: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: #fef2f2;
+            border-radius: 8px;
+            border-left: 3px solid #ef4444;
+            font-size: 0.95rem;
+        }
+        
+        .comparison-tip {
+            background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+            border: 1px solid #fbbf24;
+            border-radius: 12px;
+            padding: 1.25rem 1.5rem;
+            margin: 1.5rem 0;
+            position: relative;
+            box-shadow: 0 2px 8px rgba(251, 191, 36, 0.1);
+        }
+        
+        .comparison-tip::before {
+            content: '💡';
+            position: absolute;
+            top: -8px;
+            left: 1.5rem;
+            background: #fbbf24;
+            padding: 0.5rem;
+            border-radius: 50%;
+            font-size: 1rem;
+        }
+        
+        .comparison-tip strong {
+            color: #92400e;
+            font-weight: 700;
+        }
+        
+        .comparison-encouragement {
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+            border: 1px solid #10b981;
+            border-radius: 12px;
+            padding: 1.25rem 1.5rem;
+            margin: 1.5rem 0;
+            position: relative;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.1);
+        }
+        
+        .comparison-encouragement::before {
+            content: '🎯';
+            position: absolute;
+            top: -8px;
+            left: 1.5rem;
+            background: #10b981;
+            padding: 0.5rem;
+            border-radius: 50%;
+            font-size: 1rem;
+        }
+        
+        .comparison-encouragement strong {
+            color: #047857;
+            font-weight: 700;
+        }
+        
+        .comparison-feedback-list {
+            margin: 1rem 0;
+            padding: 0;
+            list-style: none;
+        }
+        
+        .comparison-feedback-list li {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.5rem;
+            border-left: 3px solid #3b82f6;
+            color: #374151;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+        
+        .comparison-feedback-list li:hover {
+            background: #e2e8f0;
+            transform: translateX(4px);
+        }
+        
+        .comparison-metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin: 1.5rem 0;
+        }
+        
+        .comparison-metric-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e2e8f0;
+            transition: all 0.3s ease;
+        }
+        
+        .comparison-metric-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+        }
+        
+        .comparison-metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1a202c;
+            margin-bottom: 0.5rem;
+        }
+        
+        .comparison-metric-label {
+            color: #6b7280;
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .success-highlight {
+            color: #10b981 !important;
+        }
+        
+        .warning-highlight {
+            color: #f59e0b !important;
+        }
+        
+        .error-highlight {
+            color: #ef4444 !important;
+        }
+        
+        .section-divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent 0%, #e2e8f0 50%, transparent 100%);
+            margin: 2rem 0;
+        }
+        
+        @media (max-width: 768px) {
+            .comparison-report-container {
+                padding: 1.5rem;
+                margin: 1rem 0;
+            }
+            
+            .comparison-summary-table th,
+            .comparison-summary-table td {
+                padding: 0.75rem;
+                font-size: 0.9rem;
+            }
+            
+            .comparison-section-title {
+                font-size: 1.3rem;
+            }
+            
+            .comparison-metrics-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        """, unsafe_allow_html=True)
+
+        # Render summary with enhanced metrics
+        summary = report_data.get("performance_summary", {})
+        st.markdown('<div class="comparison-report-container">', unsafe_allow_html=True)
+        
+        # Performance metrics grid
+        total_issues = summary.get('total_issues', 0)
+        identified_count = summary.get('identified_count', 0)
+        accuracy = summary.get('accuracy_percentage', 0)
+        missed_count = summary.get('missed_count', 0)
+        
+        st.markdown(f'''
+        <div class="comparison-section-title">📊 {t("review_performance_summary")}</div>
+        <div class="comparison-metrics-grid">
+            <div class="comparison-metric-card">
+                <div class="comparison-metric-value">{total_issues}</div>
+                <div class="comparison-metric-label">{t('total_issues')}</div>
+            </div>
+            <div class="comparison-metric-card">
+                <div class="comparison-metric-value success-highlight">{identified_count}</div>
+                <div class="comparison-metric-label">{t('identified_count')}</div>
+            </div>
+            <div class="comparison-metric-card">
+                <div class="comparison-metric-value {'success-highlight' if accuracy >= 80 else 'warning-highlight' if accuracy >= 60 else 'error-highlight'}">{accuracy}%</div>
+                <div class="comparison-metric-label">{t('accuracy')}</div>
+            </div>
+            <div class="comparison-metric-card">
+                <div class="comparison-metric-value {'success-highlight' if missed_count == 0 else 'error-highlight'}">{missed_count}</div>
+                <div class="comparison-metric-label">{t('missed_count')}</div>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        # Overall assessment card
+        overall_assessment = summary.get('overall_assessment', '')
+        completion_status = summary.get('completion_status', '')
+        if overall_assessment or completion_status:
+            st.markdown(f'''
+            <div class="comparison-encouragement">
+                <strong>{t('overall_assessment')}:</strong> {overall_assessment}<br>
+                <strong>{t('completion_status')}:</strong> {completion_status}
+            </div>
+            ''', unsafe_allow_html=True)
+
+        st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+        # Correctly identified issues
+        identified = report_data.get("correctly_identified_issues", [])
+        st.markdown(f'<div class="comparison-section-title">✅ {t("correctly_identified_issues")}</div>', unsafe_allow_html=True)
+        if identified:
+            st.markdown('<ul class="comparison-issue-list">', unsafe_allow_html=True)
+            for issue in identified:
+                desc = issue.get("issue_description", "")
+                praise = issue.get("praise_comment", "")
+                st.markdown(f'<li class="success-item"><span class="comparison-badge">✅ {t("found")}</span> {desc}<div class="comparison-praise">🌟 {praise}</div></li>', unsafe_allow_html=True)
+            st.markdown('</ul>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div class="comparison-tip">🔍 {t("no_identified_issues")}</div>', unsafe_allow_html=True)
+
+        # Missed issues
+        missed = report_data.get("missed_issues", [])
+        st.markdown(f'<div class="comparison-section-title">❌ {t("missed_issues")}</div>', unsafe_allow_html=True)
+        if missed:
+            st.markdown('<ul class="comparison-issue-list">', unsafe_allow_html=True)
+            for issue in missed:
+                desc = issue.get("issue_description", "")
+                why = issue.get("why_important", "")
+                how = issue.get("how_to_find", "")
+                st.markdown(f'<li class="error-item"><span class="comparison-badge">❌ {t("missed")}</span> {desc}<div class="comparison-missed">❗ <strong>{t("why_important")}:</strong> {why}<br>🔍 <strong>{t("how_to_find")}:</strong> {how}</div></li>', unsafe_allow_html=True)
+            st.markdown('</ul>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div class="comparison-encouragement">🎉 {t("all_issues_found")}</div>', unsafe_allow_html=True)
+
+        st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+        # Tips for improvement
+        tips = report_data.get("tips_for_improvement", [])
+        if tips:
+            st.markdown(f'<div class="comparison-section-title">💡 {t("tips_for_improvement")}</div>', unsafe_allow_html=True)
+            for tip in tips:
+                st.markdown(
+                    f'<div class="comparison-tip"><strong>{tip.get("category", "")}:</strong> {tip.get("tip", "")}<br><em>💭 {t("example")}: {tip.get("example", "")}</em></div>',
+                    unsafe_allow_html=True
+                )
+
+        # Java-specific guidance
+        java_guidance = report_data.get("java_specific_guidance", [])
+        if java_guidance:
+            st.markdown(f'<div class="comparison-section-title">☕ {t("java_specific_guidance")}</div>', unsafe_allow_html=True)
+            for item in java_guidance:
+                st.markdown(
+                    f'<div class="comparison-tip"><strong>☕ {item.get("topic", "")}:</strong> {item.get("guidance", "")}</div>',
+                    unsafe_allow_html=True
+                )
+
+        # Encouragement and next steps
+        encouragement = report_data.get("encouragement_and_next_steps", {})
+        if encouragement:
+            st.markdown(f'<div class="comparison-section-title">🎯 {t("encouragement_and_next_steps")}</div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="comparison-encouragement">'
+                f'<strong>🌟 {t("positive_feedback")}:</strong> {encouragement.get("positive_feedback", "")}<br><br>'
+                f'<strong>🎯 {t("next_focus_areas")}:</strong> {encouragement.get("next_focus_areas", "")}<br><br>'
+                f'<strong>📚 {t("learning_objectives")}:</strong> {encouragement.get("learning_objectives", "")}'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+
+        # Detailed feedback
+        detailed = report_data.get("detailed_feedback", {})
+        if detailed:
+            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="comparison-section-title">📝 {t("detailed_feedback")}</div>', unsafe_allow_html=True)
+            
+            strengths = detailed.get("strengths_identified", [])
+            patterns = detailed.get("improvement_patterns", [])
+            approach = detailed.get("review_approach_feedback", "")
+            
+            if strengths:
+                st.markdown(f'<strong>💪 {t("strengths_identified")}:</strong>', unsafe_allow_html=True)
+                st.markdown('<ul class="comparison-feedback-list">' + ''.join(f'<li>✨ {s}</li>' for s in strengths) + '</ul>', unsafe_allow_html=True)
+            
+            if patterns:
+                st.markdown(f'<strong>📈 {t("improvement_patterns")}:</strong>', unsafe_allow_html=True)
+                st.markdown('<ul class="comparison-feedback-list">' + ''.join(f'<li>📊 {p}</li>' for p in patterns) + '</ul>', unsafe_allow_html=True)
+            
+            if approach:
+                st.markdown(f'<div class="comparison-tip"><strong>🔍 {t("review_approach_feedback")}:</strong> {approach}</div>', unsafe_allow_html=True)
+
+        st.markdown('</div>', unsafe_allow_html=True)
 
     def _render_enhanced_results_dashboard(self, workflow_state):
         """Render enhanced results dashboard with detailed metrics."""
@@ -1041,17 +1500,7 @@ class ErrorExplorerUI:
             
             # Detailed feedback section
             comparison_report = getattr(workflow_state, 'comparison_report', None)
-            if comparison_report:
-                st.markdown(f"""
-                <div class="detailed-feedback-container">
-                    <div class="feedback-header">
-                        <h4><span class="feedback-icon">💭</span> {t('detailed_analysis')}</h4>
-                    </div>
-                    <div class="feedback-content">
-                        {comparison_report}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+            
 
     def _render_enhanced_action_panel(self):
         """Render enhanced action panel with professional styling."""
@@ -1112,4 +1561,4 @@ class ErrorExplorerUI:
                 type="secondary"
             ):
                 self._exit_practice_mode()
-                st.session_state.active_tab = 4 
+                st.session_state.active_tab = 4
