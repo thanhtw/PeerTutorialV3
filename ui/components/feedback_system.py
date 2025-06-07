@@ -16,6 +16,7 @@ from auth.badge_manager import BadgeManager
 from auth.mysql_auth import MySQLAuthManager
 from utils.language_utils import t, get_current_language
 from ui.components.animation import level_up_animation
+from ui.components.comparison_report_renderer import ComparisonReportRenderer
 
 import plotly.express as px
 import plotly.graph_objects as go
@@ -46,6 +47,7 @@ class FeedbackSystem:
         self.workflow = workflow
         self.auth_ui = auth_ui
         self.stats_updates = {}
+        self.comparison_renderer = ComparisonReportRenderer()
 
     def render_feedback_tab(self):
         """Render the feedback tab with review analysis from LangGraph workflow results."""
@@ -160,13 +162,10 @@ class FeedbackSystem:
         if review_history and len(review_history) > 0 and review_analysis:
             self._render_performance_summary(review_analysis, review_history)
         
-        # Display the comparison report
+        # Display the comparison report using the new renderer
         if comparison_report:
             st.subheader(t("educational_feedback"))            
-            st.markdown(
-                f'<div class="comparison-report">{comparison_report}</div>',
-                unsafe_allow_html=True
-            )
+            self.comparison_renderer.render_comparison_report(comparison_report)
         
         # Always show review history for better visibility
         if review_history and len(review_history) > 0:
@@ -836,6 +835,7 @@ class FeedbackSystem:
         
         # Category nodes
         angles = [i * (2 * 3.14159 / len(categories)) for i in range(len(categories))]
+        x_coords = [3 * 3.5 * 3.4]
         x_coords = [3 * 3.5 * 3.4 * 3 * 3.7 * 3.8 * 3.5 * 3.3 * 3.3 * 3 * 3.7 * 3.8 * 3.5 * 3.3 * 3.3 * 2 * 3.2 * 3.3 * 3.2 * 3.3 * 3.3 * 2 * 3.2 * 3.3 * 3.2 * 3.3 * 3.3 * 2 * 3.2 * 3.3 * 3.2 * 3.3 * 3.3 * 2 * 3.2 * 3.3 * 3.2 * 3.3 * 3.3 * 2 * 3.2 * 3.3 * 3.2 * 3.3 * 3.3 * 2 * 3.2 * 3.3 * 3.2 * 3.3 * 3.3 * 2 * 3.2 * 3.3 * 3.2 * 3.3 * 3.3 * 2 * 3.2 * 3.3 * 3.2 * 3.3 * 3.3 * 2 * 3.2 * 3.3 * 3.2 * 3.3 * 3.3 * 2 * 3.2 * 3.3 * 3.2 * 3.3 * 3.3 * 2 * 3.2 * 3.3 * 3.2 * 3.3 * 3.3 * 2 * 3.2 * 3.3 * 3.2 * 3.3 * 3.3 * 2 * 3.2 * 3.3 * 3.2 * 3.3 * 3.3 * 2 * 3.2 * 3.3 * 2 * math.cos(angle) for angle in angles]
         y_coords = [2 * math.sin(angle) for angle in angles]
         

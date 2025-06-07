@@ -10,6 +10,7 @@ from utils.language_utils import t, get_current_language
 from static.css_utils import load_css
 from utils.code_utils import _get_category_icon, _get_difficulty_icon, add_line_numbers
 from state_schema import WorkflowState
+from ui.components.comparison_report_renderer import ComparisonReportRenderer
 import json
 import re
 
@@ -22,6 +23,7 @@ class ErrorExplorerUI:
         """Initialize the Error Explorer UI."""
         self.repository = DatabaseErrorRepository()
         self.workflow = workflow  # JavaCodeReviewGraph instance
+        self.comparison_renderer = ComparisonReportRenderer()
         
         # Log workflow initialization for debugging
         if workflow:
@@ -999,166 +1001,17 @@ class ErrorExplorerUI:
             self._render_comparison_report(comparison_report)
         
         # Enhanced action panel
-        self._render_enhanced_action_panel()
+        #self._render_enhanced_action_panel()
 
     def _render_comparison_report(self, comparison_report: str):
         """
-        Extract and render the comparison report JSON with professional layout.
-        CSS styles are now loaded from external files.
+        Render comparison report using the dedicated renderer module.
+        
+        Args:
+            comparison_report: The raw comparison report string
         """
-        # Extract JSON object after "=== RESPONSE ==="
-        json_text = ""
-        if "=== RESPONSE ===" in comparison_report:
-            # If the report is a full LLM log, extract after marker
-            json_text = comparison_report.split("=== RESPONSE ===", 1)[-1].strip()
-        else:
-            # Otherwise, try to find the first JSON object in the string
-            match = re.search(r'\{[\s\S]+\}', comparison_report)
-            if match:
-                json_text = match.group(0)
-            else:
-                st.warning("No valid comparison report found.")
-                return
-
-        # Try to parse JSON
-        try:
-            report_data = json.loads(json_text)
-            print(f"Parsed comparison report: {report_data}")  # Debugging output
-        except Exception as e:
-            st.error(f"Failed to parse comparison report: {e}")
-            st.code(json_text)
-            return
-
-        # Render summary with enhanced metrics
-        summary = report_data.get("performance_summary", {})
-        st.markdown('<div class="comparison-report-container">', unsafe_allow_html=True)
-        
-        # Performance metrics grid
-        total_issues = summary.get('total_issues', 0)
-        identified_count = summary.get('identified_count', 0)
-        accuracy = summary.get('accuracy_percentage', 0)
-        missed_count = summary.get('missed_count', 0)
-        
-        st.markdown(f'''
-        <div class="comparison-section-title">📊 {t("review_performance_summary")}</div>
-        <div class="comparison-metrics-grid">
-            <div class="comparison-metric-card">
-                <div class="comparison-metric-value">{total_issues}</div>
-                <div class="comparison-metric-label">{t('total_issues')}</div>
-            </div>
-            <div class="comparison-metric-card">
-                <div class="comparison-metric-value success-highlight">{identified_count}</div>
-                <div class="comparison-metric-label">{t('identified_count')}</div>
-            </div>
-            <div class="comparison-metric-card">
-                <div class="comparison-metric-value {'success-highlight' if accuracy >= 80 else 'warning-highlight' if accuracy >= 60 else 'error-highlight'}">{accuracy}%</div>
-                <div class="comparison-metric-label">{t('accuracy')}</div>
-            </div>
-            <div class="comparison-metric-card">
-                <div class="comparison-metric-value {'success-highlight' if missed_count == 0 else 'error-highlight'}">{missed_count}</div>
-                <div class="comparison-metric-label">{t('missed_count')}</div>
-            </div>
-        </div>
-        ''', unsafe_allow_html=True)
-        
-        # Overall assessment card
-        overall_assessment = summary.get('overall_assessment', '')
-        completion_status = summary.get('completion_status', '')
-        if overall_assessment or completion_status:
-            st.markdown(f'''
-            <div class="comparison-encouragement">
-                <strong>{t('overall_assessment')}:</strong> {overall_assessment}<br>
-                <strong>{t('completion_status')}:</strong> {completion_status}
-            </div>
-            ''', unsafe_allow_html=True)
-
-        st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-
-        # Correctly identified issues
-        identified = report_data.get("correctly_identified_issues", [])
-        st.markdown(f'<div class="comparison-section-title">✅ {t("correctly_identified_issues")}</div>', unsafe_allow_html=True)
-        if identified:
-            st.markdown('<ul class="comparison-issue-list">', unsafe_allow_html=True)
-            for issue in identified:
-                desc = issue.get("issue_description", "")
-                praise = issue.get("praise_comment", "")
-                st.markdown(f'<li class="success-item"><span class="comparison-badge">✅ {t("found")}</span> {desc}<div class="comparison-praise">🌟 {praise}</div></li>', unsafe_allow_html=True)
-            st.markdown('</ul>', unsafe_allow_html=True)
-        else:
-            st.markdown(f'<div class="comparison-tip">🔍 {t("no_identified_issues")}</div>', unsafe_allow_html=True)
-
-        # Missed issues
-        missed = report_data.get("missed_issues", [])
-        st.markdown(f'<div class="comparison-section-title">❌ {t("missed_issues")}</div>', unsafe_allow_html=True)
-        if missed:
-            st.markdown('<ul class="comparison-issue-list">', unsafe_allow_html=True)
-            for issue in missed:
-                desc = issue.get("issue_description", "")
-                why = issue.get("why_important", "")
-                how = issue.get("how_to_find", "")
-                st.markdown(f'<li class="error-item"><span class="comparison-badge">❌ {t("missed")}</span> {desc}<div class="comparison-missed">❗ <strong>{t("why_important")}:</strong> {why}<br>🔍 <strong>{t("how_to_find")}:</strong> {how}</div></li>', unsafe_allow_html=True)
-            st.markdown('</ul>', unsafe_allow_html=True)
-        else:
-            st.markdown(f'<div class="comparison-encouragement">🎉 {t("all_issues_found")}</div>', unsafe_allow_html=True)
-
-        st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-
-        # Tips for improvement
-        tips = report_data.get("tips_for_improvement", [])
-        if tips:
-            st.markdown(f'<div class="comparison-section-title">💡 {t("tips_for_improvement")}</div>', unsafe_allow_html=True)
-            for tip in tips:
-                st.markdown(
-                    f'<div class="comparison-tip"><strong>{tip.get("category", "")}:</strong> {tip.get("tip", "")}<br><em>💭 {t("example")}: {tip.get("example", "")}</em></div>',
-                    unsafe_allow_html=True
-                )
-
-        # Java-specific guidance
-        java_guidance = report_data.get("java_specific_guidance", [])
-        if java_guidance:
-            st.markdown(f'<div class="comparison-section-title">☕ {t("java_specific_guidance")}</div>', unsafe_allow_html=True)
-            for item in java_guidance:
-                st.markdown(
-                    f'<div class="comparison-tip"><strong>☕ {item.get("topic", "")}:</strong> {item.get("guidance", "")}</div>',
-                    unsafe_allow_html=True
-                )
-
-        # Encouragement and next steps
-        encouragement = report_data.get("encouragement_and_next_steps", {})
-        if encouragement:
-            st.markdown(f'<div class="comparison-section-title">🎯 {t("encouragement_and_next_steps")}</div>', unsafe_allow_html=True)
-            st.markdown(
-                f'<div class="comparison-encouragement">'
-                f'<strong>🌟 {t("positive_feedback")}:</strong> {encouragement.get("positive_feedback", "")}<br><br>'
-                f'<strong>🎯 {t("next_focus_areas")}:</strong> {encouragement.get("next_focus_areas", "")}<br><br>'
-                f'<strong>📚 {t("learning_objectives")}:</strong> {encouragement.get("learning_objectives", "")}'
-                f'</div>',
-                unsafe_allow_html=True
-            )
-
-        # Detailed feedback
-        detailed = report_data.get("detailed_feedback", {})
-        if detailed:
-            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="comparison-section-title">📝 {t("detailed_feedback")}</div>', unsafe_allow_html=True)
-            
-            strengths = detailed.get("strengths_identified", [])
-            patterns = detailed.get("improvement_patterns", [])
-            approach = detailed.get("review_approach_feedback", "")
-            
-            if strengths:
-                st.markdown(f'<strong>💪 {t("strengths_identified")}:</strong>', unsafe_allow_html=True)
-                st.markdown('<ul class="comparison-feedback-list">' + ''.join(f'<li>✨ {s}</li>' for s in strengths) + '</ul>', unsafe_allow_html=True)
-            
-            if patterns:
-                st.markdown(f'<strong>📈 {t("improvement_patterns")}:</strong>', unsafe_allow_html=True)
-                st.markdown('<ul class="comparison-feedback-list">' + ''.join(f'<li>📊 {p}</li>' for p in patterns) + '</ul>', unsafe_allow_html=True)
-            
-            if approach:
-                st.markdown(f'<div class="comparison-tip"><strong>🔍 {t("review_approach_feedback")}:</strong> {approach}</div>', unsafe_allow_html=True)
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
+        self.comparison_renderer.render_comparison_report(comparison_report)
+    
     def _render_enhanced_results_dashboard(self, workflow_state):
         """Render enhanced results dashboard with detailed metrics."""
         review_history = getattr(workflow_state, 'review_history', [])
@@ -1206,64 +1059,3 @@ class ErrorExplorerUI:
             
             # Detailed feedback section
             comparison_report = getattr(workflow_state, 'comparison_report', None)
-            
-    def _render_enhanced_action_panel(self):
-        """Render enhanced action panel with professional styling."""
-        st.markdown(f"""
-        <div class="enhanced-action-panel">
-            <div class="action-header">
-                <h4><span class="action-icon">🚀</span> {t('what_would_you_like_to_do_next')}</h4>
-            </div>
-            <div class="action-grid">
-                <div class="action-option">
-                    <div class="option-icon">🔄</div>
-                    <div class="option-content">
-                        <h5>{t('practice_again')}</h5>
-                        <p>{t('retry_same_error_type_new_code')}</p>
-                    </div>
-                </div>
-                <div class="action-option">
-                    <div class="option-icon">🎯</div>
-                    <div class="option-content">
-                        <h5>{t('try_different_error')}</h5>
-                        <p>{t('explore_other_error_types_library')}</p>
-                    </div>
-                </div>
-                <div class="action-option">
-                    <div class="option-icon">📈</div>
-                    <div class="option-content">
-                        <h5>{t('view_progress')}</h5>
-                        <p>{t('check_overall_learning_progress')}</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Action buttons
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if st.button(
-                f"🔄 {t('practice_same_error')}",
-                use_container_width=True,
-                type="primary"
-            ):
-                self._restart_practice_session()
-        
-        with col2:
-            if st.button(
-                f"🎯 {t('explore_more_errors')}",
-                use_container_width=True,
-                type="secondary"
-            ):
-                self._exit_practice_mode()
-        
-        with col3:
-            if st.button(
-                f"📈 {t('view_dashboard')}",
-                use_container_width=True,
-                type="secondary"
-            ):
-                self._exit_practice_mode()
-                st.session_state.active_tab = 4
