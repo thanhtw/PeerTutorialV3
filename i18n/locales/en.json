@@ -808,6 +808,26 @@
     "check_overall_learning_progress": "Check your overall learning progress.",
     "practice_same_error": "Practice Same Error",
     "explore_more_errors": "Explore More Errors",
-    "view_dashboard": "View Dashboard"
+    "view_dashboard": "View Dashboard",
+    "total_issues": "Total Issues",
+    "missed_count": "Missed",
+    "overall_assessment": "Overall Assessment",
+    "completion_status": "Completion Status",
+    "found": "Found",
+    "missed": "Missed",
+    "all_issues_found": "Excellent! You found all issues",
+    "tips_for_improvement": "Tips for Improvement",
+    "java_specific_guidance": "Java-Specific Guidance",
+    "encouragement_and_next_steps": "Encouragement & Next Steps",
+    "positive_feedback": "Positive Feedback",
+    "next_focus_areas": "Next Focus Areas",
+    "learning_objectives": "Learning Objectives",
+    "strengths_identified": "Strengths Identified",
+    "improvement_patterns": "Improvement Patterns",
+    "review_approach_feedback": "Review Approach Feedback",
+    "whats_next": "What's Next?",
+    "choose_your_next_action": "Choose your next action to continue learning",
+    "try_another_challenge": "Try Another Challenge",
+    "back_to_explorer": "Back to Explorer"
   }
 }

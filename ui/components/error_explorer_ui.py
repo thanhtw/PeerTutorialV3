@@ -943,7 +943,7 @@ class ErrorExplorerUI:
         with col1:
             # REMOVED: submit_disabled = not student_review or len(student_review.strip()) < 10
             if st.button(
-                f"🚀 {t('submit_analysis')}",
+                f"🚀 {t('submit_review_button')}",
                 # REMOVED: disabled=submit_disabled,
                 key=f"submit_practice_review_{current_iteration}",
                 use_container_width=True,

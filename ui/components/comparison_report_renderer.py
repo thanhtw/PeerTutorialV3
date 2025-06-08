@@ -122,23 +122,23 @@ class ComparisonReportRenderer:
         identified_count = summary.get('identified_count', 0)
         missed_count = summary.get('missed_count', 0)
         
-        st.markdown(f'''
-        <div class="comparison-section-title">📊 {t("review_performance_summary")}</div>
-        <div class="comparison-metrics-grid">
-            <div class="comparison-metric-card">
-                <div class="comparison-metric-value">{total_issues}</div>
-                <div class="comparison-metric-label">{t('total_issues')}</div>
-            </div>
-            <div class="comparison-metric-card">
-                <div class="comparison-metric-value success-highlight">{identified_count}</div>
-                <div class="comparison-metric-label">{t('identified_count')}</div>
-            </div>
-            <div class="comparison-metric-card">
-                <div class="comparison-metric-value {'success-highlight' if missed_count == 0 else 'error-highlight'}">{missed_count}</div>
-                <div class="comparison-metric-label">{t('missed_count')}</div>
-            </div>
-        </div>
-        ''', unsafe_allow_html=True)
+        # st.markdown(f'''
+        # <div class="comparison-section-title">📊 {t("review_performance_summary")}</div>
+        # <div class="comparison-metrics-grid">
+        #     <div class="comparison-metric-card">
+        #         <div class="comparison-metric-value">{total_issues}</div>
+        #         <div class="comparison-metric-label">{t('total_issues')}</div>
+        #     </div>
+        #     <div class="comparison-metric-card">
+        #         <div class="comparison-metric-value success-highlight">{identified_count}</div>
+        #         <div class="comparison-metric-label">{t('identified_count')}</div>
+        #     </div>
+        #     <div class="comparison-metric-card">
+        #         <div class="comparison-metric-value {'success-highlight' if missed_count == 0 else 'error-highlight'}">{missed_count}</div>
+        #         <div class="comparison-metric-label">{t('missed_count')}</div>
+        #     </div>
+        # </div>
+        # ''', unsafe_allow_html=True)
         
         # Overall assessment card
         overall_assessment = summary.get('overall_assessment', '')
