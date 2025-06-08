@@ -163,8 +163,7 @@ class FeedbackSystem:
             self._render_performance_summary(review_analysis, review_history)
         
         # Display the comparison report using the new renderer
-        if comparison_report:
-            st.subheader(t("educational_feedback"))            
+        if comparison_report:           
             self.comparison_renderer.render_comparison_report(comparison_report)
         
         # Always show review history for better visibility
@@ -212,32 +211,10 @@ class FeedbackSystem:
             
     def _render_performance_summary(self, review_analysis: Dict[str, Any], review_history: List[Dict[str, Any]]):
         """Render enhanced performance summary metrics and charts with CJK font support"""
-        st.subheader(t("review_performance_summary"))
-        
-        # Create performance metrics using the original error count if available
-        col1, col2 = st.columns(2)
-        
+       
         # Get the correct total_problems count from original_error_count if available
         original_error_count = review_analysis[t('total_problems')]
-        # Calculate metrics using the original count for consistency
-        identified_count = review_analysis[t('identified_count')]
-        accuracy = (identified_count / original_error_count * 100) if original_error_count > 0 else 0
-                
-        with col1:
-            st.metric(
-                t("overall_accuracy"), 
-                f"{accuracy:.1f}%",
-                delta=None,
-                delta_color="normal"
-            )
-            
-        with col2:
-            st.metric(
-                t("issues_identified"), 
-                f"{identified_count}/{original_error_count}",
-                delta=None
-            )
-            
+             
         # Create a progress chart if multiple iterations
         if len(review_history) > 1:
             # Extract data for chart

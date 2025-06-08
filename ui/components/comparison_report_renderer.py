@@ -9,6 +9,7 @@ import streamlit as st
 import json
 import re
 import logging
+import os
 from typing import Dict, Any, Optional
 from utils.language_utils import t
 
@@ -21,8 +22,24 @@ class ComparisonReportRenderer:
     """
     
     def __init__(self):
-        """Initialize the comparison report renderer."""
-        pass
+        """Initialize the comparison report renderer and load CSS styles."""
+        self._load_styles()
+    
+    def _load_styles(self):
+        """Load CSS styles for the comparison report renderer."""
+        try:
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            css_file_path = os.path.join(current_dir, "..", "..", "static", "css", "error_explorer", "practice_mode.css")
+            
+            if os.path.exists(css_file_path):
+                with open(css_file_path, 'r', encoding='utf-8') as file:
+                    css_content = file.read()
+                    st.markdown(f"<style>{css_content}</style>", unsafe_allow_html=True)
+                    logger.debug("Successfully loaded practice_mode.css for comparison report renderer")
+            else:
+                logger.warning(f"CSS file not found at: {css_file_path}")
+        except Exception as e:
+            logger.error(f"Error loading CSS for comparison report renderer: {str(e)}")
     
     def render_comparison_report(self, comparison_report: str) -> None:
         """
@@ -83,7 +100,7 @@ class ComparisonReportRenderer:
         Args:
             report_data: The parsed report data dictionary
         """
-        st.markdown('<div class="comparison-report-container">', unsafe_allow_html=True)
+        # st.markdown('<div class="comparison-report-container">', unsafe_allow_html=True)
         
         # Render each section
         self._render_performance_summary(report_data)
@@ -94,7 +111,7 @@ class ComparisonReportRenderer:
         self._render_encouragement_section(report_data)
         self._render_detailed_feedback(report_data)
         
-        st.markdown('</div>', unsafe_allow_html=True)
+        #st.markdown('</div>', unsafe_allow_html=True)
     
     def _render_performance_summary(self, report_data: Dict[str, Any]) -> None:
         """Render the performance summary section."""
@@ -103,7 +120,6 @@ class ComparisonReportRenderer:
         # Performance metrics grid
         total_issues = summary.get('total_issues', 0)
         identified_count = summary.get('identified_count', 0)
-        accuracy = summary.get('accuracy_percentage', 0)
         missed_count = summary.get('missed_count', 0)
         
         st.markdown(f'''
@@ -116,10 +132,6 @@ class ComparisonReportRenderer:
             <div class="comparison-metric-card">
                 <div class="comparison-metric-value success-highlight">{identified_count}</div>
                 <div class="comparison-metric-label">{t('identified_count')}</div>
-            </div>
-            <div class="comparison-metric-card">
-                <div class="comparison-metric-value {'success-highlight' if accuracy >= 80 else 'warning-highlight' if accuracy >= 60 else 'error-highlight'}">{accuracy}%</div>
-                <div class="comparison-metric-label">{t('accuracy')}</div>
             </div>
             <div class="comparison-metric-card">
                 <div class="comparison-metric-value {'success-highlight' if missed_count == 0 else 'error-highlight'}">{missed_count}</div>
@@ -231,3 +243,47 @@ class ComparisonReportRenderer:
             
             if approach:
                 st.markdown(f'<div class="comparison-tip"><strong>🔍 {t("review_approach_feedback")}:</strong> {approach}</div>', unsafe_allow_html=True)
+
+    def render_enhanced_action_panel(self):
+        """Render enhanced action panel for practice session completion."""
+        import streamlit as st
+        from utils.language_utils import t
+        
+        st.markdown(f"""
+        <div class="enhanced-action-panel">
+            <div class="action-panel-header">
+                <h3><span class="action-icon">🎯</span> {t('whats_next')}</h3>
+                <p>{t('choose_your_next_action')}</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Action buttons in columns
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button(
+                f"🔄 {t('try_another_challenge')}",
+                key="restart_practice_session_renderer",
+                use_container_width=True,
+                type="primary"
+            ):
+                return "restart"
+        
+        with col2:
+            if st.button(
+                f"🎲 {t('generate_new_challenge')}",
+                key="new_practice_challenge_renderer",
+                use_container_width=True
+            ):
+                return "regenerate"
+        
+        with col3:
+            if st.button(
+                f"🏠 {t('back_to_explorer')}",
+                key="exit_practice_to_explorer_renderer",
+                use_container_width=True
+            ):
+                return "exit"
+        
+        return None

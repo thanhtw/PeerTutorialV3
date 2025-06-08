@@ -995,13 +995,9 @@ class ErrorExplorerUI:
         # Enhanced results dashboard
         self._render_enhanced_results_dashboard(workflow_state)
         
-        # Extract and render comparison report if available
-        comparison_report = getattr(workflow_state, 'comparison_report', None)
-        if comparison_report:
-            self._render_comparison_report(comparison_report)
         
         # Enhanced action panel
-        #self._render_enhanced_action_panel()
+        self._render_enhanced_action_panel()
 
     def _render_comparison_report(self, comparison_report: str):
         """
@@ -1059,3 +1055,44 @@ class ErrorExplorerUI:
             
             # Detailed feedback section
             comparison_report = getattr(workflow_state, 'comparison_report', None)
+            if comparison_report:
+                self._render_comparison_report(comparison_report)
+
+    def _render_enhanced_action_panel(self):
+        """Render enhanced action panel for practice session completion."""
+        st.markdown(f"""
+        <div class="enhanced-action-panel">
+            <div class="action-panel-header">
+                <h3><span class="action-icon">🎯</span> {t('whats_next')}</h3>
+                <p>{t('choose_your_next_action')}</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Action buttons in columns
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button(
+                f"🔄 {t('try_another_challenge')}",
+                key="restart_practice_session",
+                use_container_width=True,
+                type="primary"
+            ):
+                self._restart_practice_session()
+        
+        with col2:
+            if st.button(
+                f"🎲 {t('generate_new_challenge')}",
+                key="new_practice_challenge",
+                use_container_width=True
+            ):
+                self._regenerate_practice_code()
+        
+        with col3:
+            if st.button(
+                f"🏠 {t('back_to_explorer')}",
+                key="exit_practice_to_explorer",
+                use_container_width=True
+            ):
+                self._exit_practice_mode()

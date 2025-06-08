@@ -850,6 +850,217 @@
     line-height: 1.4;
 }
 
+/* Comparison Report Specific Styles */
+.comparison-report-container {
+    background: white;
+    border-radius: 15px;
+    padding: 2rem;
+    margin: 2rem 0;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e9ecef;
+}
+
+.comparison-section-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #495057;
+    margin: 1.5rem 0 1rem 0;
+    padding: 0.75rem 1rem;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 10px;
+    border-left: 4px solid #667eea;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.comparison-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.comparison-metric-card {
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.comparison-metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+}
+
+.comparison-metric-value {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: #495057;
+}
+
+.comparison-metric-value.success-highlight {
+    color: #28a745;
+}
+
+.comparison-metric-value.warning-highlight {
+    color: #ffc107;
+}
+
+.comparison-metric-value.error-highlight {
+    color: #dc3545;
+}
+
+.comparison-metric-label {
+    font-size: 0.9rem;
+    color: #6c757d;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.comparison-issue-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.comparison-issue-list li {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    border-left: 4px solid transparent;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease;
+}
+
+.comparison-issue-list li:hover {
+    transform: translateX(5px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.comparison-issue-list .success-item {
+    border-left-color: #28a745;
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+}
+
+.comparison-issue-list .error-item {
+    border-left-color: #dc3545;
+    background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+}
+
+.comparison-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 15px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-right: 0.5rem;
+    color: white;
+}
+
+.success-item .comparison-badge {
+    background: #28a745;
+}
+
+.error-item .comparison-badge {
+    background: #dc3545;
+}
+
+.comparison-praise {
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background: rgba(40, 167, 69, 0.1);
+    border-radius: 6px;
+    font-style: italic;
+    color: #155724;
+}
+
+.comparison-missed {
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background: rgba(220, 53, 69, 0.1);
+    border-radius: 6px;
+    color: #721c24;
+    line-height: 1.4;
+}
+
+.comparison-tip {
+    background: linear-gradient(135deg, #e3f2fd 0%, #f1f8ff 100%);
+    border: 1px solid #2196f3;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 0.75rem 0;
+    color: #1976d2;
+    line-height: 1.5;
+}
+
+.comparison-encouragement {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    border: 1px solid #28a745;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+    color: #155724;
+    line-height: 1.6;
+}
+
+.comparison-feedback-list {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0;
+}
+
+.comparison-feedback-list li {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #f8f9fa;
+    color: #495057;
+}
+
+.comparison-feedback-list li:last-child {
+    border-bottom: none;
+}
+
+.section-divider {
+    height: 2px;
+    background: linear-gradient(90deg, transparent 0%, #e9ecef 50%, transparent 100%);
+    margin: 2rem 0;
+    border: none;
+}
+
+/* Action Panel Styles for Comparison Report */
+.action-panel-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 12px;
+    border: 1px solid #dee2e6;
+}
+
+.action-panel-header h3 {
+    margin: 0 0 0.5rem 0;
+    color: #495057;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+}
+
+.action-panel-header p {
+    margin: 0;
+    color: #6c757d;
+    font-size: 1rem;
+}
+
 /* Responsive Design for Practice Mode */
 @media (max-width: 768px) {
     .practice-header-content {
