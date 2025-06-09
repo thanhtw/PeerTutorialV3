@@ -12,7 +12,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Union
 import streamlit as st
-from db.mysql_connection import MySQLConnection
+from data.mysql_connection import MySQLConnection
 from utils.language_utils import get_current_language
 
 logger = logging.getLogger(__name__)

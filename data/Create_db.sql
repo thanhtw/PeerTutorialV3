@@ -7,6 +7,15 @@ DROP TABLE IF EXISTS java_errors;
 DROP TABLE IF EXISTS error_categories;
 DROP TABLE IF EXISTS badges;
 DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS user_sessions;
+DROP TABLE IF EXISTS user_interactions;
+DROP TABLE IF EXISTS practice_sessions;
+DROP TABLE IF EXISTS workflow_tracking;
+DROP TABLE IF EXISTS tab_navigation;
+DROP TABLE IF EXISTS error_identification_analysis;
+DROP TABLE IF EXISTS learning_path_progress;
+
+DROP TABLE IF EXISTS error_category_stats;
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- Create users table
@@ -305,7 +314,65 @@ CREATE TABLE IF NOT EXISTS learning_path_progress (
     INDEX idx_learning_progress_mastery (mastery_level)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+-- 8. Error Category Statistics - User-specific category performance tracking
+CREATE TABLE IF NOT EXISTS error_category_stats (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    category_code VARCHAR(50) NOT NULL,
+    total_encounters INT DEFAULT 0,
+    successful_identifications INT DEFAULT 0,
+    total_practice_sessions INT DEFAULT 0,
+    average_identification_time_seconds FLOAT DEFAULT 0.0,
+    mastery_level FLOAT DEFAULT 0.0,
+    accuracy_percentage FLOAT DEFAULT 0.0,
+    improvement_trend FLOAT DEFAULT 0.0,
+    first_encounter_date DATE NULL,
+    last_encounter_date DATE NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    performance_data JSON,
+    
+    FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE,
+    FOREIGN KEY (category_code) REFERENCES error_categories(category_code) ON DELETE CASCADE,
+    UNIQUE KEY unique_user_category_stats (user_id, category_code),
+    INDEX idx_category_stats_user (user_id),
+    INDEX idx_category_stats_category (category_code),
+    INDEX idx_category_stats_mastery (mastery_level),
+    INDEX idx_category_stats_updated (last_updated)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+-- Error usage statistics table - Enhanced version for better analytics
+CREATE TABLE IF NOT EXISTS error_usage_stats (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    error_id INT NOT NULL,
+    user_id VARCHAR(36),
+    session_id VARCHAR(36),
+    practice_session_id VARCHAR(36) NULL,
+    workflow_id VARCHAR(36) NULL,
+    action_type ENUM('viewed', 'practiced', 'mastered', 'failed', 'skipped', 'reviewed') NOT NULL,
+    action_result ENUM('success', 'failure', 'partial', 'timeout') DEFAULT 'success',
+    time_spent_seconds INT DEFAULT 0,
+    attempts_count INT DEFAULT 1,
+    accuracy_score FLOAT DEFAULT 0.0,
+    difficulty_perceived ENUM('easy', 'medium', 'hard') NULL,
+    context_data JSON,
+    device_type VARCHAR(50),
+    interaction_source VARCHAR(100),
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (error_id) REFERENCES java_errors(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE SET NULL,
+    FOREIGN KEY (session_id) REFERENCES user_sessions(session_id) ON DELETE SET NULL,
+    FOREIGN KEY (practice_session_id) REFERENCES practice_sessions(practice_session_id) ON DELETE SET NULL,
+    FOREIGN KEY (workflow_id) REFERENCES workflow_tracking(workflow_id) ON DELETE SET NULL,
+    INDEX idx_error_user_enhanced (error_id, user_id, action_type),
+    INDEX idx_session_enhanced (session_id, created_at),
+    INDEX idx_action_type_enhanced (action_type, action_result),
+    INDEX idx_performance (accuracy_score, time_spent_seconds),
+    INDEX idx_timestamps (started_at, completed_at)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+                
 -- Verification and status
 SELECT 'Database tables created successfully!' as Status;
 SELECT COUNT(table_name) as Tables_Created 
@@ -313,4 +380,4 @@ FROM information_schema.tables
 WHERE table_schema = DATABASE() 
 AND table_name IN ('users', 'error_categories', 'java_errors', 'badges', 'user_badges', 'activity_log', 'error_usage_stats', 
                    'user_sessions', 'user_interactions', 'practice_sessions', 'workflow_tracking', 
-                   'tab_navigation', 'error_identification_analysis', 'learning_path_progress');
+                   'tab_navigation', 'error_identification_analysis', 'learning_path_progress', 'error_category_stats');   

@@ -637,8 +637,7 @@ class CodeGeneratorUI:
                     st.info("✅ Code generation completed. You can proceed to review the code.")
                 else:
                     st.success("✅ Code generated successfully!") 
-                st.session_state.active_tab = 1
-                # FIXED: Use session state flag instead of st.rerun()
+                st.session_state.active_tab = 2
                 st.session_state.generation_completed = True
                 st.session_state.switch_to_review_tab = True
                 
@@ -750,7 +749,7 @@ class CodeGeneratorUI:
                 st.error(f"❌ Generation failed: {str(e)}")
     
     def _handle_generation_result_with_tracking(self, updated_state, generation_duration: float):
-        """Handle generation result with comprehensive tracking."""
+        """Handle generation result with comprehensive tracking - FIXED: Proper tab switching."""
         user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
         
         try:
@@ -806,9 +805,10 @@ class CodeGeneratorUI:
                 else:
                     st.success("✅ Code generated successfully!")
                 
-                # FIXED: Use session state flag instead of st.rerun()
+                # FIXED: Immediate tab switching after successful generation
                 st.session_state.generation_completed = True
-                st.session_state.switch_to_review_tab = True
+                st.session_state.active_tab = 1
+                
                 
             elif has_error:
                 # Track generation failure

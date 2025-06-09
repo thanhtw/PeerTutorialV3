@@ -6,7 +6,7 @@ import logging
 import datetime
 import uuid
 from typing import Dict, Any, List, Optional, Tuple
-from db.mysql_connection import MySQLConnection
+from data.mysql_connection import MySQLConnection
 from utils.language_utils import get_current_language, t
 
 # Configure logging

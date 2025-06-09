@@ -10,7 +10,7 @@ import logging
 import random
 import json
 from typing import Dict, List, Any, Optional, Set, Union, Tuple
-from db.mysql_connection import MySQLConnection
+from data.mysql_connection import MySQLConnection
 from utils.language_utils import get_current_language, t
 
 # Configure logging

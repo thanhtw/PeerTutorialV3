@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
 import streamlit as st
 from analytics.behavior_tracker import behavior_tracker
-from db.mysql_connection import MySQLConnection
+from data.mysql_connection import MySQLConnection
 import threading
 import queue
 import json
