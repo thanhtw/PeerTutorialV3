@@ -9,6 +9,7 @@ organization, error handling, and type safety.
 import re
 import random
 import logging
+import json
 from typing import List, Dict, Any, Optional, Tuple, Union
 from dataclasses import dataclass
 
@@ -915,3 +916,119 @@ def validate_prompt_inputs(code_length: str = None, difficulty_level: str = None
     except Exception as e:
         logger.error(f"Error validating prompt inputs: {str(e)}")
         return False, f"Validation error: {str(e)}"
+
+def parse_comparison_report(report_text: str) -> Dict[str, Any]:
+    """
+    Parse comparison report text and extract JSON data with improved error handling.
+    
+    Args:
+        report_text: Text containing comparison report
+        
+    Returns:
+        Dictionary containing parsed report data
+    """
+    if not report_text:
+        return {
+            "error": "Empty report text",
+            "performance_summary": {
+                "total_issues": 0,
+                "identified_count": 0,
+                "accuracy_percentage": 0.0,
+                "missed_count": 0,
+                "overall_assessment": "No report available",
+                "completion_status": "Error"
+            },
+            "correctly_identified_issues": [],
+            "missed_issues": [],
+            "tips_for_improvement": [],
+            "java_specific_guidance": [],
+            "encouragement_and_next_steps": {
+                "positive_feedback": "No feedback available",
+                "next_focus_areas": "Please try again",
+                "learning_objectives": "Continue practicing"
+            },
+            "detailed_feedback": {
+                "strengths_identified": [],
+                "improvement_patterns": [],
+                "review_approach_feedback": "No feedback available"
+            }
+        }
+    
+    try:
+        # First try to parse as direct JSON
+        if report_text.strip().startswith('{') and report_text.strip().endswith('}'):
+            try:
+                return json.loads(report_text)
+            except json.JSONDecodeError:
+                pass
+        
+        # Try to extract JSON from text
+        json_match = re.search(r'\{.*\}', report_text, re.DOTALL)
+        if json_match:
+            json_str = json_match.group(0)
+            
+            # Clean up common JSON issues
+            json_str = re.sub(r',(\s*[}\]])', r'\1', json_str)  # Remove trailing commas
+            json_str = re.sub(r'([{,]\s*)(\w+):', r'\1"\2":', json_str)  # Quote unquoted keys
+            
+            try:
+                return json.loads(json_str)
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse cleaned JSON: {e}")
+        
+        # If all JSON parsing fails, return a basic structure
+        logger.warning("Could not parse comparison report as JSON, returning basic structure")
+        return {
+            "error": "Failed to parse JSON",
+            "raw_text": report_text[:500] + ("..." if len(report_text) > 500 else ""),
+            "performance_summary": {
+                "total_issues": 0,
+                "identified_count": 0,
+                "accuracy_percentage": 0.0,
+                "missed_count": 0,
+                "overall_assessment": "Report parsing failed",
+                "completion_status": "Error"
+            },
+            "correctly_identified_issues": [],
+            "missed_issues": [],
+            "tips_for_improvement": [],
+            "java_specific_guidance": [],
+            "encouragement_and_next_steps": {
+                "positive_feedback": "System encountered an error",
+                "next_focus_areas": "Please try again",
+                "learning_objectives": "Continue practicing"
+            },
+            "detailed_feedback": {
+                "strengths_identified": [],
+                "improvement_patterns": [],
+                "review_approach_feedback": "Report parsing failed"
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error parsing comparison report: {str(e)}")
+        return {
+            "error": f"Parse error: {str(e)}",
+            "performance_summary": {
+                "total_issues": 0,
+                "identified_count": 0,
+                "accuracy_percentage": 0.0,
+                "missed_count": 0,
+                "overall_assessment": "Error parsing report",
+                "completion_status": "Error"
+            },
+            "correctly_identified_issues": [],
+            "missed_issues": [],
+            "tips_for_improvement": [],
+            "java_specific_guidance": [],
+            "encouragement_and_next_steps": {
+                "positive_feedback": "System error occurred",
+                "next_focus_areas": "Please try again",
+                "learning_objectives": "Continue practicing"
+            },
+            "detailed_feedback": {
+                "strengths_identified": [],
+                "improvement_patterns": [],
+                "review_approach_feedback": "Error occurred"
+            }
+        }

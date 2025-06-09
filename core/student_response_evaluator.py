@@ -503,6 +503,36 @@ class StudentResponseEvaluator:
             # Clean up the report
             report = report.replace('\\n', '\n')
             
+            # Try to extract and validate JSON from the response
+            try:
+                # Look for JSON content in the response
+                json_match = re.search(r'\{.*\}', report, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(0)
+                    
+                    # Clean up common JSON formatting issues
+                    json_str = re.sub(r',(\s*[}\]])', r'\1', json_str)  # Remove trailing commas
+                    json_str = re.sub(r'(\w+):', r'"\1":', json_str)    # Quote unquoted keys
+                    json_str = re.sub(r':\s*([^",\[\{][^,\]\}]*)', r': "\1"', json_str)  # Quote unquoted string values
+                    
+                    # Try to parse the cleaned JSON
+                    try:
+                        parsed_json = json.loads(json_str)
+                        # If successful, return the JSON as a formatted string
+                        report = json.dumps(parsed_json, indent=2, ensure_ascii=False)
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"Failed to parse LLM JSON response: {e}")
+                        # Fall back to manual extraction of key fields
+                        report = self._extract_comparison_report_fallback(report, review_analysis)
+                else:
+                    # No JSON found, use fallback extraction
+                    report = self._extract_comparison_report_fallback(report, review_analysis)
+                    
+            except Exception as e:
+                logger.warning(f"Error processing LLM response: {e}")
+                # Use fallback method
+                report = self._extract_comparison_report_fallback(report, review_analysis)
+            
             # Log the report generation
             self.llm_logger.log_interaction("comparison_report", prompt, report, {
                 t("evaluation_errors_count"): len(evaluation_errors),
@@ -511,9 +541,200 @@ class StudentResponseEvaluator:
             })
             
             return report
+            
         except Exception as e:
             # Log the error
             logger.error(f"Error generating comparison report with LLM: {str(e)}")
-            # Return an empty string
-            return ""
+            # Return a fallback report
+            return self._generate_fallback_comparison_report(review_analysis, review_history)
     
+    def _extract_comparison_report_fallback(self, raw_response: str, review_analysis: Dict[str, Any]) -> str:
+        """
+        Extract comparison report data from malformed LLM response as fallback.
+        
+        Args:
+            raw_response: Raw response from LLM
+            review_analysis: Analysis data for context
+            
+        Returns:
+            Valid JSON string for comparison report
+        """
+        try:
+            # Initialize report structure
+            report = {
+                "performance_summary": {
+                    "total_issues": review_analysis.get(t("total_problems"), 0),
+                    "identified_count": review_analysis.get(t("identified_count"), 0),
+                    "accuracy_percentage": review_analysis.get(t("identified_percentage"), 0.0),
+                    "missed_count": review_analysis.get(t("total_problems"), 0) - review_analysis.get(t("identified_count"), 0),
+                    "overall_assessment": "Review analysis complete",
+                    "completion_status": "Completed"
+                },
+                "correctly_identified_issues": [],
+                "missed_issues": [],
+                "tips_for_improvement": [
+                    {
+                        "category": "Code Review",
+                        "tip": "Be more systematic in your analysis",
+                        "example": "Check each line carefully for syntax and logic errors"
+                    }
+                ],
+                "java_specific_guidance": [
+                    {
+                        "topic": "String Comparison",
+                        "guidance": "Use equals() method for string comparison instead of =="
+                    }
+                ],
+                "encouragement_and_next_steps": {
+                    "positive_feedback": "Keep practicing to improve your code review skills",
+                    "next_focus_areas": "Focus on identifying logical errors and best practices",
+                    "learning_objectives": "Develop systematic approach to code review"
+                },
+                "detailed_feedback": {
+                    "strengths_identified": ["Attention to detail"],
+                    "improvement_patterns": ["Need more comprehensive analysis"],
+                    "review_approach_feedback": "Continue practicing with different types of errors"
+                }
+            }
+            
+            # Try to extract specific information from raw response
+            if "correctly identified" in raw_response.lower():
+                # Extract identified issues section
+                identified_match = re.search(r'correctly identified.*?(\[.*?\])', raw_response, re.DOTALL | re.IGNORECASE)
+                if identified_match:
+                    try:
+                        identified_text = identified_match.group(1)
+                        # Simple extraction of issue descriptions
+                        issues = re.findall(r'"([^"]+)"', identified_text)
+                        for issue in issues:
+                            report["correctly_identified_issues"].append({
+                                "issue_description": issue,
+                                "praise_comment": "Good identification of this issue"
+                            })
+                    except:
+                        pass
+            
+            if "missed" in raw_response.lower():
+                # Extract missed issues section
+                missed_match = re.search(r'missed.*?(\[.*?\])', raw_response, re.DOTALL | re.IGNORECASE)
+                if missed_match:
+                    try:
+                        missed_text = missed_match.group(1)
+                        # Simple extraction of issue descriptions
+                        issues = re.findall(r'"([^"]+)"', missed_text)
+                        for issue in issues:
+                            report["missed_issues"].append({
+                                "issue_description": issue,
+                                "why_important": "This type of error can cause runtime issues",
+                                "how_to_find": "Look for this pattern in similar code structures"
+                            })
+                    except:
+                        pass
+            
+            return json.dumps(report, indent=2, ensure_ascii=False)
+            
+        except Exception as e:
+            logger.error(f"Error in fallback extraction: {e}")
+            return self._generate_fallback_comparison_report(review_analysis, None)
+    
+    def _generate_fallback_comparison_report(self, review_analysis: Dict[str, Any], review_history: List[Dict[str, Any]] = None) -> str:
+        """
+        Generate a basic comparison report when LLM fails.
+        
+        Args:
+            review_analysis: Analysis data
+            review_history: History of reviews
+            
+        Returns:
+            Basic JSON comparison report
+        """
+        try:
+            total_issues = review_analysis.get(t("total_problems"), 0)
+            identified_count = review_analysis.get(t("identified_count"), 0)
+            missed_count = total_issues - identified_count
+            accuracy = review_analysis.get(t("identified_percentage"), 0.0)
+            
+            # Determine completion status
+            if identified_count == total_issues:
+                status = "Excellent work"
+            elif identified_count > total_issues * 0.7:
+                status = "Good progress"
+            else:
+                status = "Needs improvement"
+            
+            report = {
+                "performance_summary": {
+                    "total_issues": total_issues,
+                    "identified_count": identified_count,
+                    "accuracy_percentage": accuracy,
+                    "missed_count": missed_count,
+                    "overall_assessment": f"You identified {identified_count} out of {total_issues} issues",
+                    "completion_status": status
+                },
+                "correctly_identified_issues": [
+                    {
+                        "issue_description": "Code issues were identified in your review",
+                        "praise_comment": "Good effort in analyzing the code"
+                    }
+                ] if identified_count > 0 else [],
+                "missed_issues": [
+                    {
+                        "issue_description": "Some issues were not identified",
+                        "why_important": "Identifying all issues helps improve code quality",
+                        "how_to_find": "Review code more systematically line by line"
+                    }
+                ] if missed_count > 0 else [],
+                "tips_for_improvement": [
+                    {
+                        "category": "Code Review Skills",
+                        "tip": "Practice systematic code analysis",
+                        "example": "Check syntax, logic, and best practices in order"
+                    }
+                ],
+                "java_specific_guidance": [
+                    {
+                        "topic": "Common Java Errors",
+                        "guidance": "Focus on null checks, string comparisons, and array bounds"
+                    }
+                ],
+                "encouragement_and_next_steps": {
+                    "positive_feedback": "Keep practicing to improve your skills",
+                    "next_focus_areas": "Focus on areas where you missed issues",
+                    "learning_objectives": "Develop more comprehensive review approach"
+                },
+                "detailed_feedback": {
+                    "strengths_identified": ["Engaged in code review process"],
+                    "improvement_patterns": ["Could benefit from more systematic approach"],
+                    "review_approach_feedback": "Continue practicing with different error types"
+                }
+            }
+            
+            return json.dumps(report, indent=2, ensure_ascii=False)
+            
+        except Exception as e:
+            logger.error(f"Error generating fallback report: {e}")
+            # Return minimal valid JSON
+            return json.dumps({
+                "performance_summary": {
+                    "total_issues": 0,
+                    "identified_count": 0,
+                    "accuracy_percentage": 0.0,
+                    "missed_count": 0,
+                    "overall_assessment": "Review analysis unavailable",
+                    "completion_status": "Error"
+                },
+                "correctly_identified_issues": [],
+                "missed_issues": [],
+                "tips_for_improvement": [],
+                "java_specific_guidance": [],
+                "encouragement_and_next_steps": {
+                    "positive_feedback": "System error occurred",
+                    "next_focus_areas": "Please try again",
+                    "learning_objectives": "Continue practicing"
+                },
+                "detailed_feedback": {
+                    "strengths_identified": [],
+                    "improvement_patterns": [],
+                    "review_approach_feedback": "Please try again"
+                }
+            }, indent=2)
