@@ -500,7 +500,7 @@ class CodeDisplayUI:
 
 def render_review_tab(workflow, code_display_ui, auth_ui=None):
     """
-    Render the review tab UI with enhanced debugging and state management.
+    FIXED: Render the review tab UI with enhanced debugging and state management.
     """
     st.markdown(f"""
     <div style="margin-bottom: 2rem;">

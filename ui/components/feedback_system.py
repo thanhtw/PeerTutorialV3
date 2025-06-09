@@ -681,7 +681,7 @@ def render_enhanced_feedback_tab(workflow, auth_ui=None):
                             new_state.error_count_end = 1
                             
                             st.session_state.workflow_state = new_state
-                            st.session_state.active_tab = 0  # Go to generate tab
+                            st.session_state.active_tab = 1  # Go to generate tab
                             st.rerun()
             
             with col2:
