@@ -274,6 +274,7 @@
     "good_review_lesson": "Effective reviews are detailed, specific, and help developers understand and fix issues",
     "evaluation_failed": "Evaluation failed",
     "identified_count": "identified_count",
+    "identified_percentage": "identified_percentage", 
     "total_problems": "total_problems",
     "fallback_feedback_good": "Good work! You mentioned several key issues in the code.",
     "fallback_feedback_improve": "Try to look more carefully for specific issues like null checks, array bounds, and string comparisons.",

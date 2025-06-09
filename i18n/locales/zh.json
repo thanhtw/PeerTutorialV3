@@ -153,6 +153,7 @@
     "good_review_lesson": "有效的審查是詳細、具體的，並幫助開發者理解和修復問題",
     "evaluation_failed": "評估失敗",
     "identified_count": "identified_count",
+    "identified_percentage": "identified_percentage",
     "total_problems": "total_problems",
     "fallback_feedback_good": "做得好！您提到了程式碼中的幾個關鍵問題。",
     "fallback_feedback_improve": "嘗試更仔細地尋找特定問題，如空值檢查、陣列界限和字串比較。",

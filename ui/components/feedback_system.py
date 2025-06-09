@@ -164,49 +164,8 @@ class FeedbackSystem:
         
         # Display the comparison report using the new renderer
         if comparison_report:           
-            self.comparison_renderer.render_comparison_report(comparison_report)
+            self.comparison_renderer.render_comparison_report(comparison_report)       
         
-        # Always show review history for better visibility
-        if review_history and len(review_history) > 0:
-            st.subheader(t("your_review"))
-            
-            # First show the most recent review prominently
-            if review_history:
-                latest_review = review_history[-1]    
-                review_analysis = latest_review["review_analysis"]
-                iteration = latest_review["iteration_number"]
-                
-                st.markdown(f"#### {t('your_final_review').format(iteration=iteration)}")
-                
-                # Format the review text with syntax highlighting
-                st.markdown("```text\n" +latest_review["student_review"] + "\n```")
-                                
-            # Show earlier reviews in an expander if there are multiple
-            if len(review_history) > 1:
-                with st.expander(t("review_history"), expanded=False):
-                    tabs = st.tabs([f"{t('attempt')} {rev['iteration_number']}" for i, rev in enumerate(review_history)])
-                    
-                    for i, (tab, review) in enumerate(zip(tabs, review_history)):
-                        with tab:
-                            review_analysis = review["review_analysis"]
-                            st.markdown("```text\n" + review[t('student_review')] + "\n```")
-                            
-                            st.write(f"**{t('found')}:** {review_analysis[t('identified_count')]} {t('of')} "
-                                    f"{review_analysis[t('total_problems')]} {t('issues')} "
-                                    f"({review_analysis[t('identified_percentage')]:.1f}% {t('accuracy')})")
-        
-        # Display analysis details in an expander
-        if review_analysis:            
-            with st.expander(t("detailed_analysis"), expanded=True):
-                tabs = st.tabs([t("identified_issues"), t("missed_issues")])
-                
-                with tabs[0]:  # Identified Issues
-                    self._render_identified_issues(review_analysis)
-                
-                with tabs[1]:  # Missed Issues
-                    self._render_missed_issues(review_analysis)
-
-        # Add horizontal separator
         st.markdown("---")             
             
     def _render_performance_summary(self, review_analysis: Dict[str, Any], review_history: List[Dict[str, Any]]):
@@ -292,126 +251,6 @@ class FeedbackSystem:
             
             fig.tight_layout()
             st.pyplot(fig)
-    
-    def _render_identified_issues(self, review_analysis: Dict[str, Any]):
-        """Render identified issues section with enhanced styling and proper language support"""
-        identified_problems = review_analysis[t("identified_problems")]
-
-        if not identified_problems:
-            st.info(t("no_identified_issues"))
-            return
-                
-        st.subheader(f"{t('correctly_identified_issues')} ({len(identified_problems)})")
-        
-        # Group issues by category if possible
-        categorized_issues = {}
-        for issue in identified_problems:
-            # Try to extract category information
-            category = None
-            if isinstance(issue, dict) and t("category") in issue:
-                category = issue[t('category')]
-            elif isinstance(issue, str):
-                # Try to extract category from string format like "CATEGORY - Issue name"
-                parts = issue.split(" - ", 1)
-                if len(parts) > 1:
-                    category = parts[0]
-            
-            # Default category if none found
-            if not category:
-                category = "Other"
-                
-            # Add to categorized dictionary
-            if category not in categorized_issues:
-                categorized_issues[category] = []
-            
-            categorized_issues[category].append(issue)
-        
-        # Display issues by category with collapsible sections
-        for category, issues in categorized_issues.items():
-            if category and issues:     
-                for i, issue in enumerate(issues, 1):
-                    if isinstance(issue, dict):
-                        problem = issue[t('problem')]
-                        student_comment = issue[t('student_comment')]
-                        #feedback = issue[t('feedback')]                        
-                        st.markdown(
-                            f"""
-                            <div class="feedback-issue-item identified">
-                                <div><span class="issue-property">{t("problem")}:</span> {problem}</div>
-                                <div><span class="issue-property">{t("student_comment")}:</span> {student_comment}</div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
-                    else:
-                        # Fallback for plain string issues
-                        st.markdown(
-                            f"""
-                            <div class="feedback-issue-item identified">
-                                <span class="issue-property">{i}. {issue}</span>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
-    
-    def _render_missed_issues(self, review_analysis: Dict[str, Any]):
-        """Render missed issues section with enhanced styling and proper language support"""
-
-        missed_problems = review_analysis[t("missed_problems")]
-        
-        if not missed_problems:
-            st.success(t("all_issues_found"))
-            return
-                
-        st.subheader(f"{t('issues_missed')} ({len(missed_problems)})")
-        
-        # Group issues by category similar to identified issues method
-        categorized_issues = {}
-        
-        for issue in missed_problems:
-            # Extract category similar to identified issues method
-            category = None
-            if isinstance(issue, dict) and t("category") in issue:
-                category = issue[t("category")]
-            elif isinstance(issue, str):
-                parts = issue.split(" - ", 1)
-                if len(parts) > 1:
-                    category = parts[0]
-            
-            if not category:
-                category = "Other"
-                
-            if category not in categorized_issues:
-                categorized_issues[category] = []
-            
-            categorized_issues[category].append(issue)
-        
-        # Display issues by category with collapsible sections
-        for category, issues in categorized_issues.items():
-            if category and issues:             
-                for i, issue in enumerate(issues, 1):
-                    if isinstance(issue, dict):
-                        problem = issue[t('problem')]
-                        hint = issue[t('hint')]
-                        st.markdown(
-                            f"""
-                            <div class="feedback-issue-item missed">
-                                <div><span class="issue-property">{t("problem")}:</span> {problem}</div>
-                                {f'<div><span class="issue-property">{t("hint")}:</span> {hint}</div>' if hint else ''}
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
-                    else:
-                        # Fallback for plain string
-                        st.markdown(
-                            f"""
-                            <div class="feedback-issue-item missed">
-                                <span class="issue-property">{i}. {issue}</span>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
     
     def _check_review_completion(self, state) -> bool:
         """
@@ -522,94 +361,7 @@ class FeedbackSystem:
                     f"{t('error_generating_report')} "
                     f"{t('check_review_history')}."
                 )
-    
-    def _update_user_statistics(self, state, latest_analysis):
-        """
-        Update user statistics based on review performance.
-        Now with level-up animation and proper session state refresh.
-        
-        Args:
-            state: The workflow state
-            latest_analysis: The analysis of the latest review
-        """
-        # Check if we already updated stats for this iteration
-        current_iteration = getattr(state, 'current_iteration', 1)
-        identified_count = latest_analysis[t("identified_count")]
-        stats_key = f"stats_updated_{current_iteration}_{identified_count}"
-
-        if stats_key not in st.session_state and stats_key not in self.stats_updates:
-            try:
-                # Extract accuracy and identified_count from the latest review
-                accuracy = latest_analysis[t("accuracy_percentage")]
-                    
-                # Log details before update
-                logger.debug(f"{t('preparing_update_stats')}: {t('accuracy')}={accuracy:.1f}%, " + 
-                        f"{t('score')}={identified_count} ({t('identified_count')}), key={stats_key}")
-                
-                # Update user stats with identified_count as score
-                result = self.auth_ui.update_review_stats(accuracy, identified_count)
-                    
-                # Store the update result for debugging
-                st.session_state[stats_key] = result
-                self.stats_updates[stats_key] = True
-                
-                # Log the update result
-                if result and result.get("success", False):
-                    logger.debug(f"Successfully updated user statistics: {result}")
-                    
-                    # **FIX: Update session state with new values**
-                    if "auth" in st.session_state and "user_info" in st.session_state.auth:
-                        # Update the session state with new values from the database result
-                        new_reviews_completed = result.get("reviews_completed")
-                        new_score = result.get("score")
-                        
-                        if new_reviews_completed is not None:
-                            st.session_state.auth["user_info"]["reviews_completed"] = new_reviews_completed
-                            logger.debug(f"Updated session reviews_completed to: {new_reviews_completed}")
-                        
-                        if new_score is not None:
-                            st.session_state.auth["user_info"]["score"] = new_score
-                            logger.debug(f"Updated session score to: {new_score}")
-                        
-                        # Update level if it changed
-                        if result.get("level_changed", False):
-                            new_level = result.get("new_level")
-                            if new_level:
-                                # Update both level formats that might be used
-                                st.session_state.auth["user_info"]["level"] = new_level
-                                # Also update the language-specific level names if they exist
-                                current_lang = get_current_language()
-                                level_key = f"level_name_{current_lang}"
-                                if level_key in st.session_state.auth["user_info"]:
-                                    st.session_state.auth["user_info"][level_key] = new_level
-                                logger.debug(f"Updated session level to: {new_level}")
-                    
-                    # Show level promotion message and animation if level changed
-                    if result.get("level_changed", False):
-                        old_level = result.get("old_level", "").capitalize()
-                        new_level = result.get("new_level", "").capitalize()
-                        
-                        # Import the animation function
-                        try:
-                            level_up_animation(old_level, new_level)
-                        except ImportError:
-                            # Fallback if animation module is not available
-                            st.balloons()  # Add visual celebration effect
-                            st.success(f"🎉 Congratulations! Your level has been upgraded from {old_level} to {new_level}!")
-                        
-                        # Give the database a moment to complete the update
-                        time.sleep(1)
-                        st.rerun()
-                else:                 
-                    logger.error(f"{t('failed_update_statistics')}:")
-                    st.error(f"{t('failed_update_statistics')}:")
-
-                
-            except Exception as e:
-                logger.error(f"{t('error')} {t('updating_user_statistics')}: {str(e)}")
-                logger.error(traceback.format_exc())
-                st.error(f"{t('error')} {t('updating_statistics')}: {str(e)}")
-                
+              
     def _render_new_session_button(self):
         """Render button to start a new session."""
         st.markdown("---")
@@ -850,42 +602,7 @@ class FeedbackSystem:
         )
         
         st.plotly_chart(fig, use_container_width=True)
-
-    def refresh_user_profile_data(self):
-        """
-        Refresh user profile data from the database to ensure UI shows current values.
-        Call this after updating user statistics.
-        """
-        if not self.auth_ui or not self.auth_ui.is_authenticated():
-            return
-        
-        try:
-            user_id = st.session_state.auth.get("user_id")
-            if user_id:
-                # Get fresh data from database
-                profile_result = self.auth_ui.auth_manager.get_user_profile(user_id)
-                
-                if profile_result and profile_result.get("success", False):
-                    # Update session state with fresh data
-                    user_info = st.session_state.auth.get("user_info", {})
-                    
-                    # Update key fields that are displayed in the profile
-                    user_info["reviews_completed"] = profile_result.get("reviews_completed", 0)
-                    user_info["score"] = profile_result.get("score", 0)
-                    
-                    # Update level information
-                    current_lang = get_current_language()
-                    level_key = f"level_name_{current_lang}"
-                    if level_key in profile_result:
-                        user_info[level_key] = profile_result[level_key]
-                        user_info["level"] = profile_result[level_key]
-                    
-                    st.session_state.auth["user_info"] = user_info
-                    logger.debug("Refreshed user profile data from database")
-                    
-        except Exception as e:
-            logger.error(f"Error refreshing user profile data: {str(e)}")
-       
+    
 def render_enhanced_feedback_tab(workflow, auth_ui=None):
         """
         Enhanced feedback tab that properly handles both regular and practice sessions.

@@ -568,11 +568,10 @@ class ErrorExplorerUI:
         </div>
         """, unsafe_allow_html=True)
 
-
-
     def _render_practice_mode(self):
         """Render the enhanced professional practice mode interface."""
         practice_error = st.session_state.get("practice_error_data", {})
+        print(f"Practice error data: {practice_error}")  # Debugging output
         error_name = practice_error.get("error_name", t("unknown_error"))
         error_code = practice_error.get("error_code", "")
         difficulty = practice_error.get("difficulty_level", "medium")
@@ -664,7 +663,7 @@ class ErrorExplorerUI:
 
     def _render_enhanced_error_details(self, practice_error):
         """Render enhanced error details with professional styling."""
-        description = practice_error.get('description', t('no_description_available'))
+        description = practice_error.get(t('description'), t('no_description_available'))
         implementation_guide = practice_error.get('implementation_guide', '')
         difficulty = practice_error.get('difficulty_level', 'medium')
         

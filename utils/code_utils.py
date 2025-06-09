@@ -717,7 +717,7 @@ def create_comparison_report_prompt(evaluation_errors: List[str],
         prompt_vars = {
             "total_problems": total_problems,
             "identified_count": identified_count,
-            "accuracy": review_analysis.get(t("identified_count"), 0),
+            "accuracy": review_analysis.get(t("identified_percentage"), 0),
             "len_missed_str": len(review_analysis.get(t("missed_problems"), [])),
             "identified_text": _extract_problems_text(review_analysis, t("identified_problems")),
             "missed_text": _extract_problems_text(review_analysis, t("missed_problems")),

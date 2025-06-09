@@ -43,7 +43,6 @@ from ui.components.code_generator import CodeGeneratorUI
 from ui.components.code_display import CodeDisplayUI, render_review_tab  
 from ui.components.feedback_system import render_enhanced_feedback_tab
 from ui.components.auth_ui import AuthUI
-from ui.components.enhanced_tutorial import EnhancedTutorialUI
 from ui.components.learning_dashboard import LearningDashboardUI
 from ui.components.error_explorer_ui import ErrorExplorerUI
 
@@ -155,8 +154,7 @@ def main():
 
     # Initialize UI components
     code_display_ui = CodeDisplayUI()
-    code_generator_ui = CodeGeneratorUI(workflow, code_display_ui)
-    enhanced_tutorial_ui = EnhancedTutorialUI(llm_manager)
+    code_generator_ui = CodeGeneratorUI(workflow, code_display_ui)   
     learning_dashboard_ui = LearningDashboardUI()
     error_explorer_ui = ErrorExplorerUI(workflow)  # Pass workflow for practice mode
     
@@ -170,8 +168,7 @@ def main():
             code_generator_ui, 
             workflow, 
             code_display_ui, 
-            auth_ui,
-            enhanced_tutorial_ui,
+            auth_ui,           
             learning_dashboard_ui,
             error_explorer_ui,
             user_level
@@ -192,7 +189,7 @@ def render_practice_mode_interface(error_explorer_ui, workflow):
     error_explorer_ui.render(workflow)
 
 def render_normal_interface(code_generator_ui, workflow, code_display_ui, auth_ui, 
-                          enhanced_tutorial_ui, learning_dashboard_ui, error_explorer_ui, user_level):
+                          learning_dashboard_ui, error_explorer_ui, user_level):
     """Render the normal tabbed interface."""
     
     # Header with improved styling
@@ -214,10 +211,9 @@ def render_normal_interface(code_generator_ui, workflow, code_display_ui, auth_u
     tab_labels = [
         t("tab_generate"),
         t("tab_review"),
-        t("tab_feedback"),
-        t("tab_tutorial"),
+        t("tab_feedback"),       
         t("tab_dashboard"),
-        t("tab_error_explorer")
+        t("tab_tutorial")
     ]
     
     # Use the enhanced tabs function
@@ -242,19 +238,15 @@ def render_normal_interface(code_generator_ui, workflow, code_display_ui, auth_u
     with tabs[3]: # Tutorial Tab
         user_id = st.session_state.auth.get("user_id")
         if user_id:
-            enhanced_tutorial_ui.render(user_id=user_id, on_complete=lambda: st.session_state.update({"active_tab": 0}))
-        else:
-            st.info(t("tutorial_available_after_login"))
-
-    with tabs[4]: # Dashboard Tab
-        user_id = st.session_state.auth.get("user_id")
-        if user_id:
             learning_dashboard_ui.render(user_id=user_id)
         else:
             st.warning(t("user_not_authenticated_dashboard"))
-        
-    with tabs[5]: # Error Explorer Tab
+
+    with tabs[4]: # Dashboard Tab
         error_explorer_ui.render(workflow)
+        
+   
+       
 
 def render_enhanced_review_tab(workflow, code_display_ui, auth_ui=None):
     """
