@@ -661,7 +661,7 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
                 
                 # Process the student review
                 logger.info("Calling _process_student_review...")
-                result = _process_student_review(workflow, review_text)
+                result = _process_student_review_with_comprehensive_tracking(workflow, review_text)
                 logger.info(f"_process_student_review returned: {result}")
                 
                 if result is True:
@@ -930,3 +930,319 @@ def _process_student_review(workflow, student_review: str) -> bool:
         logger.error(error_msg, exc_info=True)
         st.error(f"❌ {error_msg}")
         return False
+    
+def _process_student_review_with_comprehensive_tracking(workflow, student_review: str) -> bool:
+    """Enhanced review processing with detailed behavior tracking."""
+    try:
+        user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
+        review_start_time = time.time()
+        
+        logger.debug("Starting student review processing")
+        logger.debug(f"Processing review: '{student_review[:100]}...' (length: {len(student_review)})")
+        
+        # Track review submission
+        if user_id:
+            current_iteration = getattr(st.session_state.workflow_state, 'current_iteration', 1)
+            max_iterations = getattr(st.session_state.workflow_state, 'max_iterations', 3)
+            
+            # Analyze review content for tracking
+            review_analysis = {
+                "review_length": len(student_review),
+                "word_count": len(student_review.split()),
+                "line_count": len(student_review.split('\n')),
+                "has_line_references": bool(re.search(r'line\s*\d+', student_review.lower())),
+                "iteration": current_iteration,
+                "max_iterations": max_iterations
+            }
+            
+            behavior_tracker.log_interaction(
+                user_id=user_id,
+                interaction_type="submit",
+                interaction_category="main_workflow",
+                component="review_input",
+                action="submit_review",
+                details=review_analysis
+            )
+            
+            # Update workflow step
+            behavior_tracker.update_workflow_step(
+                user_id=user_id,
+                new_step="review_analysis",
+                step_data={
+                    "review_submitted": True,
+                    "review_iteration": current_iteration,
+                    "review_analysis": review_analysis
+                }
+            )
+        
+        # Enhanced status tracking with detailed steps
+        with st.status(t("processing_review"), expanded=True) as status:
+            
+            # Validation steps with tracking
+            status.update(label="🔍 Validating workflow...", state="running")
+            
+            if not workflow:
+                error_msg = "No workflow provided"
+                logger.error(error_msg)
+                
+                if user_id:
+                    behavior_tracker.log_interaction(
+                        user_id=user_id,
+                        interaction_type="error",
+                        interaction_category="main_workflow",
+                        component="workflow_validator",
+                        action="workflow_validation_failed",
+                        success=False,
+                        error_message=error_msg
+                    )
+                
+                status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
+                st.error(f"❌ {error_msg}")
+                return False
+            
+            # ... similar tracking for other validation steps ...
+            
+            # Submit to workflow with timing
+            status.update(label="🚀 Analyzing review with AI...", state="running")
+            
+            try:
+                analysis_start_time = time.time()
+                raw_updated_state = workflow.submit_review(st.session_state.workflow_state, student_review)
+                analysis_duration = time.time() - analysis_start_time
+                
+                logger.debug(f"Workflow analysis completed in {analysis_duration:.2f}s")
+                
+                if not raw_updated_state:
+                    error_msg = "Workflow returned empty state"
+                    
+                    if user_id:
+                        behavior_tracker.log_interaction(
+                            user_id=user_id,
+                            interaction_type="error",
+                            interaction_category="main_workflow",
+                            component="workflow_execution",
+                            action="workflow_empty_response",
+                            success=False,
+                            error_message=error_msg,
+                            time_spent_seconds=int(analysis_duration)
+                        )
+                    
+                    status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
+                    st.error(f"❌ {error_msg}")
+                    return False
+                
+            except Exception as workflow_error:
+                analysis_duration = time.time() - analysis_start_time
+                error_msg = f"Workflow execution failed: {str(workflow_error)}"
+                logger.error(error_msg, exc_info=True)
+                
+                if user_id:
+                    behavior_tracker.log_interaction(
+                        user_id=user_id,
+                        interaction_type="error",
+                        interaction_category="main_workflow",
+                        component="workflow_execution",
+                        action="workflow_execution_exception",
+                        success=False,
+                        error_message=str(workflow_error),
+                        time_spent_seconds=int(analysis_duration)
+                    )
+                
+                status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
+                st.error(f"❌ {error_msg}")
+                return False
+            
+            # Process results with tracking
+            status.update(label="📊 Processing analysis results...", state="running")
+            
+            error = getattr(raw_updated_state, 'error', None)
+            if error:
+                logger.error(f"Workflow returned error: {error}")
+                
+                if user_id:
+                    behavior_tracker.log_interaction(
+                        user_id=user_id,
+                        interaction_type="error",
+                        interaction_category="main_workflow",
+                        component="workflow_result",
+                        action="workflow_result_error",
+                        success=False,
+                        error_message=error,
+                        time_spent_seconds=int(time.time() - review_start_time)
+                    )
+                
+                status.update(label=f"❌ {t('error')}: {error}", state="error")
+                st.error(f"❌ {error}")
+                return False
+            
+            # Update session state
+            status.update(label="💾 Updating session state...", state="running")
+            
+            st.session_state.workflow_state = raw_updated_state
+            st.session_state.review_processing_success = True
+            st.session_state.last_review_timestamp = time.time()
+            
+            # Extract results for tracking
+            review_history = getattr(raw_updated_state, 'review_history', None)
+            current_iteration = getattr(raw_updated_state, 'current_iteration', 1)
+            review_sufficient = getattr(raw_updated_state, 'review_sufficient', False)
+            
+            total_processing_time = time.time() - review_start_time
+            
+            if review_history and len(review_history) > 0:
+                logger.debug(f"Review processing completed successfully. History length: {len(review_history)}")
+                
+                # Track successful review processing
+                if user_id:
+                    latest_review = review_history[-1]
+                    analysis_results = getattr(latest_review, 'analysis', {}) if hasattr(latest_review, 'analysis') else {}
+                    
+                    processing_details = {
+                        "processing_duration": total_processing_time,
+                        "analysis_duration": analysis_duration,
+                        "review_iteration": current_iteration,
+                        "review_sufficient": review_sufficient,
+                        "analysis_results": {
+                            "identified_count": analysis_results.get(t('identified_count'), 0),
+                            "total_problems": analysis_results.get(t('total_problems'), 0),
+                            "accuracy_percentage": analysis_results.get(t('identified_percentage'), 0)
+                        }
+                    }
+                    
+                    behavior_tracker.log_interaction(
+                        user_id=user_id,
+                        interaction_type="success",
+                        interaction_category="main_workflow",
+                        component="review_processor",
+                        action="review_processing_success",
+                        time_spent_seconds=int(total_processing_time),
+                        details=processing_details
+                    )
+                    
+                    # Track error identification for specific errors
+                    if analysis_results:
+                        _track_error_identification_from_review(
+                            user_id, 
+                            raw_updated_state, 
+                            student_review, 
+                            current_iteration, 
+                            analysis_results,
+                            total_processing_time
+                        )
+                    
+                    # Check for workflow completion
+                    if review_sufficient or current_iteration > getattr(raw_updated_state, 'max_iterations', 3):
+                        behavior_tracker.complete_workflow(
+                            user_id=user_id,
+                            final_results={
+                                "identified_count": analysis_results.get(t('identified_count'), 0),
+                                "total_problems": analysis_results.get(t('total_problems'), 0),
+                                "accuracy": analysis_results.get(t('identified_percentage'), 0),
+                                "iterations_used": current_iteration - 1,
+                                "review_sufficient": review_sufficient,
+                                "total_processing_time": total_processing_time
+                            }
+                        )
+                
+                status.update(label=f"✅ {t('analysis_complete_processed')}", state="complete")
+                return True
+            else:
+                logger.warning("Review processing may not have completed properly - no review history found")
+                
+                if user_id:
+                    behavior_tracker.log_interaction(
+                        user_id=user_id,
+                        interaction_type="warning",
+                        interaction_category="main_workflow",
+                        component="review_processor",
+                        action="review_processing_incomplete",
+                        time_spent_seconds=int(total_processing_time),
+                        details={"warning": "No review history found"}
+                    )
+                
+                status.update(label="⚠️ Processing completed with warnings", state="complete")
+                return True
+            
+    except Exception as e:
+        total_time = time.time() - review_start_time
+        error_msg = f"Exception in review processing: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        
+        # Track processing exception
+        if user_id:
+            behavior_tracker.log_interaction(
+                user_id=user_id,
+                interaction_type="error",
+                interaction_category="main_workflow",
+                component="review_processor",
+                action="review_processing_exception",
+                success=False,
+                error_message=str(e),
+                time_spent_seconds=int(total_time)
+            )
+        
+        st.error(f"❌ {error_msg}")
+        return False
+
+def _track_error_identification_from_review(user_id: str, workflow_state, review_text: str, 
+                                          iteration: int, analysis_results: Dict[str, Any], 
+                                          processing_time: float):
+    """Track specific error identification from review analysis."""
+    try:
+        # Get error information from workflow state
+        evaluation_result = getattr(workflow_state, 'evaluation_result', None)
+        if not evaluation_result:
+            return
+        
+        found_errors = evaluation_result.get(t('found_errors'), [])
+        identified_problems = analysis_results.get(t('identified_problems'), [])
+        
+        # Track each error that was supposed to be found
+        for error in found_errors:
+            error_info = str(error) if error else ""
+            error_code = _extract_error_code_from_string(error_info)
+            
+            # Check if this error was identified
+            identified_correctly = any(
+                str(problem) for problem in identified_problems 
+                if error_info.lower() in str(problem).lower()
+            )
+            
+            if error_code:
+                behavior_tracker.track_error_identification(
+                    user_id=user_id,
+                    error_code=error_code,
+                    review_iteration=iteration,
+                    review_text=review_text,
+                    identified_correctly=identified_correctly,
+                    time_to_identify=int(processing_time),
+                    analysis_data={
+                        "error_string": error_info,
+                        "analysis_source": "main_workflow",
+                        "total_found_errors": len(found_errors),
+                        "total_identified": len(identified_problems)
+                    }
+                )
+        
+    except Exception as e:
+        logger.error(f"Error tracking error identification: {str(e)}")
+
+def _extract_error_code_from_string(error_string: str) -> Optional[str]:
+    """Extract error code from error string for tracking."""
+    try:
+        # This would need to be implemented based on how errors are formatted
+        # For example, if errors are formatted as "LOGICAL - Off-by-one error"
+        # This would map to the corresponding error_code in the database
+        
+        # Simple implementation - you'd want to make this more robust
+        if "off-by-one" in error_string.lower():
+            return "logical_off_by_one"
+        elif "null" in error_string.lower() and "check" in error_string.lower():
+            return "logical_null_check_after_dereference"
+        # Add more mappings as needed
+        
+        return None
+        
+    except Exception as e:
+        logger.debug(f"Error extracting error code: {str(e)}")
+        return None

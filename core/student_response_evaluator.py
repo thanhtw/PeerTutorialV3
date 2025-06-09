@@ -513,9 +513,8 @@ class StudentResponseEvaluator:
                     t("evaluation_errors_count"): len(evaluation_errors),
                     t("review_analysis"): review_analysis,
                     t("review_history_count"): len(review_history) if review_history else 0
-                })
+                })               
                 
-                print("\nreport is", formatted_report)
                 return formatted_report
                 
             except Exception as extraction_error:

@@ -27,6 +27,7 @@ class ErrorExplorerUI:
         self.workflow = workflow  # JavaCodeReviewGraph instance
         self.comparison_renderer = ComparisonReportRenderer()
         self.behavior_tracker = behavior_tracker
+        self.interaction_start_times = {}
         
         # Log workflow initialization for debugging
         if workflow:
@@ -44,6 +45,9 @@ class ErrorExplorerUI:
         # Initialize timing for interactions
         if "error_explorer_start_time" not in st.session_state:
             st.session_state.error_explorer_start_time = time.time()
+         # Track component load time
+        if "error_explorer_load_time" not in st.session_state:
+            st.session_state.error_explorer_load_time = time.time()
         
         self._load_styles()
     
@@ -68,6 +72,19 @@ class ErrorExplorerUI:
             if "session_tracking_started" not in st.session_state:
                 self.behavior_tracker.start_user_session(user_id)
                 st.session_state.session_tracking_started = True
+            
+            # Track Error Explorer access
+            self.behavior_tracker.log_interaction(
+                user_id=user_id,
+                interaction_type="access",
+                interaction_category="error_explorer",
+                component="error_explorer_main",
+                action="access_error_explorer",
+                details={
+                    "load_time": time.time() - st.session_state.error_explorer_load_time,
+                    "practice_mode_active": st.session_state.get("practice_mode_active", False)
+                }
+            )
 
         # Only update workflow if one is provided, otherwise keep the existing one
         if workflow is not None:
@@ -649,8 +666,7 @@ class ErrorExplorerUI:
 
     def _render_practice_mode(self):
         """Render the enhanced professional practice mode interface."""
-        practice_error = st.session_state.get("practice_error_data", {})
-        print(f"Practice error data: {practice_error}")  # Debugging output
+        practice_error = st.session_state.get("practice_error_data", {})        
         error_name = practice_error.get("error_name", t("unknown_error"))
         error_code = practice_error.get("error_code", "")
         difficulty = practice_error.get("difficulty_level", "medium")
@@ -668,6 +684,382 @@ class ErrorExplorerUI:
             self._render_professional_practice_review()
         elif workflow_status == "review_complete":
             self._render_professional_practice_feedback()
+
+    def _render_exploration_mode_with_tracking(self):
+        """Render exploration mode with detailed interaction tracking."""
+        user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
+        
+        # Track exploration mode entry
+        if user_id:
+            self.behavior_tracker.log_interaction(
+                user_id=user_id,
+                interaction_type="mode_change",
+                interaction_category="error_explorer",
+                component="mode_selector",
+                action="enter_exploration_mode"
+            )
+        
+        # Professional header with tracking
+        self._render_header_with_tracking()
+        
+        # Search and filter section with tracking
+        self._render_search_filters_with_tracking()
+        
+        # Main content area with tracking
+        self._render_error_content_with_tracking()
+
+    def _render_search_filters_with_tracking(self):
+        """Enhanced search filters with interaction tracking."""
+        user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
+        
+        # ... existing search filter UI code ...
+        
+        # Track search interactions
+        search_term = st.text_input(
+            "",
+            placeholder=f"🔍 {t('search_errors_placeholder')}",
+            key="error_search",
+            help=t('search_help_text'),
+            on_change=lambda: self._track_search_interaction(user_id) if user_id else None
+        )
+        
+        # Track category filter changes
+        selected_category = st.selectbox(
+            f"📂 {t('category')}",
+            options=[t('all_categories')] + self._get_categories(),
+            key="category_filter",
+            help=t('category_filter_help'),
+            on_change=lambda: self._track_filter_interaction(user_id, "category") if user_id else None
+        )
+        
+        # Track difficulty filter changes
+        selected_difficulty = st.selectbox(
+            f"⚡ {t('difficulty')}",
+            options=[t('all_levels'), t('easy'), t('medium'), t('hard')],
+            key="difficulty_filter",
+            help=t('difficulty_filter_help'),
+            on_change=lambda: self._track_filter_interaction(user_id, "difficulty") if user_id else None
+        )
+
+    def _track_search_interaction(self, user_id: str):
+        """Track search interactions."""
+        search_term = st.session_state.get("error_search", "")
+        
+        self.behavior_tracker.log_interaction(
+            user_id=user_id,
+            interaction_type="search",
+            interaction_category="error_explorer",
+            component="search_box",
+            action="search_errors",
+            details={
+                "search_term_length": len(search_term),
+                "has_search_term": len(search_term) > 0,
+                "search_term_hash": hash(search_term) if search_term else None  # Privacy-safe
+            }
+        )
+    
+    def _track_filter_interaction(self, user_id: str, filter_type: str):
+        """Track filter interactions."""
+        filter_value = st.session_state.get(f"{filter_type}_filter", "")
+        
+        self.behavior_tracker.log_interaction(
+            user_id=user_id,
+            interaction_type="filter",
+            interaction_category="error_explorer",
+            component=f"{filter_type}_filter",
+            action=f"change_{filter_type}_filter",
+            details={
+                "filter_type": filter_type,
+                "filter_value": filter_value,
+                "active_filters": {
+                    "category": st.session_state.get("category_filter", ""),
+                    "difficulty": st.session_state.get("difficulty_filter", "")
+                }
+            }
+        )
+
+    def _render_consecutive_error_card_with_tracking(self, error: Dict[str, Any]):
+        """Enhanced error card with detailed interaction tracking."""
+        user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
+        error_name = error.get(t("error_name_variable"), t("unknown_error"))
+        error_code = error.get('error_code', f"error_{hash(error_name) % 10000}")
+        
+        # Track error card view
+        if user_id:
+            self.behavior_tracker.log_interaction(
+                user_id=user_id,
+                interaction_type="view",
+                interaction_category="error_explorer",
+                component="error_card",
+                action="view_error_details",
+                details={
+                    "error_code": error_code,
+                    "error_name": error_name,
+                    "error_category": error.get('category', ''),
+                    "difficulty_level": error.get('difficulty_level', 'medium')
+                }
+            )
+        
+        # ... existing error card rendering code ...
+        
+        # Enhanced practice button with tracking
+        practice_key = f"practice_{error_code}_{hash(error_name) % 1000}"
+        
+        if st.button(
+            f"🚀 {t('start_practice_session')}", 
+            key=practice_key, 
+            use_container_width=True,
+            type="primary",
+            help=t('generate_practice_code_with_error_type')
+        ):
+            # Track practice button click
+            if user_id:
+                self.behavior_tracker.log_interaction(
+                    user_id=user_id,
+                    interaction_type="click",
+                    interaction_category="error_explorer",
+                    component="practice_button",
+                    action="click_start_practice",
+                    details={
+                        "error_code": error_code,
+                        "error_name": error_name,
+                        "button_context": "error_card"
+                    }
+                )
+            
+            self._start_practice_session_with_tracking(error)
+    
+    def _start_practice_session_with_tracking(self, error: Dict[str, Any]):
+        """Enhanced practice session start with comprehensive tracking."""
+        try:
+            user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
+            error_name = error.get(t("error_name_variable"), t("unknown_error"))
+            error_code = error.get('error_code', f"error_{hash(error_name) % 10000}")
+            error_category = error.get('category', 'Unknown')
+            difficulty = error.get('difficulty_level', 'medium')
+            
+            logger.info(f"Starting practice session for error: {error_name}")
+            
+            # Track practice session initiation
+            if user_id:
+                # Start practice session tracking
+                practice_session_id = self.behavior_tracker.start_practice_session(
+                    user_id=user_id,
+                    error_code=error_code,
+                    error_name=error_name,
+                    error_category=error_category,
+                    difficulty_level=difficulty
+                )
+                
+                # Store additional tracking data
+                st.session_state.practice_session_id = practice_session_id
+                st.session_state.practice_start_interaction_time = time.time()
+                st.session_state.practice_error_selection_context = {
+                    "source": "error_explorer",
+                    "selection_method": "manual_card_selection",
+                    "search_context": {
+                        "had_search_term": bool(st.session_state.get("error_search", "")),
+                        "category_filter": st.session_state.get("category_filter", ""),
+                        "difficulty_filter": st.session_state.get("difficulty_filter", "")
+                    }
+                }
+            
+            # Set session state flags
+            st.session_state.practice_mode_active = True
+            st.session_state.practice_error_data = error
+            st.session_state.practice_workflow_status = "setup"
+            
+            # Show immediate feedback
+            st.success(t('starting_practice_session_with').format(error_name=error_name))
+            st.info(f"✨ {t('practice_mode_activated_interface_reload')}")
+            
+            time.sleep(0.5)
+            st.rerun()
+            
+        except Exception as e:
+            logger.error(f"Error starting practice session: {str(e)}", exc_info=True)
+            
+            # Track error
+            if user_id:
+                self.behavior_tracker.log_interaction(
+                    user_id=user_id,
+                    interaction_type="error",
+                    interaction_category="error_explorer",
+                    component="practice_session",
+                    action="start_practice_error",
+                    success=False,
+                    error_message=str(e),
+                    details={"error_code": error_code}
+                )
+            
+            st.error(f"❌ {t('error_setting_up_practice_session')}: {str(e)}")
+    
+    def _generate_practice_code_with_comprehensive_tracking(self, practice_error):
+        """Enhanced code generation with detailed tracking."""
+        user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
+        
+        if not self.workflow:
+            logger.error("No workflow available for practice mode")
+            st.error(f"❌ {t('practice_mode_requires_workflow_refresh')}")
+            return
+        
+        try:
+            generation_start_time = time.time()
+            
+            # Track code generation start
+            if user_id:
+                self.behavior_tracker.log_interaction(
+                    user_id=user_id,
+                    interaction_type="action",
+                    interaction_category="practice",
+                    component="code_generator",
+                    action="start_practice_code_generation",
+                    details={
+                        "error_code": practice_error.get('error_code', ''),
+                        "error_name": practice_error.get(t("error_name_variable"), ''),
+                        "difficulty": practice_error.get('difficulty_level', 'medium'),
+                        "generation_context": st.session_state.get("practice_error_selection_context", {})
+                    }
+                )
+            
+            # Enhanced status display
+            with st.status(f"🚀 {t('generating_practice_challenge')}", expanded=True) as status:
+                # Execute the generation
+                workflow_state = self._prepare_practice_workflow_state(practice_error)
+                
+                if not workflow_state:
+                    st.error(f"❌ {t('failed_prepare_practice_session')}")
+                    return
+                
+                logger.info(f"Executing code generation with workflow: {type(self.workflow)}")
+                updated_state = self.workflow.execute_code_generation(workflow_state)
+                
+                generation_duration = time.time() - generation_start_time
+                
+                # Validate and handle result
+                if hasattr(updated_state, 'error') and updated_state.error:
+                    error_msg = updated_state.error
+                    
+                    # Track generation failure
+                    if user_id:
+                        self.behavior_tracker.log_interaction(
+                            user_id=user_id,
+                            interaction_type="error",
+                            interaction_category="practice",
+                            component="code_generator",
+                            action="practice_code_generation_failed",
+                            success=False,
+                            error_message=error_msg,
+                            time_spent_seconds=int(generation_duration),
+                            details={
+                                "error_code": practice_error.get('error_code', ''),
+                                "generation_attempts": getattr(updated_state, 'evaluation_attempts', 1)
+                            }
+                        )
+                    
+                    st.error(f"❌ {t('failed_to_generate_practice_code')}: {error_msg}")
+                    return
+                
+                if not hasattr(updated_state, 'code_snippet') or not updated_state.code_snippet:
+                    # Track generation failure
+                    if user_id:
+                        self.behavior_tracker.log_interaction(
+                            user_id=user_id,
+                            interaction_type="error",
+                            interaction_category="practice",
+                            component="code_generator",
+                            action="practice_code_generation_no_output",
+                            success=False,
+                            time_spent_seconds=int(generation_duration),
+                            details={"error_code": practice_error.get('error_code', '')}
+                        )
+                    
+                    st.error(f"❌ {t('failed_to_generate_practice_code')}: No code generated")
+                    return
+                
+                # Track successful generation
+                if user_id:
+                    code_snippet = updated_state.code_snippet
+                    code_stats = {
+                        "lines_of_code": len(code_snippet.code.split('\n')) if hasattr(code_snippet, 'code') else 0,
+                        "code_length_chars": len(code_snippet.code) if hasattr(code_snippet, 'code') else 0,
+                        "has_clean_code": hasattr(code_snippet, 'clean_code') and bool(code_snippet.clean_code),
+                        "expected_errors": getattr(code_snippet, 'expected_error_count', 0)
+                    }
+                    
+                    self.behavior_tracker.log_interaction(
+                        user_id=user_id,
+                        interaction_type="success",
+                        interaction_category="practice",
+                        component="code_generator",
+                        action="practice_code_generation_success",
+                        time_spent_seconds=int(generation_duration),
+                        details={
+                            "error_code": practice_error.get('error_code', ''),
+                            "generation_attempts": getattr(updated_state, 'evaluation_attempts', 1),
+                            "code_stats": code_stats,
+                            "workflow_step": getattr(updated_state, 'current_step', 'unknown')
+                        }
+                    )
+                    
+                    # Update practice session
+                    self.behavior_tracker.update_practice_session(
+                        user_id=user_id,
+                        status="code_ready",
+                        additional_data={
+                            "code_generation_successful": True,
+                            "generation_duration_seconds": generation_duration,
+                            "generation_attempts": getattr(updated_state, 'evaluation_attempts', 1),
+                            "code_stats": code_stats
+                        }
+                    )
+            
+            # Store results and update status
+            st.session_state.practice_workflow_state = updated_state
+            st.session_state.practice_code_generated = True
+            st.session_state.practice_workflow_status = "code_ready"
+            
+            # Track usage for analytics
+            try:
+                error_code = practice_error.get('error_code', '')
+                if error_code:
+                    self.repository.update_error_usage(
+                        error_code=error_code,
+                        user_id=user_id,
+                        action_type='practiced',
+                        context={
+                            'source': 'practice_mode', 
+                            'method': 'professional',
+                            'generation_duration': generation_duration,
+                            'session_id': st.session_state.get("session_id")
+                        }
+                    )
+            except Exception as e:
+                logger.debug(f"Could not track error usage: {str(e)}")
+            
+            # Success message
+            st.success("✅ Practice challenge ready!")
+            
+            time.sleep(1)
+            st.rerun()
+            
+        except Exception as e:
+            logger.error(f"Error generating practice code: {str(e)}", exc_info=True)
+            
+            # Track unexpected error
+            if user_id:
+                self.behavior_tracker.log_interaction(
+                    user_id=user_id,
+                    interaction_type="error",
+                    interaction_category="practice",
+                    component="code_generator",
+                    action="practice_code_generation_exception",
+                    success=False,
+                    error_message=str(e),
+                    details={"error_code": practice_error.get('error_code', '')}
+                )
+            
+            st.error(f"❌ {t('error_setting_up_practice_session')}: {str(e)}")
 
     def _render_professional_practice_header(self, error_name: str, difficulty: str, category: str):
         """Render enhanced professional practice mode header."""

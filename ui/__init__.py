@@ -10,7 +10,6 @@ from ui.components.code_generator import CodeGeneratorUI
 from ui.components.code_display import CodeDisplayUI
 from ui.components.feedback_system import FeedbackSystem
 from ui.components.auth_ui import AuthUI
-from ui.components.learning_dashboard import LearningDashboardUI, render_learning_dashboard
 
 # UI utilities
 from ui.utils.main_ui import (
@@ -31,10 +30,8 @@ __all__ = [
     'CodeGeneratorUI',
     'CodeDisplayUI', 
     'FeedbackSystem',
-    'AuthUI',
-    'LearningDashboardUI',
-    'render_learning_dashboard',
-    
+    'AuthUI'
+        
     # UI utilities - compact and professional
     'init_session_state',
     'render_llm_logs_tab',

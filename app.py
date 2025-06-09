@@ -42,8 +42,8 @@ from ui.components.code_generator import CodeGeneratorUI
 from ui.components.code_display import CodeDisplayUI, render_review_tab  
 from ui.components.feedback_system import render_enhanced_feedback_tab
 from ui.components.auth_ui import AuthUI
-from ui.components.learning_dashboard import LearningDashboardUI
-from ui.components.error_explorer_ui import ErrorExplorerUI
+
+from ui.components.tutorial import ErrorExplorerUI
 
 from analytics.behavior_tracker import behavior_tracker
 import atexit
@@ -165,8 +165,7 @@ def main():
 
     # Initialize UI components
     code_display_ui = CodeDisplayUI()
-    code_generator_ui = CodeGeneratorUI(workflow, code_display_ui)   
-    learning_dashboard_ui = LearningDashboardUI()
+    code_generator_ui = CodeGeneratorUI(workflow, code_display_ui)       
     error_explorer_ui = ErrorExplorerUI(workflow)  # Pass workflow for practice mode
     
     # UPDATED: Check if we're in practice mode
@@ -179,8 +178,7 @@ def main():
             code_generator_ui, 
             workflow, 
             code_display_ui, 
-            auth_ui,           
-            learning_dashboard_ui,
+            auth_ui,          
             error_explorer_ui,
             user_level
         )
@@ -200,7 +198,7 @@ def render_practice_mode_interface(error_explorer_ui, workflow):
     error_explorer_ui.render(workflow)
 
 def render_normal_interface(code_generator_ui, workflow, code_display_ui, auth_ui, 
-                          learning_dashboard_ui, error_explorer_ui, user_level):
+                          error_explorer_ui, user_level):
     """Render the normal tabbed interface."""
     
     # Header with improved styling
@@ -220,18 +218,21 @@ def render_normal_interface(code_generator_ui, workflow, code_display_ui, auth_u
     
     # Create enhanced tabs for different steps of the workflow
     tab_labels = [
+        t("tab_tutorial"),
         t("tab_generate"),
         t("tab_review"),
-        t("tab_feedback"),       
-        t("tab_dashboard"),
-        t("tab_tutorial")
+        t("tab_feedback")      
+        
     ]
     
     # Use the enhanced tabs function
     tabs = create_enhanced_tabs(tab_labels)
 
     # Tab content
-    with tabs[0]:
+    with tabs[0]: # Tutorial Tab
+        error_explorer_ui.render(workflow) 
+
+    with tabs[1]:
         # Check for special practice session completion flow
         if st.session_state.get("practice_session_active", False):
             error_name = st.session_state.get("practice_error_name", "")
@@ -240,21 +241,13 @@ def render_normal_interface(code_generator_ui, workflow, code_display_ui, auth_u
         
         code_generator_ui.render(user_level)
     
-    with tabs[1]:
+    with tabs[2]:
         render_enhanced_review_tab(workflow, code_display_ui, auth_ui)
     
-    with tabs[2]:
+    with tabs[3]:
         render_enhanced_feedback_tab(workflow, auth_ui)
         
-    with tabs[3]: # Tutorial Tab
-        user_id = st.session_state.auth.get("user_id")
-        if user_id:
-            learning_dashboard_ui.render(user_id=user_id)
-        else:
-            st.warning(t("user_not_authenticated_dashboard"))
-
-    with tabs[4]: # Dashboard Tab
-        error_explorer_ui.render(workflow)
+          
         
    
        

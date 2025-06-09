@@ -712,8 +712,7 @@ def create_comparison_report_prompt(evaluation_errors: List[str],
         builder = PromptBuilder(context)
         
         total_problems = review_analysis.get(t("total_problems"), 0)
-        identified_count = review_analysis.get(t("identified_count"), 0)
-        print(f"\nreview_analysis: {review_analysis}")
+        identified_count = review_analysis.get(t("identified_count"), 0)        
         prompt_vars = {
             "total_problems": total_problems,
             "identified_count": identified_count,
