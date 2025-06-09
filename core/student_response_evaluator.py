@@ -467,7 +467,7 @@ class StudentResponseEvaluator:
         return False, t("please_use_format_line_description")
    
     def generate_comparison_report(self, evaluation_errors: List[str], review_analysis: Dict[str, Any], 
-                                  review_history: List[Dict[str, Any]] = None) -> str:
+                              review_history: List[Dict[str, Any]] = None) -> str:
         """
         Generate a comparison report showing progress across review attempts.
         Uses the LLM instance that's already available in the class.
@@ -503,44 +503,25 @@ class StudentResponseEvaluator:
             # Clean up the report
             report = report.replace('\\n', '\n')
             
-            # Try to extract and validate JSON from the response
+           
             try:
-                # Look for JSON content in the response
-                json_match = re.search(r'\{.*\}', report, re.DOTALL)
-                if json_match:
-                    json_str = json_match.group(0)
-                    
-                    # Clean up common JSON formatting issues
-                    json_str = re.sub(r',(\s*[}\]])', r'\1', json_str)  # Remove trailing commas
-                    json_str = re.sub(r'(\w+):', r'"\1":', json_str)    # Quote unquoted keys
-                    json_str = re.sub(r':\s*([^",\[\{][^,\]\}]*)', r': "\1"', json_str)  # Quote unquoted string values
-                    
-                    # Try to parse the cleaned JSON
-                    try:
-                        parsed_json = json.loads(json_str)
-                        # If successful, return the JSON as a formatted string
-                        report = json.dumps(parsed_json, indent=2, ensure_ascii=False)
-                    except json.JSONDecodeError as e:
-                        logger.warning(f"Failed to parse LLM JSON response: {e}")
-                        # Fall back to manual extraction of key fields
-                        report = self._extract_comparison_report_fallback(report, review_analysis)
-                else:
-                    # No JSON found, use fallback extraction
-                    report = self._extract_comparison_report_fallback(report, review_analysis)
-                    
-            except Exception as e:
-                logger.warning(f"Error processing LLM response: {e}")
-                # Use fallback method
-                report = self._extract_comparison_report_fallback(report, review_analysis)
-            
-            # Log the report generation
-            self.llm_logger.log_interaction("comparison_report", prompt, report, {
-                t("evaluation_errors_count"): len(evaluation_errors),
-                t("review_analysis"): review_analysis,
-                t("review_history_count"): len(review_history) if review_history else 0
-            })
-            
-            return report
+                # First try to parse as direct JSON
+                formatted_report = self._extract_and_format_comparison_data(report, review_analysis, evaluation_errors)
+                
+                # Log the report generation
+                self.llm_logger.log_interaction("comparison_report", prompt, formatted_report, {
+                    t("evaluation_errors_count"): len(evaluation_errors),
+                    t("review_analysis"): review_analysis,
+                    t("review_history_count"): len(review_history) if review_history else 0
+                })
+                
+                print("\nreport is", formatted_report)
+                return formatted_report
+                
+            except Exception as extraction_error:
+                logger.warning(f"Error extracting and formatting comparison data: {extraction_error}")
+                # Fall back to original processing logic
+                return self._process_original_report_format(report, review_analysis, evaluation_errors)
             
         except Exception as e:
             # Log the error
@@ -548,94 +529,168 @@ class StudentResponseEvaluator:
             # Return a fallback report
             return self._generate_fallback_comparison_report(review_analysis, review_history)
     
-    def _extract_comparison_report_fallback(self, raw_response: str, review_analysis: Dict[str, Any]) -> str:
+    def _extract_and_format_comparison_data(self, raw_content: str, review_analysis: Dict[str, Any], 
+                                       evaluation_errors: List[str]) -> str:
         """
-        Extract comparison report data from malformed LLM response as fallback.
+        Extract data from LLM response content and format according to provided JSON structure.
         
         Args:
-            raw_response: Raw response from LLM
-            review_analysis: Analysis data for context
+            raw_content: Raw content from LLM response
+            review_analysis: Analysis of the latest student review
+            evaluation_errors: List of errors found by evaluation
             
         Returns:
-            Valid JSON string for comparison report
+            Formatted comparison report as JSON string
         """
         try:
-            # Initialize report structure
-            report = {
-                "performance_summary": {
-                    "total_issues": review_analysis.get(t("total_problems"), 0),
-                    "identified_count": review_analysis.get(t("identified_count"), 0),
-                    "accuracy_percentage": review_analysis.get(t("identified_percentage"), 0.0),
-                    "missed_count": review_analysis.get(t("total_problems"), 0) - review_analysis.get(t("identified_count"), 0),
-                    "overall_assessment": "Review analysis complete",
-                    "completion_status": "Completed"
-                },
-                "correctly_identified_issues": [],
-                "missed_issues": [],
-                "tips_for_improvement": [
-                    {
-                        "category": "Code Review",
-                        "tip": "Be more systematic in your analysis",
-                        "example": "Check each line carefully for syntax and logic errors"
-                    }
-                ],
-                "java_specific_guidance": [
-                    {
-                        "topic": "String Comparison",
-                        "guidance": "Use equals() method for string comparison instead of =="
-                    }
-                ],
-                "encouragement_and_next_steps": {
-                    "positive_feedback": "Keep practicing to improve your code review skills",
-                    "next_focus_areas": "Focus on identifying logical errors and best practices",
-                    "learning_objectives": "Develop systematic approach to code review"
-                },
-                "detailed_feedback": {
-                    "strengths_identified": ["Attention to detail"],
-                    "improvement_patterns": ["Need more comprehensive analysis"],
-                    "review_approach_feedback": "Continue practicing with different types of errors"
-                }
-            }
+            # Try to parse existing JSON structure from raw content
+            parsed_data = None
+            json_match = re.search(r'\{.*\}', raw_content, re.DOTALL)
+            if json_match:
+                try:
+                    json_str = json_match.group(0)
+                    # Clean up common JSON issues
+                    json_str = re.sub(r',(\s*[}\]])', r'\1', json_str)  # Remove trailing commas
+                    json_str = re.sub(r'(\w+):', r'"\1":', json_str)    # Quote unquoted keys
+                    parsed_data = json.loads(json_str)
+                except json.JSONDecodeError:
+                    logger.debug("Could not parse JSON from raw content, extracting manually")
             
-            # Try to extract specific information from raw response
-            if "correctly identified" in raw_response.lower():
-                # Extract identified issues section
-                identified_match = re.search(r'correctly identified.*?(\[.*?\])', raw_response, re.DOTALL | re.IGNORECASE)
-                if identified_match:
-                    try:
-                        identified_text = identified_match.group(1)
-                        # Simple extraction of issue descriptions
-                        issues = re.findall(r'"([^"]+)"', identified_text)
-                        for issue in issues:
-                            report["correctly_identified_issues"].append({
-                                "issue_description": issue,
-                                "praise_comment": "Good identification of this issue"
-                            })
-                    except:
-                        pass
+            # Initialize the report structure
+            formatted_report = {}
             
-            if "missed" in raw_response.lower():
-                # Extract missed issues section
-                missed_match = re.search(r'missed.*?(\[.*?\])', raw_response, re.DOTALL | re.IGNORECASE)
-                if missed_match:
-                    try:
-                        missed_text = missed_match.group(1)
-                        # Simple extraction of issue descriptions
-                        issues = re.findall(r'"([^"]+)"', missed_text)
-                        for issue in issues:
-                            report["missed_issues"].append({
-                                "issue_description": issue,
-                                "why_important": "This type of error can cause runtime issues",
-                                "how_to_find": "Look for this pattern in similar code structures"
-                            })
-                    except:
-                        pass
+            # Extract each required section from parsed_data or raw_content
+            if parsed_data and isinstance(parsed_data, dict):
+                # Extract from parsed JSON
+                formatted_report["performance_summary"] = parsed_data.get("performance_summary", {})
+                formatted_report["correctly_identified_issues"] = parsed_data.get("correctly_identified_issues", [])
+                formatted_report["missed_issues"] = parsed_data.get("missed_issues", [])
+                formatted_report["tips_for_improvement"] = parsed_data.get("tips_for_improvement", [])
+                formatted_report["java_specific_guidance"] = parsed_data.get("java_specific_guidance", [])
+                formatted_report["encouragement_and_next_steps"] = parsed_data.get("encouragement_and_next_steps", {})
+                formatted_report["detailed_feedback"] = parsed_data.get("detailed_feedback", {})
+            else:
+                # Extract from raw text using regex patterns
+                formatted_report["performance_summary"] = self._extract_performance_summary(raw_content)
+                formatted_report["correctly_identified_issues"] = self._extract_identified_issues(raw_content)
+                formatted_report["missed_issues"] = self._extract_missed_issues(raw_content)
+                formatted_report["tips_for_improvement"] = self._extract_tips_for_improvement(raw_content)
+                formatted_report["java_specific_guidance"] = self._extract_java_specific_guidance(raw_content)
+                formatted_report["encouragement_and_next_steps"] = self._extract_encouragement_and_next_steps(raw_content)
+                formatted_report["detailed_feedback"] = self._extract_detailed_feedback(raw_content)
             
-            return json.dumps(report, indent=2, ensure_ascii=False)
+            # Return as formatted JSON string
+            return json.dumps(formatted_report, indent=2, ensure_ascii=False)
             
         except Exception as e:
-            logger.error(f"Error in fallback extraction: {e}")
-            return self._generate_fallback_comparison_report(review_analysis, None)
+            logger.error(f"Error in _extract_and_format_comparison_data: {str(e)}")
+            raise
+
+    def _extract_performance_summary(self, content: str) -> Dict[str, Any]:
+        """Extract performance_summary section from raw content."""
+        try:
+            # Look for performance_summary section
+            pattern = r'"?performance_summary"?\s*:\s*\{([^}]*(?:\{[^}]*\}[^}]*)*)\}'
+            match = re.search(pattern, content, re.DOTALL)
+            if match:
+                summary_content = '{' + match.group(1) + '}'
+                try:
+                    return json.loads(summary_content)
+                except json.JSONDecodeError:
+                    pass
+            return {}
+        except Exception:
+            return {}
+
+    def _extract_identified_issues(self, content: str) -> List[Dict[str, Any]]:
+        """Extract correctly_identified_issues section from raw content."""
+        try:
+            pattern = r'"?correctly_identified_issues"?\s*:\s*\[(.*?)\]'
+            match = re.search(pattern, content, re.DOTALL)
+            if match:
+                issues_content = '[' + match.group(1) + ']'
+                try:
+                    return json.loads(issues_content)
+                except json.JSONDecodeError:
+                    pass
+            return []
+        except Exception:
+            return []
+
+    def _extract_missed_issues(self, content: str) -> List[Dict[str, Any]]:
+        """Extract missed_issues section from raw content."""
+        try:
+            pattern = r'"?missed_issues"?\s*:\s*\[(.*?)\]'
+            match = re.search(pattern, content, re.DOTALL)
+            if match:
+                issues_content = '[' + match.group(1) + ']'
+                try:
+                    return json.loads(issues_content)
+                except json.JSONDecodeError:
+                    pass
+            return []
+        except Exception:
+            return []
+
+    def _extract_tips_for_improvement(self, content: str) -> List[Dict[str, Any]]:
+        """Extract tips_for_improvement section from raw content."""
+        try:
+            pattern = r'"?tips_for_improvement"?\s*:\s*\[(.*?)\]'
+            match = re.search(pattern, content, re.DOTALL)
+            if match:
+                tips_content = '[' + match.group(1) + ']'
+                try:
+                    return json.loads(tips_content)
+                except json.JSONDecodeError:
+                    pass
+            return []
+        except Exception:
+            return []
+
+    def _extract_java_specific_guidance(self, content: str) -> List[Dict[str, Any]]:
+        """Extract java_specific_guidance section from raw content."""
+        try:
+            pattern = r'"?java_specific_guidance"?\s*:\s*\[(.*?)\]'
+            match = re.search(pattern, content, re.DOTALL)
+            if match:
+                guidance_content = '[' + match.group(1) + ']'
+                try:
+                    return json.loads(guidance_content)
+                except json.JSONDecodeError:
+                    pass
+            return []
+        except Exception:
+            return []
+
+    def _extract_encouragement_and_next_steps(self, content: str) -> Dict[str, Any]:
+        """Extract encouragement_and_next_steps section from raw content."""
+        try:
+            pattern = r'"?encouragement_and_next_steps"?\s*:\s*\{([^}]*(?:\{[^}]*\}[^}]*)*)\}'
+            match = re.search(pattern, content, re.DOTALL)
+            if match:
+                encouragement_content = '{' + match.group(1) + '}'
+                try:
+                    return json.loads(encouragement_content)
+                except json.JSONDecodeError:
+                    pass
+            return {}
+        except Exception:
+            return {}
+
+    def _extract_detailed_feedback(self, content: str) -> Dict[str, Any]:
+        """Extract detailed_feedback section from raw content."""
+        try:
+            pattern = r'"?detailed_feedback"?\s*:\s*\{([^}]*(?:\{[^}]*\}[^}]*)*)\}'
+            match = re.search(pattern, content, re.DOTALL)
+            if match:
+                feedback_content = '{' + match.group(1) + '}'
+                try:
+                    return json.loads(feedback_content)
+                except json.JSONDecodeError:
+                    pass
+            return {}
+        except Exception:
+            return {}
     
     def _generate_fallback_comparison_report(self, review_analysis: Dict[str, Any], review_history: List[Dict[str, Any]] = None) -> str:
         """

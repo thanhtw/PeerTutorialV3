@@ -711,13 +711,13 @@ def create_comparison_report_prompt(evaluation_errors: List[str],
         context = PromptContext(language=get_current_language())
         builder = PromptBuilder(context)
         
-        total_problems = len(evaluation_errors)
+        total_problems = review_analysis.get(t("total_problems"), 0)
         identified_count = review_analysis.get(t("identified_count"), 0)
-        
+        print(f"\nreview_analysis: {review_analysis}")
         prompt_vars = {
             "total_problems": total_problems,
             "identified_count": identified_count,
-            "accuracy": (identified_count / total_problems * 100) if total_problems > 0 else 0,
+            "accuracy": review_analysis.get(t("identified_count"), 0),
             "len_missed_str": len(review_analysis.get(t("missed_problems"), [])),
             "identified_text": _extract_problems_text(review_analysis, t("identified_problems")),
             "missed_text": _extract_problems_text(review_analysis, t("missed_problems")),
