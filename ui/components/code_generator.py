@@ -45,6 +45,15 @@ class CodeGeneratorUI:
         Args:
             user_level: User's experience level (basic, medium, senior)
         """
+        # FIXED: Check for tab switching flag and handle it
+        if st.session_state.get("switch_to_review_tab", False):
+            # Clear the flag
+            st.session_state.switch_to_review_tab = False
+            # Set active tab
+            st.session_state.active_tab = 1
+            st.rerun()
+            return
+        
         # Professional header section
         self._render_header()
     
@@ -70,7 +79,7 @@ class CodeGeneratorUI:
             st.session_state.selected_categories = []
 
     def _render_code_display_section(self):
-        """Render the generated code display section."""
+        """Render the generated code display section - FIXED: Handle regeneration properly."""
         if hasattr(st.session_state, 'workflow_state') and st.session_state.workflow_state:
             state = st.session_state.workflow_state
             
@@ -87,6 +96,7 @@ class CodeGeneratorUI:
                 </div>
                 """, unsafe_allow_html=True)
                 
+                # FIXED: Remove on_click callback
                 if st.button("🔄 Generate New Problem", key="regenerate", use_container_width=True):
                     self._handle_code_generation_with_tracking()
 
@@ -136,14 +146,18 @@ class CodeGeneratorUI:
             )
         
         st.markdown('<div class="generate-button-section">', unsafe_allow_html=True)
-        st.button(
+        
+        # FIXED: Remove on_click callback to avoid st.rerun() in callback
+        if st.button(
             f"🔧 {t('generate_code_problem')}",
             key="generate_code_main",
             type="primary",
             use_container_width=True,
-            disabled=not self._can_generate(),
-            on_click=self._handle_code_generation_with_tracking if self._can_generate() else None
-        )
+            disabled=not self._can_generate()
+        ):
+            if self._can_generate():
+                self._handle_code_generation_with_tracking()
+        
         st.markdown('</div>', unsafe_allow_html=True)
         
         if not selected_categories:
@@ -238,7 +252,7 @@ class CodeGeneratorUI:
             st.warning(t("no_categories_available"))
 
     def _toggle_category(self, category_name: str):
-        """Toggle category selection."""
+        """Toggle category selection without triggering rerun."""
         # Ensure selected_categories is initialized as a list
         if "selected_categories" not in st.session_state:
             st.session_state.selected_categories = []
@@ -251,7 +265,8 @@ class CodeGeneratorUI:
             st.session_state.selected_categories.remove(category_name)
         else:
             st.session_state.selected_categories.append(category_name)
-        st.rerun()
+        
+        # FIXED: Remove st.rerun() call - let natural flow handle updates
 
     def _render_category_grid(self, categories: List[str]):
         """Render categories in a compact three-column layout with parameter card styling."""
@@ -285,8 +300,7 @@ class CodeGeneratorUI:
                 </div>
                 """, unsafe_allow_html=True)
                
-
-                # Hidden button for interaction (maintains functionality)
+                # FIXED: Remove st.rerun() from button callback
                 if st.button(
                     selection_indicator,
                     key=f"category_card_{category_name}",
@@ -294,7 +308,7 @@ class CodeGeneratorUI:
                     use_container_width=True
                 ):
                     self._toggle_category(category_name)
-                    st.rerun()
+                    # FIXED: Remove st.rerun() call
         
         # Compact quick actions optimized for 3-column layout
         if categories and len(categories) > 1:
@@ -309,7 +323,7 @@ class CodeGeneratorUI:
                     disabled=len(selected) == len(categories)
                 ):
                     st.session_state.selected_categories = categories.copy()
-                    st.rerun()
+                    # FIXED: Remove st.rerun() call
             
             with col2:
                 if st.button(
@@ -320,7 +334,7 @@ class CodeGeneratorUI:
                     disabled=len(selected) == 0
                 ):
                     st.session_state.selected_categories = []
-                    st.rerun()
+                    # FIXED: Remove st.rerun() call
 
     def _can_generate(self) -> bool:
         """Check if we can generate code based on selected categories."""
@@ -624,7 +638,10 @@ class CodeGeneratorUI:
                 else:
                     st.success("✅ Code generated successfully!") 
                 st.session_state.active_tab = 1
-                st.rerun()                
+                # FIXED: Use session state flag instead of st.rerun()
+                st.session_state.generation_completed = True
+                st.session_state.switch_to_review_tab = True
+                
             elif has_error:               
                 st.error(f"❌ Generation failed: {error}")
                 logger.error(f"Code generation failed with error: {error}")
@@ -789,9 +806,9 @@ class CodeGeneratorUI:
                 else:
                     st.success("✅ Code generated successfully!")
                 
-                # Navigate to review tab
-                st.session_state.active_tab = 1
-                st.rerun()
+                # FIXED: Use session state flag instead of st.rerun()
+                st.session_state.generation_completed = True
+                st.session_state.switch_to_review_tab = True
                 
             elif has_error:
                 # Track generation failure
