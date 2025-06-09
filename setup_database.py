@@ -18,7 +18,6 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 
 from db.database_setup import DatabaseSetup
-from db.schema_update import update_database_schema
 from db.mysql_connection import MySQLConnection
 
 # Configure logging
