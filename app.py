@@ -33,8 +33,7 @@ from langgraph_workflow import JavaCodeReviewGraph
 
 # Import modularized UI functions
 from ui.utils.main_ui import (
-    init_session_state,
-    render_llm_logs_tab,
+    init_session_state,    
     create_enhanced_tabs
 )
 
@@ -46,6 +45,8 @@ from ui.components.auth_ui import AuthUI
 from ui.components.learning_dashboard import LearningDashboardUI
 from ui.components.error_explorer_ui import ErrorExplorerUI
 
+from analytics.behavior_tracker import behavior_tracker
+import atexit
 
 # Set page config
 st.set_page_config(
@@ -57,8 +58,18 @@ st.set_page_config(
 
 css_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "css")
 
+def cleanup_session():
+    """Clean up user session on app exit."""
+    try:
+        user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
+        if user_id:
+            behavior_tracker.end_user_session(user_id)
+    except Exception as e:
+        logger.error(f"Error during session cleanup: {str(e)}")
+
 try:
     load_css(css_directory=css_dir)
+    atexit.register(cleanup_session)
 except Exception as e:
     logger.warning(f"CSS loading failed: {str(e)}")
 
@@ -68,14 +79,14 @@ def main():
     # Initialize language selection and i18n system
     init_language()
 
-    try:
-        from db.schema_update import update_database_schema
-        update_database_schema()
-    except Exception as e:
-        logger.error(f"Database schema update failed: {str(e)}")
-
     # Initialize the authentication UI
     auth_ui = AuthUI()
+
+    if auth_ui.is_authenticated():
+        user_id = st.session_state.auth.get("user_id")
+        if user_id and "session_tracking_started" not in st.session_state:
+            behavior_tracker.start_user_session(user_id)
+            st.session_state.session_tracking_started = True
 
     # Check if the user is authenticated
     if not auth_ui.is_authenticated():

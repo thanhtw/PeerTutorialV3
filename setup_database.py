@@ -290,8 +290,8 @@ def automated_database_setup():
             return False
         
         # Step 6: Create/update .env file
-        if setup.create_env_file():
-            logger.debug("✅ .env file updated")
+        # if setup.create_env_file():
+        #     logger.debug("✅ .env file updated")
         
         return True
         

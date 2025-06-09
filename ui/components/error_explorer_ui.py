@@ -13,6 +13,8 @@ from state_schema import WorkflowState
 from ui.components.comparison_report_renderer import ComparisonReportRenderer
 import json
 import re
+from analytics.behavior_tracker import behavior_tracker
+
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +26,7 @@ class ErrorExplorerUI:
         self.repository = DatabaseErrorRepository()
         self.workflow = workflow  # JavaCodeReviewGraph instance
         self.comparison_renderer = ComparisonReportRenderer()
+        self.behavior_tracker = behavior_tracker
         
         # Log workflow initialization for debugging
         if workflow:
@@ -38,6 +41,9 @@ class ErrorExplorerUI:
             st.session_state.user_progress = {}
         if "practice_mode_active" not in st.session_state:
             st.session_state.practice_mode_active = False
+        # Initialize timing for interactions
+        if "error_explorer_start_time" not in st.session_state:
+            st.session_state.error_explorer_start_time = time.time()
         
         self._load_styles()
     
@@ -54,6 +60,15 @@ class ErrorExplorerUI:
 
     def render(self, workflow=None):
         """Render the complete error explorer interface."""
+
+        user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
+
+        if user_id:
+            # Start session tracking if not already started
+            if "session_tracking_started" not in st.session_state:
+                self.behavior_tracker.start_user_session(user_id)
+                st.session_state.session_tracking_started = True
+
         # Only update workflow if one is provided, otherwise keep the existing one
         if workflow is not None:
             self.workflow = workflow
@@ -78,8 +93,23 @@ class ErrorExplorerUI:
     def _process_practice_review(self, student_review):
         """Process the submitted practice review."""
         try:
+            user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
             workflow_state = st.session_state.practice_workflow_state
             
+            if user_id:
+                self.behavior_tracker.log_interaction(
+                    user_id=user_id,
+                    interaction_type="submit",
+                    interaction_category="practice",
+                    component="review_input",
+                    action="submit_practice_review",
+                    details={
+                        "review_length": len(student_review),
+                        "review_iteration": getattr(workflow_state, 'current_iteration', 1)
+                    }
+                )
+
+
             with st.spinner(f"🔄 {t('analyzing_your_review')}"):
                 # Submit review through workflow
                 updated_state = self.workflow.submit_review(workflow_state, student_review)
@@ -92,6 +122,42 @@ class ErrorExplorerUI:
                 current_iteration = getattr(updated_state, 'current_iteration', 1)
                 max_iterations = getattr(updated_state, 'max_iterations', 3)
                 
+                if user_id and review_sufficient:
+                    # Get analysis results for tracking
+                    latest_review = updated_state.review_history[-1] if updated_state.review_history else None
+                    analysis = latest_review.analysis if latest_review else {}
+                    
+                    identified_count = analysis.get(t('identified_count'), 0)
+                    total_problems = analysis.get(t('total_problems'), 0)
+                    accuracy = (identified_count / total_problems * 100) if total_problems > 0 else 0
+                    
+                    self.behavior_tracker.update_practice_session(
+                        user_id=user_id,
+                        status="review_complete",
+                        additional_data={
+                            "final_accuracy": accuracy,
+                            "errors_identified": identified_count,
+                            "total_errors": total_problems,
+                            "review_iterations": current_iteration
+                        }
+                    )
+                    
+                    # Track error identification
+                    practice_error = st.session_state.get("practice_error_data", {})
+                    error_code = practice_error.get('error_code', '')
+                    
+                    if error_code:
+                        self.behavior_tracker.track_error_identification(
+                            user_id=user_id,
+                            error_code=error_code,
+                            review_iteration=current_iteration,
+                            review_text=student_review,
+                            identified_correctly=identified_count == total_problems,
+                            time_to_identify=int(time.time() - st.session_state.get("practice_start_time", time.time())),
+                            analysis_data=analysis
+                        )
+
+
                 if review_sufficient or current_iteration > max_iterations:
                     st.session_state.practice_workflow_status = "review_complete"
                     st.success(f"✅ {t('review_analysis_complete')}")
@@ -382,13 +448,26 @@ class ErrorExplorerUI:
                 self._start_practice_session(error)
 
     def _start_practice_session(self, error: Dict[str, Any]):
-        """
-        FIXED: Start practice session without causing setIn error.
+        """        
         Uses session state flags instead of immediate st.rerun() calls.
         """
         try:
+            user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
             error_name = error.get(t("error_name_variable"), t("unknown_error"))
+            error_code = error.get('error_code', f"error_{hash(error_name) % 10000}")
+            error_category = error.get('category', 'Unknown')
+            difficulty = error.get('difficulty_level', 'medium')
             logger.info(f"Starting practice session for error: {error_name}")
+
+            if user_id:
+                practice_session_id = self.behavior_tracker.start_practice_session(
+                    user_id=user_id,
+                    error_code=error_code,
+                    error_name=error_name,
+                    error_category=error_category,
+                    difficulty_level=difficulty
+                )
+                st.session_state.practice_session_id = practice_session_id
             
             # Set session state flags (no st.rerun() yet)
             st.session_state.practice_mode_active = True
@@ -748,6 +827,22 @@ class ErrorExplorerUI:
 
     def _generate_practice_code_professional(self, practice_error):
         """Generate practice code with enhanced professional status display."""
+        user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
+
+        if user_id:
+            self.behavior_tracker.log_interaction(
+                user_id=user_id,
+                interaction_type="action",
+                interaction_category="practice",
+                component="code_generator",
+                action="generate_practice_code",
+                details={
+                    "error_code": practice_error.get('error_code', ''),
+                    "error_name": practice_error.get(t("error_name_variable"), ''),
+                    "difficulty": practice_error.get('difficulty_level', 'medium')
+                }
+            )
+
         if not self.workflow:
             logger.error("No workflow available for practice mode")
             st.error(f"❌ {t('practice_mode_requires_workflow_refresh')}")
@@ -783,6 +878,7 @@ class ErrorExplorerUI:
             logger.info(f"Executing code generation with workflow: {type(self.workflow)}")
             updated_state = self.workflow.execute_code_generation(workflow_state)
             
+
             # Validate and handle result
             if hasattr(updated_state, 'error') and updated_state.error:
                 st.error(f"❌ {t('failed_to_generate_practice_code')}: {updated_state.error}")
@@ -791,6 +887,16 @@ class ErrorExplorerUI:
             if not hasattr(updated_state, 'code_snippet') or not updated_state.code_snippet:
                 st.error(f"❌ {t('failed_to_generate_practice_code')}: No code generated")
                 return
+            
+            if user_id and updated_state and hasattr(updated_state, 'code_snippet') and updated_state.code_snippet:
+                self.behavior_tracker.update_practice_session(
+                    user_id=user_id,
+                    status="code_ready",
+                    additional_data={
+                        "code_generation_successful": True,
+                        "generation_attempts": getattr(updated_state, 'evaluation_attempts', 1)
+                    }
+                )
             
             # Store results and update status
             st.session_state.practice_workflow_state = updated_state

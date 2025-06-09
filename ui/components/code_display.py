@@ -16,6 +16,7 @@ from typing import List, Dict, Any, Optional, Callable
 
 from utils.code_utils import add_line_numbers
 from utils.language_utils import t
+from analytics.behavior_tracker import behavior_tracker
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -759,9 +760,31 @@ def _process_student_review(workflow, student_review: str) -> bool:
     FIXED: Process student review with enhanced error handling and debugging.
     """
     try:
+        user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
         logger.debug("Starting student review processing")
         logger.debug(f"Processing review: '{student_review[:100]}...' (length: {len(student_review)})")
         
+        if user_id:
+            behavior_tracker.log_interaction(
+                user_id=user_id,
+                interaction_type="submit",
+                interaction_category="main_workflow",
+                component="review_input",
+                action="submit_review",
+                details={
+                    "review_length": len(student_review),
+                    "review_iteration": getattr(st.session_state.workflow_state, 'current_iteration', 1)
+                }
+            )
+            
+            # Update workflow step
+            behavior_tracker.update_workflow_step(
+                user_id=user_id,
+                new_step="review",
+                step_data={"review_submitted": True}
+            )
+
+
         # Enhanced status tracking
         with st.status(t("processing_review"), expanded=True) as status:
             
@@ -825,10 +848,29 @@ def _process_student_review(workflow, student_review: str) -> bool:
             logger.debug(f"Calling workflow.submit_review with state and review text")
             
             try:                
-                raw_updated_state = workflow.submit_review(state, review_text)
-                logger.debug(f"Workflow.submit_review returned: {type(raw_updated_state)}")
+                updated_state = workflow.submit_review(state, review_text)
+                logger.debug(f"Workflow.submit_review returned: {type(updated_state)}")
                 
-                if not raw_updated_state:
+                # Track review completion if workflow is done
+                if updated_state and (getattr(updated_state, 'review_sufficient', False) or 
+                                    getattr(updated_state, 'current_iteration', 0) > getattr(updated_state, 'max_iterations', 3)):
+                    
+                    if user_id:
+                        # Get final results
+                        latest_review = updated_state.review_history[-1] if updated_state.review_history else None
+                        analysis = latest_review.analysis if latest_review else {}
+                        
+                        behavior_tracker.complete_workflow(
+                            user_id=user_id,
+                            final_results={
+                                "identified_count": analysis.get(t('identified_count'), 0),
+                                "total_problems": analysis.get(t('total_problems'), 0),
+                                "accuracy": analysis.get(t('identified_percentage'), 0),
+                                "iterations_used": getattr(updated_state, 'current_iteration', 1) - 1
+                            }
+                        )
+
+                if not updated_state:
                     error_msg = "Workflow returned empty state"
                     logger.error(error_msg)
                     status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
@@ -846,7 +888,7 @@ def _process_student_review(workflow, student_review: str) -> bool:
             status.update(label="⚙️ Processing workflow result...", state="running")
             
             # Check for errors
-            error = getattr(raw_updated_state, 'error', None)
+            error = getattr(updated_state, 'error', None)
             if error:
                 logger.error(f"Workflow returned error: {error}")
                 status.update(label=f"❌ {t('error')}: {error}", state="error")
@@ -857,7 +899,7 @@ def _process_student_review(workflow, student_review: str) -> bool:
             status.update(label="💾 Updating session state...", state="running")
             
             # Update session state with the result
-            st.session_state.workflow_state = raw_updated_state
+            st.session_state.workflow_state = updated_state
             st.session_state.review_processing_success = True
             st.session_state.last_review_timestamp = time.time()
             
@@ -867,8 +909,8 @@ def _process_student_review(workflow, student_review: str) -> bool:
             status.update(label="✅ Verifying processing...", state="running")
             
             # Check if review was actually processed
-            review_history = getattr(raw_updated_state, 'review_history', None)
-            current_iteration = getattr(raw_updated_state, 'current_iteration', 1)
+            review_history = getattr(updated_state, 'review_history', None)
+            current_iteration = getattr(updated_state, 'current_iteration', 1)
             
             if review_history and len(review_history) > 0:
                 logger.debug(f"Review processing completed successfully. History length: {len(review_history)}")

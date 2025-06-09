@@ -13,6 +13,7 @@ from data.database_error_repository import DatabaseErrorRepository
 from utils.language_utils import get_current_language, t
 from state_schema import WorkflowState
 from utils.code_utils import _get_category_icon
+from analytics.behavior_tracker import behavior_tracker
 # Configure logging 
 logging.basicConfig(level=logging.INFO) 
 logger = logging.getLogger(__name__)
@@ -20,8 +21,7 @@ logger = logging.getLogger(__name__)
 class CodeGeneratorUI:
     """
     Professional UI component for Java code generation with clean layout and intuitive workflow.
-    Now properly integrated with the workflow manager system.
-    FIXED: Proper handling of LangGraph state objects.
+    Now properly integrated with the workflow manager system.    
     """
     
     def __init__(self, workflow, code_display_ui):
@@ -425,8 +425,6 @@ class CodeGeneratorUI:
         # Keep for backward compatibility but redirect
         self._render_advanced_error_selection()
 
-    
-
     def _toggle_category(self, category_name: str):
         """Toggle category selection."""
         # Ensure selected_categories is initialized as a list
@@ -605,6 +603,37 @@ class CodeGeneratorUI:
         Handle the code generation process with proper workflow integration.
         Now uses the workflow manager for proper workflow execution.
         """
+        user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
+
+        if user_id and not st.session_state.get("workflow_tracking_started", False):
+            workflow_id = behavior_tracker.start_workflow_tracking(
+                user_id=user_id,
+                workflow_type="main_workflow",
+                initial_step="generate",
+                configuration={
+                    "code_length": st.session_state.workflow_state.code_length,
+                    "difficulty_level": st.session_state.workflow_state.difficulty_level,
+                    "selected_categories": st.session_state.get("selected_categories", []),
+                    "selected_errors": st.session_state.get("selected_specific_errors", []),
+                    "error_selection_mode": st.session_state.get("error_selection_mode", "random")
+                }
+            )
+            st.session_state.workflow_tracking_started = True
+            
+        if user_id:
+            behavior_tracker.log_interaction(
+                user_id=user_id,
+                interaction_type="action",
+                interaction_category="code_generation",
+                component="code_generator",
+                action="generate_code",
+                details={
+                    "mode": st.session_state.get("error_selection_mode", "random"),
+                    "code_length": st.session_state.workflow_state.code_length,
+                    "difficulty": st.session_state.workflow_state.difficulty_level
+                }
+            )
+            
         with st.spinner("🔧 Generating your Java code challenge..."):
             try:
                 logger.debug("Starting code generation through workflow manager")
