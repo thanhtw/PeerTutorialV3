@@ -351,7 +351,6 @@ class CodeDisplayUI:
         """, unsafe_allow_html=True)
         
         # FIXED: Use timestamp-based keys to avoid conflicts
-        #timestamp = int(time.time() * 1000)  # milliseconds for uniqueness
         text_area_key = f"review_input"
         submit_button_key = f"submit_review"
         clear_button_key = f"clear_review"
@@ -406,7 +405,7 @@ class CodeDisplayUI:
         
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # FIXED: Handle clear button with session state flag
+        # FIXED: Handle clear button with session state flag - NO RERUN
         if clear_button:
             # Clear the draft
             if f"review_draft_{iteration_count}" in st.session_state:
@@ -414,7 +413,7 @@ class CodeDisplayUI:
             st.info("Review cleared. Please refresh if the text area is not empty.")
             return False
         
-        # FIXED: Handle submit button with better error handling
+        # FIXED: Handle submit button with better error handling - NO IMMEDIATE RERUN
         if submit_button:
             return self._process_review_submission(
                 student_review_input, 
@@ -428,7 +427,7 @@ class CodeDisplayUI:
     def _process_review_submission(self, review_text: str, iteration_count: int, 
                                  on_submit_callback: Callable, success_flag: str) -> bool:
         """
-        FIXED: Process review submission without causing setIn errors.
+        FIXED: Process review submission without causing setIn errors and only rerun when complete.
         """
         try:
             logger.info(f"Processing review submission for iteration {iteration_count}")
@@ -463,7 +462,7 @@ class CodeDisplayUI:
                         
                         # FIXED: More lenient success check
                         if result is True or result is None:  # Accept True or None as success
-                           
+                          
                             st.session_state[success_flag] = True
                             
                             # Clear the draft
@@ -473,8 +472,10 @@ class CodeDisplayUI:
                             
                             logger.info(f"Review successfully submitted for iteration {iteration_count}")
                             
-                            # Show success message
+                            # Show success message without immediate rerun
                             st.success("✅ Review submitted successfully!")       
+                            
+                            # FIXED: Only rerun after a delay to ensure processing is complete
                             time.sleep(1)
                             st.rerun()
                             return True
@@ -602,7 +603,7 @@ def _extract_known_problems(state) -> List[str]:
 
 def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
     """
-    FIXED: Handle review submission with better state management and debugging.
+    Handle review submission with better state management and NO automatic tab switching.
     """
     # Get current review state
     state = st.session_state.workflow_state
@@ -720,21 +721,17 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
                 except Exception as e:
                     logger.error(f"Error updating stats in review tab: {str(e)}")
             
-            # Auto-switch to feedback tab
-            if not st.session_state.get("feedback_tab_switch_attempted", False):
-                st.session_state.feedback_tab_switch_attempted = True
-                st.session_state.active_tab = 2
+            # FIXED: Remove automatic tab switching - let user decide when to view feedback
+            # Only show a button to go to feedback if user wants
+            if not st.session_state.get("feedback_tab_offered", False):
+                st.session_state.feedback_tab_offered = True
                 st.balloons()
                 
-                col1, col2 = st.columns([3, 1])
+                col1, col2, col3 = st.columns([1, 1, 1])
                 with col2:
-                    if st.button("📊 View Feedback", key="go_to_feedback", type="primary"):
+                    if st.button("📊 View Feedback", key="go_to_feedback", type="primary", use_container_width=True):
                         st.session_state.active_tab = 3
                         st.rerun()
-                
-                # Single st.rerun() call
-                time.sleep(2)
-                st.rerun()
                 
         else:
             # Enhanced iterations completed message
@@ -749,6 +746,13 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
                 </p>
             </div>
             """, unsafe_allow_html=True)
+            
+            # FIXED: Offer feedback button instead of automatic switching
+            col1, col2, col3 = st.columns([1, 1, 1])
+            with col2:
+                if st.button("📊 View Results", key="go_to_results", type="primary", use_container_width=True):
+                    st.session_state.active_tab = 3
+                    st.rerun()
 
 def _process_student_review(workflow, student_review: str) -> bool:
     """
@@ -995,9 +999,49 @@ def _process_student_review_with_comprehensive_tracking(workflow, student_review
                 st.error(f"❌ {error_msg}")
                 return False
             
-            # ... similar tracking for other validation steps ...
+            # Step 2: Validate workflow state
+            status.update(label="🔍 Validating workflow state...", state="running")
             
-            # Submit to workflow with timing
+            if not hasattr(st.session_state, 'workflow_state'):
+                error_msg = "Workflow state not found"
+                logger.error(error_msg)
+                status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
+                st.error(f"❌ {error_msg}. {t('please_generate_problem_first')}")
+                return False
+                
+            state = st.session_state.workflow_state
+            logger.debug(f"Current workflow state: step={getattr(state, 'current_step', 'unknown')}, iteration={getattr(state, 'current_iteration', 'unknown')}")
+            
+            # Step 3: Validate code snippet
+            status.update(label="🔍 Validating code snippet...", state="running")
+            
+            if not hasattr(state, "code_snippet") or state.code_snippet is None:
+                error_msg = "No code snippet available"
+                logger.error(error_msg)
+                status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
+                st.error(f"❌ {error_msg}. {t('please_generate_problem_first')}")
+                return False
+            
+            # Step 4: Validate review content
+            status.update(label="🔍 Validating review content...", state="running")
+            
+            if not student_review or not student_review.strip():
+                error_msg = "Review cannot be empty"
+                logger.error(error_msg)
+                status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
+                st.error(f"❌ {t('please_enter_review')}")
+                return False
+            
+            review_text = student_review.strip()
+            
+            if len(review_text) < 10:
+                error_msg = "Review too short"
+                logger.error(error_msg)
+                status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
+                st.error(f"❌ {t('provide_detailed_review_minimum')}")
+                return False
+            
+            # Step 5: Submit to workflow
             status.update(label="🚀 Analyzing review with AI...", state="running")
             
             try:

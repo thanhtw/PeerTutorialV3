@@ -62,11 +62,8 @@ class CodeGeneratorUI:
         if "selected_categories" not in st.session_state:
             st.session_state.selected_categories = []
         
-        if "selected_specific_errors" not in st.session_state:
-            st.session_state.selected_specific_errors = []
-        
-        if "error_selection_mode" not in st.session_state:
-            st.session_state.error_selection_mode = "random"
+        # Remove advanced mode variables - only use random mode
+        st.session_state.error_selection_mode = "random"
         
         # Ensure selected_categories is always a list
         if not isinstance(st.session_state.selected_categories, list):
@@ -94,7 +91,7 @@ class CodeGeneratorUI:
                     self._handle_code_generation_with_tracking()
 
     def _render_configuration_section(self, user_level: str):
-        """Render the configuration section with tabbed mode selection and parameters."""
+        """Render the configuration section with category selection only."""
         st.markdown('<div class="generate-section">', unsafe_allow_html=True)
         
         # Section header
@@ -111,229 +108,46 @@ class CodeGeneratorUI:
         # Parameters display
         self._render_parameters_display(user_level)
         
-        # Tabbed mode selection and interface
-        self._render_tabbed_mode_interface()
+        # Category selection interface (no tabs needed)
+        self._render_category_selection_interface()
         
         st.markdown('</div>', unsafe_allow_html=True)
 
-    def _render_tabbed_mode_interface(self):
-        """Render the tabbed interface for random and advanced modes with correct state sync."""
-        # Use localized tab names
-        tab_names = [
-            f"🎲 {t('random_mode')}",
-            f"🎯 {t('advanced_mode')}"
-        ]
-        # Track the last active tab in session state
-        if "codegen_active_tab" not in st.session_state:
-            st.session_state.codegen_active_tab = 0
-        # Use radio with localized tab names
-        tab_index = st.radio(
-            label="Code Generation Mode",  # Non-empty label for accessibility
-            options=[0, 1],
-            index=st.session_state.codegen_active_tab,
-            key="codegen_tab_radio",
-            label_visibility="collapsed",
-            horizontal=True,
-            format_func=lambda x: tab_names[x]
+    def _render_category_selection_interface(self):
+        """Render the category selection interface without mode tabs."""
+        st.markdown(f"""
+        <div class="mode-description">
+            <p>🎲 {t('random_mode_description')}</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        self._render_category_selection()
+        
+        selected_categories = st.session_state.get("selected_categories", [])
+        if selected_categories:
+            st.markdown(
+                f"<div class='selected-categories'>"
+                + "".join(
+                    f"<span class='selected-category-item'>{_get_category_icon(cat)} {cat}</span>"
+                    for cat in selected_categories
+                )
+                + "</div>",
+                unsafe_allow_html=True
+            )
+        
+        st.markdown('<div class="generate-button-section">', unsafe_allow_html=True)
+        st.button(
+            f"🔧 {t('generate_code_problem')}",
+            key="generate_code_main",
+            type="primary",
+            use_container_width=True,
+            disabled=not self._can_generate(),
+            on_click=self._handle_code_generation_with_tracking if self._can_generate() else None
         )
-        if tab_index != st.session_state.codegen_active_tab:
-            st.session_state.codegen_active_tab = tab_index
-            st.session_state.error_selection_mode = "random" if tab_index == 0 else "advanced"
-
-        # Render the correct tab content
-        if st.session_state.codegen_active_tab == 0:
-            # Random Mode Tab
-            st.session_state.error_selection_mode = "random"
-            st.markdown(f"""
-            <div class="mode-description">
-                <p>🎲 {t('random_mode_description')}</p>
-            </div>
-            """, unsafe_allow_html=True)
-            self._render_category_selection()
-            selected_categories = st.session_state.get("selected_categories", [])
-            if selected_categories:
-                st.markdown(
-                    f"<div class='selected-categories'>"
-                    + "".join(
-                        f"<span class='selected-category-item'>{_get_category_icon(cat)} {cat}</span>"
-                        for cat in selected_categories
-                    )
-                    + "</div>",
-                    unsafe_allow_html=True
-                )
-            st.markdown('<div class="generate-button-section">', unsafe_allow_html=True)
-            st.button(
-                f"🔧 {t('generate_code_problem')}",
-                key="generate_code_main_random",
-                type="primary",
-                use_container_width=True,
-                disabled=not self._can_generate(),
-                on_click=self._handle_code_generation_with_tracking if self._can_generate() else None
-            )
-            st.markdown('</div>', unsafe_allow_html=True)
-            if not selected_categories:
-                st.warning(f"⚠️ {t('please_select_at_least_one_error_category')}")
-        else:
-            # Advanced Mode Tab
-            st.session_state.error_selection_mode = "advanced"
-            st.markdown(f"""
-            <div class="mode-description">
-                <p>🎯 {t('advanced_mode_help')}</p>
-            </div>
-            """, unsafe_allow_html=True)
-            self._render_advanced_error_selection()
-            st.markdown('<div class="generate-button-section">', unsafe_allow_html=True)
-            st.button(
-                f"🔧 {t('generate_code_problem')}",
-                key="generate_code_main_advanced",
-                type="primary",
-                use_container_width=True,
-                disabled=not self._can_generate(),
-                on_click=self._handle_code_generation_with_tracking if self._can_generate() else None
-            )
-            st.markdown('</div>', unsafe_allow_html=True)
-            if not st.session_state.get("selected_specific_errors", []):
-                st.warning(f"⚠️ {t('please_select_at_least_one_specific_error')}")
-
-    def _render_advanced_error_selection(self):
-        from data.database_error_repository import DatabaseErrorRepository  # Add import
-        repository = DatabaseErrorRepository()  # Use database repository
-                
-        # Initialize selected specific errors
-        if "selected_specific_errors" not in st.session_state:
-            st.session_state.selected_specific_errors = []
+        st.markdown('</div>', unsafe_allow_html=True)
         
-        # Load all categories from database using repository
-        categories_dict = repository.get_all_categories()
-        all_categories = categories_dict.get("java_errors", [])
-        
-        if not all_categories:
-            st.warning("No categories available in the database")
-            return
-        
-        # Track current selected errors
-        current_selected = []
-        
-        # Difficulty order for sorting
-        difficulty_order = {"easy": 1, "medium": 2, "hard": 3}
-
-        # Display all categories and their errors
-        for category in all_categories:
-            icon = _get_category_icon(category)
-            with st.expander(f"{icon} {category}", expanded=False):
-                errors = repository.get_category_errors(category)  # Use repository method
-                
-                if not errors:
-                    st.warning(f"No errors found for category: {category}")
-                    continue
-
-                # Sort errors by difficulty_level (easy, medium, hard)
-                errors_sorted = sorted(
-                    errors,
-                    key=lambda x: (
-                        difficulty_order.get(x.get('difficulty_level', 'medium'), 2),
-                        x.get(t("error_name"), x.get("name", ""))
-                    )
-                )
-                
-                # Create columns for error selection
-                for i, error in enumerate(errors_sorted):
-                    error_name = error.get(t("error_name"), error.get("name", "Unknown"))
-                    description = error.get(t("description"), "")
-                    difficulty = error.get("difficulty_level", "medium")
-                    
-                    # Map internal difficulty to localized label
-                    difficulty_label = {
-                        "easy": t("easy"),
-                        "medium": t("medium"),
-                        "hard": t("hard")
-                    }.get(difficulty, difficulty)
-                    
-                    # Create unique key for this error
-                    error_key = f"{category}_{error_name}"
-                    
-                    # Check if this error was previously selected
-                    was_selected = any(
-                        e.get("category") == category and e.get(t("error_name")) == error_name 
-                        for e in st.session_state.selected_specific_errors
-                    )
-                    
-                    col1, col2 = st.columns([4, 1])
-                    
-                    with col1:
-                        is_selected = st.checkbox(
-                            f"**{error_name}**",
-                            value=was_selected,
-                            key=f"advanced_error_check_{error_key}",
-                            help=description[:200] + "..." if len(description) > 200 else description
-                        )
-                        
-                        if is_selected:
-                            # Add complete error information
-                            error_with_metadata = error.copy()
-                            error_with_metadata["category"] = category
-                            error_with_metadata[t("category")] = category
-                            current_selected.append(error_with_metadata)
-                    
-                    with col2:
-                        # Show difficulty badge with localized label
-                        difficulty_colors = {
-                            "easy": "🟢", t("easy"): "🟢",
-                            "medium": "🟡", t("medium"): "🟡",
-                            "hard": "🔴", t("hard"): "🔴"
-                        }
-                        st.write(f"{difficulty_colors.get(difficulty_label, '⚪')} {difficulty_label}")
-        
-        # Update session state with currently selected errors
-        st.session_state.selected_specific_errors = current_selected
-        
-        # Show selected count and quick actions
-        col1, col2, col3 = st.columns([2, 1, 1])
-        
-        with col1:
-            if current_selected:
-                st.success(f"✅ {len(current_selected)} {t('errors_selected')}")
-            else:
-                st.warning(f"⚠️ {t('no_specific_errors_selected')}")
-        
-        with col2:
-            if st.button(
-                f"🎯 {t('select')} {t('all')}",
-                key=f"{t('select_all_advanced_errors')}",
-                help=f"{t('select_all_available_errors')}",
-                use_container_width=True
-            ):
-                # Select all errors from all categories
-                all_selected = []
-                for category in all_categories:
-                    errors = repository.get_category_errors(category)
-                    # Sort errors by difficulty_level for consistency
-                    errors_sorted = sorted(
-                        errors,
-                        key=lambda x: (
-                            difficulty_order.get(x.get('difficulty_level', 'medium'), 2),
-                            x.get(t("error_name"), x.get("name", ""))
-                        )
-                    )
-                    for error in errors_sorted:
-                        error_with_metadata = error.copy()
-                        error_with_metadata["category"] = category
-                        error_with_metadata[t("category")] = category
-                        all_selected.append(error_with_metadata)
-                
-                st.session_state.selected_specific_errors = all_selected
-                st.rerun()
-        
-        with col3:
-            if st.button(
-                f"🗑️ {t('clear_all')}",
-                key=f"{t('clear_all_advanced_errors')}",
-                help=f"{t('clear_all_selected_errors')}",
-                use_container_width=True,
-                disabled=len(current_selected) == 0
-            ):
-                st.session_state.selected_specific_errors = []
-                st.rerun()
+        if not selected_categories:
+            st.warning(f"⚠️ {t('please_select_at_least_one_error_category')}")
 
     def _render_parameters_display(self, user_level: str):
         """Render the parameters display with visual cards, supporting both English and Chinese."""
@@ -423,12 +237,6 @@ class CodeGeneratorUI:
         else:
             st.warning(t("no_categories_available"))
 
-    def _render_specific_error_selection(self):
-        """Render specific error selection for advanced mode."""
-        # This method is now replaced by _render_advanced_error_selection
-        # Keep for backward compatibility but redirect
-        self._render_advanced_error_selection()
-
     def _toggle_category(self, category_name: str):
         """Toggle category selection."""
         # Ensure selected_categories is initialized as a list
@@ -441,12 +249,6 @@ class CodeGeneratorUI:
         
         if category_name in st.session_state.selected_categories:
             st.session_state.selected_categories.remove(category_name)
-            # Clear specific errors for this category if in advanced mode
-            if "selected_specific_errors" in st.session_state:
-                st.session_state.selected_specific_errors = [
-                    e for e in st.session_state.selected_specific_errors 
-                    if e.get("category") != category_name
-                ]
         else:
             st.session_state.selected_categories.append(category_name)
         st.rerun()
@@ -487,7 +289,7 @@ class CodeGeneratorUI:
                 # Hidden button for interaction (maintains functionality)
                 if st.button(
                     selection_indicator,
-                    key=f"category_card_{category_name}_{st.session_state.error_selection_mode}",
+                    key=f"category_card_{category_name}",
                     help=description,
                     use_container_width=True
                 ):
@@ -501,7 +303,7 @@ class CodeGeneratorUI:
             with col1:
                 if st.button(
                     f"🎯 {t('select')} {t('all')}",
-                    key=f"select_all_categories_{st.session_state.error_selection_mode}",
+                    key="select_all_categories",
                     help=f"{t('select_all_available_categories')}",
                     use_container_width=True,
                     disabled=len(selected) == len(categories)
@@ -512,31 +314,18 @@ class CodeGeneratorUI:
             with col2:
                 if st.button(
                     f"🗑️ {t('clear_all')}",
-                    key=f"clear_all_categories_{st.session_state.error_selection_mode}", 
+                    key="clear_all_categories", 
                     help=f"{t('remove_all_selected_categories')}",
                     use_container_width=True,
                     disabled=len(selected) == 0
                 ):
                     st.session_state.selected_categories = []
-                    if "selected_specific_errors" in st.session_state:
-                        st.session_state.selected_specific_errors = []
                     st.rerun()
 
     def _can_generate(self) -> bool:
-        """Check if we can generate code based on selected categories or specific errors."""
-        mode = st.session_state.get("error_selection_mode", "random")
+        """Check if we can generate code based on selected categories."""
         selected_categories = st.session_state.get("selected_categories", [])
-        
-        # In random mode, we need at least one category selected
-        if mode == "random":
-            return len(selected_categories) > 0
-        
-        # In advanced mode, we need at least one specific error selected
-        if mode == "advanced":
-            selected_specific_errors = st.session_state.get("selected_specific_errors", [])
-            return len(selected_specific_errors) > 0
-        
-        return False
+        return len(selected_categories) > 0
 
     def _get_level_parameters(self, user_level: str) -> Dict[str, Any]:
         """Get parameters based on user level."""
@@ -659,15 +448,12 @@ class CodeGeneratorUI:
 
     def _prepare_workflow_state(self) -> Optional[WorkflowState]:
         """
-        Prepare the workflow state for code generation.
+        Prepare the workflow state for code generation (random mode only).
         
         Returns:
             WorkflowState if preparation is successful, None otherwise
         """
         try:
-            # Prepare generation parameters based on mode
-            mode = st.session_state.get("error_selection_mode", "random")
-            
             # Initialize or get workflow state
             if not hasattr(st.session_state, 'workflow_state') or st.session_state.workflow_state is None:
                 st.session_state.workflow_state = WorkflowState()
@@ -683,36 +469,18 @@ class CodeGeneratorUI:
             workflow_state.error_count_start = params["error_count_start"]
             workflow_state.error_count_end = params["error_count_end"]  
             
-            if mode == "random":
-                # Random mode: use selected categories
-                selected_categories = st.session_state.get("selected_categories", [])
-                if not selected_categories:
-                    st.error("❌ Please select at least one category in Random mode")
-                    return None
-                
-                # Format for workflow
-                categories_dict = {"java_errors": selected_categories}
-                workflow_state.selected_error_categories = categories_dict
-                workflow_state.selected_specific_errors = []
-                
-                logger.debug(f"Random mode: Selected categories: {selected_categories}")
-            else:
-                # Advanced mode: use specific errors
-                selected_specific_errors = st.session_state.get("selected_specific_errors", [])
-                if not selected_specific_errors:
-                    st.error("❌ Please select at least one specific error in Advanced mode")
-                    return None
-                
-                # Update error usage tracking
-                for error in selected_specific_errors:
-                    error_code = error.get("error_code", "")
-                    if error_code:
-                        self._update_error_usage(error_code, action_type='practiced')
-                
-                workflow_state.selected_error_categories = {"java_errors": []}
-                workflow_state.selected_specific_errors = selected_specific_errors
-                
-                logger.debug(f"Advanced mode: Selected {len(selected_specific_errors)} specific errors")
+            # Only random mode: use selected categories
+            selected_categories = st.session_state.get("selected_categories", [])
+            if not selected_categories:
+                st.error("❌ Please select at least one category")
+                return None
+            
+            # Format for workflow
+            categories_dict = {"java_errors": selected_categories}
+            workflow_state.selected_error_categories = categories_dict
+            workflow_state.selected_specific_errors = []
+            
+            logger.debug(f"Random mode: Selected categories: {selected_categories}")
             
             # Reset workflow state for fresh generation
             workflow_state.current_step = "generate"
@@ -893,8 +661,7 @@ class CodeGeneratorUI:
                 "code_length": st.session_state.workflow_state.code_length,
                 "difficulty_level": st.session_state.workflow_state.difficulty_level,
                 "selected_categories": st.session_state.get("selected_categories", []),
-                "selected_errors": st.session_state.get("selected_specific_errors", []),
-                "error_selection_mode": st.session_state.get("error_selection_mode", "random"),
+                "error_selection_mode": "random",
                 "user_level": st.session_state.get("user_level", "medium")
             }
             
@@ -913,12 +680,7 @@ class CodeGeneratorUI:
                 
                 # Track generation attempt
                 if user_id:
-                    mode = st.session_state.get("error_selection_mode", "random")
-                    selected_count = (
-                        len(st.session_state.get("selected_categories", [])) 
-                        if mode == "random" 
-                        else len(st.session_state.get("selected_specific_errors", []))
-                    )
+                    selected_count = len(st.session_state.get("selected_categories", []))
                     
                     self.behavior_tracker.log_interaction(
                         user_id=user_id,
@@ -927,7 +689,7 @@ class CodeGeneratorUI:
                         component="code_generator",
                         action="start_main_code_generation",
                         details={
-                            "selection_mode": mode,
+                            "selection_mode": "random",
                             "selected_count": selected_count,
                             "code_length": st.session_state.workflow_state.code_length,
                             "difficulty": st.session_state.workflow_state.difficulty_level,
