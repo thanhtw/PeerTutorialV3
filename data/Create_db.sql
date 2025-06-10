@@ -6,7 +6,6 @@ SET FOREIGN_KEY_CHECKS = 0;
 DROP VIEW IF EXISTS user_performance_summary;
 DROP VIEW IF EXISTS daily_activity_summary;
 DROP VIEW IF EXISTS badge_progress_summary; 
-DROP TABLE IF EXISTS system_performance_logs;
 DROP TABLE IF EXISTS badge_progress_logs;
 DROP TABLE IF EXISTS learning_achievements;
 DROP TABLE IF EXISTS user_engagement_metrics;
@@ -104,27 +103,6 @@ CREATE TABLE IF NOT EXISTS user_sessions (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- New Datatables
-CREATE TABLE system_performance_logs (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    component VARCHAR(50) NOT NULL, 
-    operation VARCHAR(100) NOT NULL, 
-    execution_time_ms INT,
-    memory_used_mb DECIMAL(8,2),
-    success BOOLEAN DEFAULT TRUE,
-    error_message TEXT,
-    user_id VARCHAR(36),
-    session_id VARCHAR(36), 
-    performance_data JSON,
-    
-    FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE SET NULL,
-    FOREIGN KEY (session_id) REFERENCES user_sessions(session_id) ON DELETE SET NULL,
-    INDEX idx_component_time (component, timestamp DESC),
-    INDEX idx_operation_performance (operation, execution_time_ms),
-    INDEX idx_errors (success, timestamp DESC),
-    INDEX idx_user_performance (user_id, timestamp DESC)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
 CREATE TABLE badge_progress_logs (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id VARCHAR(36) NOT NULL,
@@ -513,5 +491,5 @@ FROM information_schema.tables
 WHERE table_schema = DATABASE() 
 AND table_name IN ('users', 'error_categories', 'java_errors', 'badges', 'user_badges', 'activity_log', 'error_usage_stats', 
                    'user_sessions', 'user_interactions', 'practice_sessions', 'workflow_tracking', 
-                   'tab_navigation', 'error_identification_analysis', 'learning_path_progress', 'system_performance_logs','badge_progress_logs', 'error_category_stats', 'learning_achievements', 'user_engagement_metrics');   
+                   'tab_navigation', 'error_identification_analysis', 'learning_path_progress','badge_progress_logs', 'error_category_stats', 'learning_achievements', 'user_engagement_metrics');   
 
