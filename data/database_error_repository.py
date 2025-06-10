@@ -62,7 +62,7 @@ class DatabaseErrorRepository:
                 return
             
             # Check if categories have data
-            data_query = "SELECT COUNT(*) as count FROM error_categories WHERE is_active = TRUE"
+            data_query = "SELECT COUNT(*) as count FROM error_categories"
             data_result = self.db.execute_query(data_query, fetch_one=True)
             
             if not data_result or data_result.get('count', 0) == 0:
@@ -83,7 +83,7 @@ class DatabaseErrorRepository:
                 return
             
             # Check if errors have data
-            data_query = "SELECT COUNT(*) as count FROM java_errors WHERE is_active = TRUE"
+            data_query = "SELECT COUNT(*) as count FROM java_errors"
             data_result = self.db.execute_query(data_query, fetch_one=True)
             
             if not data_result or data_result.get('count', 0) == 0:
@@ -120,9 +120,8 @@ class DatabaseErrorRepository:
             description_field = self._get_language_fields('description')
             
             query = f"""
-            SELECT category_code, {name_field} as name, {description_field} as description
-            FROM error_categories 
-            WHERE is_active = TRUE
+            SELECT {name_field} as name, {description_field} as description
+            FROM error_categories            
             ORDER BY sort_order
             """
             
@@ -162,9 +161,9 @@ class DatabaseErrorRepository:
             # First, find the category by name in current language
             cat_name_field = self._get_language_fields('name')
             category_query = f"""
-            SELECT id, category_code 
+            SELECT id,name_en, name_zh 
             FROM error_categories 
-            WHERE {cat_name_field} = %s AND is_active = TRUE
+            WHERE {cat_name_field} = %s
             """
             
             category = self.db.execute_query(category_query, (category_name,), fetch_one=True)
@@ -182,7 +181,7 @@ class DatabaseErrorRepository:
                 difficulty_level,
                 error_code
             FROM java_errors 
-            WHERE category_id = %s AND is_active = TRUE
+            WHERE category_id = %s
             ORDER BY error_name_en
             """
             
@@ -254,7 +253,7 @@ class DatabaseErrorRepository:
                 difficulty_level,
                 error_code
             FROM java_errors 
-            WHERE {name_field} = %s AND is_active = TRUE
+            WHERE {name_field} = %s
             """
             
             error = self.db.execute_query(query, (error_name,), fetch_one=True)
@@ -313,8 +312,7 @@ class DatabaseErrorRepository:
                 ec.{cat_name_field} as category_name
             FROM java_errors je
             JOIN error_categories ec ON je.category_id = ec.id
-            WHERE ec.{cat_name_field} IN ({placeholders}) 
-            AND je.is_active = TRUE AND ec.is_active = TRUE
+            WHERE ec.{cat_name_field} IN ({placeholders})            
             ORDER BY RAND()
             LIMIT %s
             """
@@ -402,8 +400,7 @@ class DatabaseErrorRepository:
                     ec.{cat_name_field} as category_name
                 FROM java_errors je
                 JOIN error_categories ec ON je.category_id = ec.id
-                WHERE ec.{cat_name_field} IN ({placeholders}) 
-                AND je.is_active = TRUE AND ec.is_active = TRUE
+                WHERE ec.{cat_name_field} IN ({placeholders})               
                 AND je.difficulty_level = %s
                 ORDER BY RAND()
                 LIMIT %s
@@ -459,8 +456,7 @@ class DatabaseErrorRepository:
             SELECT je.{guide_field} as implementation_guide
             FROM java_errors je
             JOIN error_categories ec ON je.category_id = ec.id
-            WHERE je.{name_field} = %s AND ec.{cat_name_field} = %s
-            AND je.is_active = TRUE AND ec.is_active = TRUE
+            WHERE je.{name_field} = %s AND ec.{cat_name_field} = %s           
             """
             
             result = self.db.execute_query(query, (error_name, category), fetch_one=True)
@@ -502,8 +498,7 @@ class DatabaseErrorRepository:
                 ec.{cat_name_field} as category_name
             FROM java_errors je
             JOIN error_categories ec ON je.category_id = ec.id
-            WHERE je.{name_field} = %s 
-            AND je.is_active = TRUE AND ec.is_active = TRUE
+            WHERE je.{name_field} = %s             
             """
             
             result = self.db.execute_query(query, (error_name,), fetch_one=True)
@@ -566,12 +561,12 @@ class DatabaseErrorRepository:
             stats = {}
             
             # Total categories
-            cat_query = "SELECT COUNT(*) as count FROM error_categories WHERE is_active = TRUE"
+            cat_query = "SELECT COUNT(*) as count FROM error_categories"
             cat_result = self.db.execute_query(cat_query, fetch_one=True)
             stats['total_categories'] = cat_result['count'] if cat_result else 0
             
             # Total errors
-            err_query = "SELECT COUNT(*) as count FROM java_errors WHERE is_active = TRUE"
+            err_query = "SELECT COUNT(*) as count FROM java_errors"
             err_result = self.db.execute_query(err_query, fetch_one=True)
             stats['total_errors'] = err_result['count'] if err_result else 0
             
@@ -579,9 +574,8 @@ class DatabaseErrorRepository:
             breakdown_query = """
             SELECT ec.name_en, COUNT(je.id) as error_count
             FROM error_categories ec
-            LEFT JOIN java_errors je ON ec.id = je.category_id AND je.is_active = TRUE
-            WHERE ec.is_active = TRUE
-            GROUP BY ec.id, ec.name_en
+            LEFT JOIN java_errors je ON ec.id = je.category_id           
+            GROUP BY ec.id
             ORDER BY ec.sort_order
             """
             breakdown = self.db.execute_query(breakdown_query)
@@ -591,7 +585,6 @@ class DatabaseErrorRepository:
             popular_query = """
             SELECT error_name_en, usage_count
             FROM java_errors 
-            WHERE is_active = TRUE 
             ORDER BY usage_count DESC 
             LIMIT 5
             """
@@ -624,7 +617,7 @@ class DatabaseErrorRepository:
             query = f"""
             SELECT examples, tags
             FROM java_errors 
-            WHERE {name_field} = %s AND is_active = TRUE
+            WHERE {name_field} = %s
             """
             
             result = self.db.execute_query(query, (error_name,), fetch_one=True)
@@ -682,14 +675,13 @@ class DatabaseErrorRepository:
             
             query = f"""
             SELECT 
-                ec.category_code,
+                ec.name_en,
                 je.{name_field} as error_name,
                 je.{desc_field} as description,
                 je.examples,
                 je.tags
             FROM java_errors je
-            JOIN error_categories ec ON je.category_id = ec.id
-            WHERE je.is_active = TRUE AND ec.is_active = TRUE
+            JOIN error_categories ec ON je.category_id = ec.id           
             ORDER BY ec.sort_order, je.{name_field}
             """
             
@@ -697,7 +689,7 @@ class DatabaseErrorRepository:
             pattern_database = {}
             
             for error in errors or []:
-                error_key = error['category_code'] + "_" + error['error_name'].lower().replace(" ", "_")
+                error_key = error['error_name'].lower().replace(" ", "_")
                 
                 # Parse examples from JSON
                 examples_data = {}

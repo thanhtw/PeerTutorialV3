@@ -320,7 +320,7 @@ class DatabaseSetup:
                     
                     # Verify active categories
                     active_cats = db.execute_query(
-                        "SELECT COUNT(*) as count FROM error_categories WHERE is_active = TRUE",
+                        "SELECT COUNT(*) as count FROM error_categories",
                         fetch_one=True
                     )
                     active_count = active_cats['count'] if active_cats else 0
@@ -346,17 +346,17 @@ class DatabaseSetup:
                     
                     # Check error distribution across categories
                     cat_distribution = db.execute_query("""
-                        SELECT ec.category_code, COUNT(je.id) as error_count
+                        SELECT ec.name_en, COUNT(je.id) as error_count
                         FROM error_categories ec
                         LEFT JOIN java_errors je ON ec.id = je.category_id
-                        GROUP BY ec.id, ec.category_code
+                        GROUP BY ec.id, ec.name_en
                         ORDER BY ec.sort_order
                     """)
                     
                     if cat_distribution:
                         logger.debug("📊 Error distribution by category:")
                         for row in cat_distribution:
-                            logger.debug(f"   {row['category_code']}: {row['error_count']} errors")
+                            logger.debug(f"   {row['name_en']}: {row['error_count']} errors")
                         
                 except Exception as e:
                     logger.error(f"Error verifying data relationships: {str(e)}")
