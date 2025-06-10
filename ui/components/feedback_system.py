@@ -20,7 +20,7 @@ from ui.components.comparison_report_renderer import ComparisonReportRenderer
 
 import plotly.express as px
 import plotly.graph_objects as go
-from auth.badge_manager import BadgeManager
+from analytics.badge_manager import BadgeManager
 import datetime
 import math
 
