@@ -773,15 +773,6 @@ def _process_student_review_with_comprehensive_tracking(workflow, student_review
                 "max_iterations": max_iterations
             }
             
-            behavior_tracker.log_interaction(
-                user_id=user_id,
-                interaction_type="submit",
-                interaction_category="main_workflow",
-                component="review_input",
-                action="submit_review",
-                details=review_analysis
-            )
-            
             # Update workflow step
             behavior_tracker.update_workflow_step(
                 user_id=user_id,

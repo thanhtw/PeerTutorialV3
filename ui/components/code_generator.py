@@ -18,6 +18,7 @@ from analytics.behavior_tracker import behavior_tracker
 logging.basicConfig(level=logging.INFO) 
 logger = logging.getLogger(__name__)
 import time
+import datetime
 
 
 class CodeGeneratorUI:
@@ -37,6 +38,7 @@ class CodeGeneratorUI:
         self.workflow_manager = getattr(workflow, 'workflow_manager', None)
         self.behavior_tracker = behavior_tracker
         self.interaction_timers = {}
+        self.session_start_time = time.time()
         
     def render(self, user_level: str = "medium"):
         """
@@ -45,7 +47,8 @@ class CodeGeneratorUI:
         Args:
             user_level: User's experience level (basic, medium, senior)
         """
-        # FIXED: Check for tab switching flag and handle it
+        
+        # Check for tab switching flag and handle it
         if st.session_state.get("switch_to_review_tab", False):
             # Clear the flag
             st.session_state.switch_to_review_tab = False
@@ -66,6 +69,7 @@ class CodeGeneratorUI:
         # Generated code display section
         self._render_code_display_section()
 
+    
     def _initialize_session_state(self):
         """Initialize session state variables with correct data types."""
         if "selected_categories" not in st.session_state:
@@ -405,61 +409,6 @@ class CodeGeneratorUI:
         except Exception as e:
             logger.error(f"Error updating usage stats: {str(e)}")
     
-    def _handle_code_generation(self):
-        """
-        Handle the code generation process with proper workflow integration.
-        Now uses the workflow manager for proper workflow execution.
-        """
-        user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
-
-        if user_id and not st.session_state.get("workflow_tracking_started", False):
-            workflow_id = behavior_tracker.start_workflow_tracking(
-                user_id=user_id,
-                workflow_type="main_workflow",
-                initial_step="generate",
-                configuration={
-                    "code_length": st.session_state.workflow_state.code_length,
-                    "difficulty_level": st.session_state.workflow_state.difficulty_level,
-                    "selected_categories": st.session_state.get("selected_categories", []),
-                    "selected_errors": st.session_state.get("selected_specific_errors", []),
-                    "error_selection_mode": st.session_state.get("error_selection_mode", "random")
-                }
-            )
-            st.session_state.workflow_tracking_started = True
-            
-        if user_id:
-            behavior_tracker.log_interaction(
-                user_id=user_id,
-                interaction_type="action",
-                interaction_category="code_generation",
-                component="code_generator",
-                action="generate_code",
-                details={
-                    "mode": st.session_state.get("error_selection_mode", "random"),
-                    "code_length": st.session_state.workflow_state.code_length,
-                    "difficulty": st.session_state.workflow_state.difficulty_level
-                }
-            )
-            
-        with st.spinner("🔧 Generating your Java code challenge..."):
-            try:
-                logger.debug("Starting code generation through workflow manager")
-                
-                # Prepare workflow state
-                workflow_state = self._prepare_workflow_state()
-                if not workflow_state:
-                    return
-                
-                # Execute code generation through the workflow system
-                updated_state = self._execute_code_generation_workflow(workflow_state)
-                
-                # Handle the result
-                self._handle_generation_result_with_tracking(updated_state)
-                    
-            except Exception as e:
-                logger.error(f"Code generation error: {str(e)}", exc_info=True)
-                st.error(f"❌ Generation failed: {str(e)}")
-
     def _prepare_workflow_state(self) -> Optional[WorkflowState]:
         """
         Prepare the workflow state for code generation (random mode only).
@@ -608,50 +557,6 @@ class CodeGeneratorUI:
             # Return a minimal WorkflowState with error
             return WorkflowState(error=f"State conversion failed: {str(e)}")
 
-    def _handle_generation_result(self, updated_state):
-        """
-        Handle the result of code generation.
-        FIXED: Proper handling of LangGraph state objects using safe access methods.
-        
-        Args:
-            updated_state: The updated workflow state after generation
-        """
-        try:
-            # Convert the state to a proper WorkflowState object for session storage
-            workflow_state = self._convert_state_to_workflow_state(updated_state)
-            
-            # Update session state with result first (important for preserving data)
-            st.session_state.workflow_state = workflow_state
-
-            # Use safe access methods to check for code snippet and error
-            code_snippet = self._safe_get_state_value(updated_state, 'code_snippet')
-            error = self._safe_get_state_value(updated_state, 'error')
-            
-            has_code_snippet = code_snippet is not None
-            has_error = error is not None and error != ""
-           
-            if has_code_snippet:
-                logger.debug("Code generation completed successfully")               
-                if has_error:                    
-                    st.warning(f"⚠️ Code generated with warnings: {error}")
-                    st.info("✅ Code generation completed. You can proceed to review the code.")
-                else:
-                    st.success("✅ Code generated successfully!") 
-                st.session_state.active_tab = 2
-                st.session_state.generation_completed = True
-                st.session_state.switch_to_review_tab = True
-                
-            elif has_error:               
-                st.error(f"❌ Generation failed: {error}")
-                logger.error(f"Code generation failed with error: {error}")
-                
-            else:               
-                st.error("❌ Failed to generate code. Please try again.")
-                logger.warning("Code generation completed but no code snippet was created and no error message")                    
-        except Exception as e:
-            logger.error(f"Error handling generation result: {str(e)}")
-            st.error(f"❌ Error processing generation result: {str(e)}")
-
     def _build_workflow_state(self, **kwargs):
         """Helper to build a WorkflowState object for code generation."""
         # Use current session state as base if it exists, otherwise create new
@@ -695,26 +600,6 @@ class CodeGeneratorUI:
                 logger.debug("Starting code generation through workflow manager")
                 
                 # Track generation attempt
-                if user_id:
-                    selected_count = len(st.session_state.get("selected_categories", []))
-                    
-                    self.behavior_tracker.log_interaction(
-                        user_id=user_id,
-                        interaction_type="action",
-                        interaction_category="code_generation",
-                        component="code_generator",
-                        action="start_main_code_generation",
-                        details={
-                            "selection_mode": "random",
-                            "selected_count": selected_count,
-                            "code_length": st.session_state.workflow_state.code_length,
-                            "difficulty": st.session_state.workflow_state.difficulty_level,
-                            "configuration": {
-                                "error_count_start": st.session_state.workflow_state.error_count_start,
-                                "error_count_end": st.session_state.workflow_state.error_count_end
-                            }
-                        }
-                    )
                 
                 # Prepare workflow state
                 workflow_state = self._prepare_workflow_state()
@@ -733,7 +618,7 @@ class CodeGeneratorUI:
                 generation_duration = time.time() - generation_start_time
                 logger.error(f"Code generation error: {str(e)}", exc_info=True)
                 
-                # Track generation error
+                
                 if user_id:
                     self.behavior_tracker.log_interaction(
                         user_id=user_id,

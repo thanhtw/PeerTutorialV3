@@ -72,12 +72,11 @@ class BehaviorTracker:
         try:
             session_id = st.session_state.get("session_id", str(uuid.uuid4()))
             
-            
             # Create session record
             query = """
             INSERT INTO user_sessions 
             (session_id, user_id, language_preference, tabs_visited)
-            VALUES (%s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE 
             total_interactions = total_interactions + 1
             """
@@ -211,7 +210,7 @@ class BehaviorTracker:
                               error_category: str,
                               difficulty_level: str) -> str:
         """
-        Start tracking a practice session in Error Explorer.
+        Start tracking a practice session in Tutorial.
         
         Args:
             user_id: The user's ID
