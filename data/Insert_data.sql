@@ -221,13 +221,6 @@ INSERT INTO badges (badge_id, name_en, name_zh, description_en, description_zh, 
  '{"type": "efficiency", "accuracy": 90, "avg_time": 300, "min_reviews": 10, "description": "Speed and accuracy combined"}');
 
 
--- Insert initial system metrics entry
-INSERT INTO system_metrics (active_sessions, error_rate, avg_response_time, completion_rate, total_interactions, metrics_data) VALUES
-(0, 0.0000, 0.000, 1.0000, 0, '{"system_start": true, "version": "2.0"}');
-
--- Insert sample performance thresholds as system alerts configuration
-INSERT INTO system_alerts (alert_type, severity, message, threshold_value, resolved, alert_data) VALUES
-('system_startup', 'info', 'System initialized successfully', 0, TRUE, '{"initialization_time": "2024-01-01T00:00:00Z", "version": "2.0"}');
 
 -- =====================================================
 -- Badge Prerequisites and Advanced Criteria

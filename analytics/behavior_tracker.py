@@ -72,13 +72,11 @@ class BehaviorTracker:
         try:
             session_id = st.session_state.get("session_id", str(uuid.uuid4()))
             
-            # Get additional session info
-            device_info = self._get_device_info()
             
             # Create session record
             query = """
             INSERT INTO user_sessions 
-            (session_id, user_id, device_info, language_preference, tabs_visited)
+            (session_id, user_id, language_preference, tabs_visited)
             VALUES (%s, %s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE 
             total_interactions = total_interactions + 1
@@ -86,8 +84,7 @@ class BehaviorTracker:
             
             self.db.execute_query(query, (
                 session_id,
-                user_id,
-                json.dumps(device_info),
+                user_id,                
                 self.current_language,
                 json.dumps([])
             ))
@@ -734,20 +731,6 @@ class BehaviorTracker:
             
         except Exception as e:
             logger.error(f"Error updating learning progress: {str(e)}")
-    
-    def _get_device_info(self) -> Dict[str, Any]:
-        """Get device and browser information."""
-        try:
-            # Basic device info that we can get from Streamlit
-            return {
-                "language": self.current_language,
-                "timestamp": datetime.now().isoformat(),
-                "platform": "web",
-                "framework": "streamlit"
-            }
-        except Exception as e:
-            logger.error(f"Error getting device info: {str(e)}")
-            return {}
     
     def get_user_analytics(self, user_id: str, days: int = 30) -> Dict[str, Any]:
         """

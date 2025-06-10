@@ -192,42 +192,6 @@ class PerformanceMonitor:
             
         return alerts
     
-    def _store_metrics(self, metrics: Dict[str, Any]):
-        """Store metrics in database for historical analysis."""
-        try:
-            # Create metrics table if it doesn't exist
-            create_table_query = """
-            CREATE TABLE IF NOT EXISTS system_metrics (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                active_sessions INT DEFAULT 0,
-                error_rate FLOAT DEFAULT 0.0,
-                avg_response_time FLOAT DEFAULT 0.0,
-                completion_rate FLOAT DEFAULT 0.0,
-                total_interactions INT DEFAULT 0,
-                metrics_data JSON
-            ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
-            """
-            self.db.execute_query(create_table_query)
-            
-            # Insert metrics
-            insert_query = """
-            INSERT INTO system_metrics 
-            (active_sessions, error_rate, avg_response_time, completion_rate, total_interactions, metrics_data)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            """
-            
-            self.db.execute_query(insert_query, (
-                metrics.get("active_sessions", 0),
-                metrics.get("error_rate", 0),
-                metrics.get("avg_response_time", 0),
-                metrics.get("completion_rate", 0),
-                metrics.get("total_interactions", 0),
-                json.dumps(metrics)
-            ))
-            
-        except Exception as e:
-            logger.error(f"Error storing metrics: {str(e)}")
     
     def _process_alert(self, alert: Dict[str, Any]):
         """Process and handle alerts."""
@@ -243,42 +207,6 @@ class PerformanceMonitor:
             
         except Exception as e:
             logger.error(f"Error processing alert: {str(e)}")
-    
-    def _store_alert(self, alert: Dict[str, Any]):
-        """Store alert in database."""
-        try:
-            create_table_query = """
-            CREATE TABLE IF NOT EXISTS system_alerts (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                alert_type VARCHAR(50) NOT NULL,
-                severity VARCHAR(20) NOT NULL,
-                message TEXT NOT NULL,
-                alert_value FLOAT,
-                threshold_value FLOAT,
-                resolved BOOLEAN DEFAULT FALSE,
-                alert_data JSON
-            ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
-            """
-            self.db.execute_query(create_table_query)
-            
-            insert_query = """
-            INSERT INTO system_alerts 
-            (alert_type, severity, message, alert_value, threshold_value, alert_data)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            """
-            
-            self.db.execute_query(insert_query, (
-                alert['type'],
-                alert['severity'],
-                alert['message'],
-                alert.get('value'),
-                alert.get('threshold'),
-                json.dumps(alert)
-            ))
-            
-        except Exception as e:
-            logger.error(f"Error storing alert: {str(e)}")
 
 
 class BatchProcessor:
@@ -479,72 +407,6 @@ class OptimizedBehaviorTracker:
         
         return analytics
     
-    def get_system_health(self) -> Dict[str, Any]:
-        """Get system health metrics."""
-        try:
-            # Get recent metrics
-            metrics_query = """
-            SELECT * FROM system_metrics 
-            ORDER BY timestamp DESC 
-            LIMIT 1
-            """
-            latest_metrics = self.db.execute_query(metrics_query, fetch_one=True)
-            
-            # Get active alerts
-            alerts_query = """
-            SELECT COUNT(*) as active_alerts
-            FROM system_alerts 
-            WHERE resolved = FALSE AND timestamp >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
-            """
-            alerts_result = self.db.execute_query(alerts_query, fetch_one=True)
-            
-            # Get database stats
-            db_stats = self._get_database_stats()
-            
-            return {
-                "latest_metrics": latest_metrics,
-                "active_alerts": alerts_result['active_alerts'] if alerts_result else 0,
-                "database_stats": db_stats,
-                "cache_stats": {
-                    "cache_size": len(self.cache_manager.cache),
-                    "batch_size": len(self.batch_processor.interaction_batch)
-                }
-            }
-            
-        except Exception as e:
-            logger.error(f"Error getting system health: {str(e)}")
-            return {"error": str(e)}
-    
-    def _get_database_stats(self) -> Dict[str, Any]:
-        """Get database performance statistics."""
-        try:
-            # Table sizes
-            size_query = """
-            SELECT 
-                table_name,
-                ROUND(((data_length + index_length) / 1024 / 1024), 2) AS size_mb
-            FROM information_schema.tables 
-            WHERE table_schema = DATABASE()
-            AND table_name IN (
-                'user_sessions', 'user_interactions', 'practice_sessions', 
-                'workflow_tracking', 'error_identification_analysis'
-            )
-            """
-            
-            table_sizes = self.db.execute_query(size_query)
-            
-            # Connection count
-            connections_query = "SHOW STATUS LIKE 'Threads_connected'"
-            connections = self.db.execute_query(connections_query, fetch_one=True)
-            
-            return {
-                "table_sizes": table_sizes or [],
-                "active_connections": connections['Value'] if connections else 0
-            }
-            
-        except Exception as e:
-            logger.error(f"Error getting database stats: {str(e)}")
-            return {}
     
     def cleanup_old_data(self, days_to_keep: int = 90):
         """Clean up old tracking data to maintain performance."""
@@ -553,9 +415,7 @@ class OptimizedBehaviorTracker:
             
             # Tables to clean up with their date columns
             cleanup_tables = [
-                ("user_interactions", "timestamp"),
-                ("system_metrics", "timestamp"),
-                ("system_alerts", "timestamp"),
+                ("user_interactions", "timestamp"),         
                 ("tab_navigation", "timestamp")
             ]
             
@@ -646,56 +506,8 @@ class RealTimeAnalytics:
             if error_data:
                 st.bar_chart(error_data)
         
-        # Active alerts
-        alerts = self._get_active_alerts()
-        if alerts:
-            st.subheader("🚨 Active Alerts")
-            for alert in alerts:
-                severity_color = {
-                    "warning": "orange",
-                    "error": "red",
-                    "info": "blue"
-                }.get(alert.get("severity", "info"), "gray")
-                
-                st.markdown(f"""
-                <div style="padding: 10px; border-left: 4px solid {severity_color}; 
-                           background-color: rgba(255,255,255,0.1); margin: 5px 0;">
-                    <strong>{alert.get('alert_type', 'Unknown')}</strong>: {alert.get('message', '')}
-                    <br><small>{alert.get('timestamp', '')}</small>
-                </div>
-                """, unsafe_allow_html=True)
-    
-    def _get_realtime_health(self) -> Dict[str, Any]:
-        """Get real-time health metrics."""
-        try:
-            # This would query the most recent metrics
-            query = """
-            SELECT * FROM system_metrics 
-            ORDER BY timestamp DESC 
-            LIMIT 2
-            """
-            results = self.db.execute_query(query)
-            
-            if results and len(results) >= 1:
-                current = results[0]
-                previous = results[1] if len(results) > 1 else current
-                
-                return {
-                    "active_sessions": current.get("active_sessions", 0),
-                    "error_rate": current.get("error_rate", 0),
-                    "avg_response_time": current.get("avg_response_time", 0),
-                    "completion_rate": current.get("completion_rate", 0),
-                    "sessions_delta": current.get("active_sessions", 0) - previous.get("active_sessions", 0),
-                    "error_delta": current.get("error_rate", 0) - previous.get("error_rate", 0),
-                    "response_delta": current.get("avg_response_time", 0) - previous.get("avg_response_time", 0),
-                    "completion_delta": current.get("completion_rate", 0) - previous.get("completion_rate", 0)
-                }
-            
-            return {}
-            
-        except Exception as e:
-            logger.error(f"Error getting realtime health: {str(e)}")
-            return {}
+       
+
     
     def _get_activity_timeline(self):
         """Get activity timeline data."""
@@ -707,23 +519,6 @@ class RealTimeAnalytics:
         # Implementation would return error type distribution
         return None
     
-    def _get_active_alerts(self) -> List[Dict[str, Any]]:
-        """Get active system alerts."""
-        try:
-            query = """
-            SELECT alert_type, severity, message, timestamp
-            FROM system_alerts 
-            WHERE resolved = FALSE 
-            AND timestamp >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
-            ORDER BY timestamp DESC
-            LIMIT 10
-            """
-            return self.db.execute_query(query) or []
-            
-        except Exception as e:
-            logger.error(f"Error getting active alerts: {str(e)}")
-            return []
-
 
 # Global instances
 optimized_tracker = OptimizedBehaviorTracker()
@@ -737,10 +532,6 @@ def start_performance_monitoring():
 def stop_performance_monitoring():
     """Stop performance monitoring.""" 
     optimized_tracker.performance_monitor.stop_monitoring()
-
-def get_system_health():
-    """Get current system health."""
-    return optimized_tracker.get_system_health()
 
 def cleanup_old_tracking_data(days: int = 90):
     """Clean up old tracking data."""

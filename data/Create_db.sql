@@ -10,8 +10,6 @@ DROP TABLE IF EXISTS system_performance_logs;
 DROP TABLE IF EXISTS badge_progress_logs;
 DROP TABLE IF EXISTS learning_achievements;
 DROP TABLE IF EXISTS user_engagement_metrics;
-DROP TABLE IF EXISTS system_alerts;
-DROP TABLE IF EXISTS system_metrics;
 
 
 
@@ -91,8 +89,7 @@ CREATE TABLE IF NOT EXISTS user_sessions (
     session_start TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     session_end TIMESTAMP NULL,
     session_duration_minutes INT DEFAULT 0,
-    total_interactions INT DEFAULT 0,
-    device_info JSON,
+    total_interactions INT DEFAULT 0,   
     language_preference VARCHAR(10) DEFAULT 'en',
     ip_address VARCHAR(45),
     user_agent TEXT,
@@ -163,43 +160,6 @@ CREATE TABLE learning_achievements (
     INDEX idx_user_achievements (user_id, achieved_at DESC),
     INDEX idx_achievement_type (achievement_type, achieved_at DESC),
     INDEX idx_achievement_value (achievement_type, value DESC)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- System Metrics for Performance Monitoring
-CREATE TABLE system_metrics (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    active_sessions INT DEFAULT 0,
-    error_rate DECIMAL(5,4) DEFAULT 0.0000,
-    avg_response_time DECIMAL(6,3) DEFAULT 0.000,
-    completion_rate DECIMAL(5,4) DEFAULT 0.0000,
-    total_interactions INT DEFAULT 0,
-    memory_usage_mb INT DEFAULT 0,
-    cpu_usage_percent DECIMAL(5,2) DEFAULT 0.00,
-    database_connections INT DEFAULT 0,
-    metrics_data JSON,
-    INDEX idx_timestamp (timestamp DESC),
-    INDEX idx_performance (error_rate, avg_response_time),
-    INDEX idx_system_health (active_sessions, completion_rate)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- System Alerts
-CREATE TABLE system_alerts (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    alert_type VARCHAR(50) NOT NULL,
-    severity ENUM('info', 'warning', 'error', 'critical') DEFAULT 'info',
-    message TEXT NOT NULL,
-    alert_value DECIMAL(10,4),
-    threshold_value DECIMAL(10,4),
-    resolved BOOLEAN DEFAULT FALSE,
-    resolved_at TIMESTAMP NULL,
-    resolved_by VARCHAR(100),
-    alert_data JSON,
-    
-    INDEX idx_severity_time (severity, timestamp DESC),
-    INDEX idx_alert_type (alert_type, resolved),
-    INDEX idx_unresolved (resolved, timestamp DESC)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 
@@ -553,5 +513,5 @@ FROM information_schema.tables
 WHERE table_schema = DATABASE() 
 AND table_name IN ('users', 'error_categories', 'java_errors', 'badges', 'user_badges', 'activity_log', 'error_usage_stats', 
                    'user_sessions', 'user_interactions', 'practice_sessions', 'workflow_tracking', 
-                   'tab_navigation', 'error_identification_analysis', 'learning_path_progress', 'system_performance_logs','badge_progress_logs', 'error_category_stats', 'learning_achievements', 'user_engagement_metrics', 'system_metrics', 'system_alerts');   
+                   'tab_navigation', 'error_identification_analysis', 'learning_path_progress', 'system_performance_logs','badge_progress_logs', 'error_category_stats', 'learning_achievements', 'user_engagement_metrics');   
 
