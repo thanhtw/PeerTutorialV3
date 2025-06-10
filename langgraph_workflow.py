@@ -198,7 +198,7 @@ class JavaCodeReviewGraph:
                     if user_id:
                         # Check if badge manager is available
                         try:
-                            from auth.badge_manager import BadgeManager
+                            from analytics.badge_manager import BadgeManager
                             badge_manager = BadgeManager()
                             
                             # Get error categories from found_errors

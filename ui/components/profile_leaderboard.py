@@ -6,7 +6,7 @@ import streamlit as st
 import logging
 import html # Added for escaping
 from typing import Dict, Any, List
-from auth.badge_manager import BadgeManager
+from analytics.badge_manager import BadgeManager
 from utils.language_utils import t, get_current_language
 
 logger = logging.getLogger(__name__)

@@ -192,7 +192,6 @@ class PerformanceMonitor:
             
         return alerts
     
-    
     def _process_alert(self, alert: Dict[str, Any]):
         """Process and handle alerts."""
         try:

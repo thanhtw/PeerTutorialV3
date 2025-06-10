@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import time
 import traceback
 from typing import List, Dict, Any, Optional, Tuple, Callable
-from auth.badge_manager import BadgeManager
+from analytics.badge_manager import BadgeManager
 from auth.mysql_auth import MySQLAuthManager
 from utils.language_utils import t, get_current_language
 from ui.components.animation import level_up_animation

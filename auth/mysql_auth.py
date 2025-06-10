@@ -9,7 +9,7 @@ import hashlib
 import uuid
 from typing import Dict, Any, List, Optional
 from data.mysql_connection import MySQLConnection
-from auth.badge_manager import BadgeManager
+from analytics.badge_manager import BadgeManager
 from utils.language_utils import set_language, get_current_language, t
 
 # Configure logging

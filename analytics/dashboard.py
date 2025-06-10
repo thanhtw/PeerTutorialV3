@@ -485,10 +485,7 @@ class EducationalAnalyticsDashboard:
         except Exception as e:
             logger.error(f"Error exporting data: {str(e)}")
             st.error("Error exporting data. Please try again.")
-    
-    # Placeholder methods for additional chart creation
-    # These would be implemented with actual data queries and Plotly charts
-    
+      
     def _get_session_duration_data(self, time_range: int) -> Optional[pd.DataFrame]:
         """Get session duration data.""" 
         # Implementation would query session durations and return DataFrame
