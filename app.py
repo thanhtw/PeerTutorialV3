@@ -43,7 +43,7 @@ from ui.components.code_display import CodeDisplayUI, render_review_tab
 from ui.components.feedback_system import render_enhanced_feedback_tab
 from ui.components.auth_ui import AuthUI
 
-from ui.components.tutorial import ErrorExplorerUI
+from ui.components.tutorial import TutorialUI
 
 from analytics.behavior_tracker import behavior_tracker
 import atexit
@@ -166,7 +166,7 @@ def main():
     # Initialize UI components
     code_display_ui = CodeDisplayUI()
     code_generator_ui = CodeGeneratorUI(workflow, code_display_ui)       
-    error_explorer_ui = ErrorExplorerUI(workflow)  # Pass workflow for practice mode
+    error_explorer_ui = TutorialUI(workflow)  # Pass workflow for practice mode
     
     # UPDATED: Check if we're in practice mode
     if st.session_state.get("practice_mode_active", False):

@@ -261,7 +261,7 @@ class BehaviorTracker:
                 user_id=user_id,
                 interaction_type="start_session",
                 interaction_category="practice",
-                component="error_explorer",
+                component="code_generation",
                 action="start_practice",
                 details={
                     "error_code": error_code,
@@ -517,6 +517,7 @@ class BehaviorTracker:
             
         except Exception as e:
             logger.error(f"Error completing workflow: {str(e)}")
+    
     
     def track_tab_navigation(self,
                             user_id: str,
