@@ -237,7 +237,7 @@ CREATE TABLE IF NOT EXISTS user_interactions (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     session_id VARCHAR(36) NOT NULL,
     user_id VARCHAR(36) NOT NULL,
-    interaction_type ENUM('action','error_identification','complete_workflow','start_workflow','status_change','start_session','step_change','access','click', 'submit', 'navigation', 'view', 'edit', 'download', 'upload', 'search', 'filter', 'error', 'success', 'warning','mode_change') NOT NULL,
+    interaction_type ENUM('tutorial_identification_attempt','start_practice_session','complete_tutorial_abandoned','complete_tutorial_incomplete','complete_tutorial_completed','tutorial_step_code_generate_complete','tutorial_step_code_generation_no_output','tutorial_step_code_generation_failed','tutorial_step_code_generation_started','tutorial_step_submit_again','tutorial_step_review_analysis_complete','tutorial_step_review_submitted','tutorial_step_ready_for_review','code_generation_exception','start_tutorial_error','start_tutorial_code_generation','filter_by_difficulty','filter_by_category','search_errors','regenerate_tutorial_code','restart_tutorial_session','review_processing_error','error_identification_attempt','start_tutorial_session_error','start_tutorial_session','access_tutorial_ui','action','error_identification','complete_workflow','start_workflow','status_change','start_session','step_change','access','click', 'submit', 'navigation', 'view', 'edit', 'download', 'upload', 'search', 'filter', 'error', 'success', 'warning','mode_change') NOT NULL,
     interaction_category VARCHAR(50) NOT NULL,
     component VARCHAR(100) NOT NULL, 
     action VARCHAR(100) NOT NULL, 
