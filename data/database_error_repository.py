@@ -141,15 +141,6 @@ class DatabaseErrorRepository:
             return {"java_errors": [], "descriptions": []}
 
     def get_category_errors(self, category_name: str) -> List[Dict[str, str]]:
-        """
-        Get errors for a specific category.
-        
-        Args:
-            category_name: Name of the category
-            
-        Returns:
-            List of error dictionaries for the category
-        """
         try:
             self.current_language = get_current_language()
             
@@ -515,45 +506,6 @@ class DatabaseErrorRepository:
         except Exception as e:
             logger.error(f"Error getting error by name {error_name}: {str(e)}")
             return None
-    
-    def update_error_usage(self, error_code: str, user_id: str = None, 
-                          action_type: str = 'viewed', context: Dict = None):
-        """
-        Track error usage for analytics.
-        
-        Args:
-            error_code: The error code
-            user_id: User ID (optional)
-            action_type: Type of action ('viewed', 'practiced', 'mastered', 'failed')
-            context: Additional context data
-        """
-        try:
-            # Get error ID
-            error_query = "SELECT id FROM java_errors WHERE error_code = %s"
-            error_result = self.db.execute_query(error_query, (error_code,), fetch_one=True)
-            
-            if not error_result:
-                return
-            
-            error_id = error_result['id']
-            
-            # Insert usage record
-            usage_query = """
-            INSERT INTO error_usage_stats (error_id, user_id, action_type, context_data)
-            VALUES (%s, %s, %s, %s)
-            """
-            
-            import json
-            context_json = json.dumps(context) if context else None
-            
-            self.db.execute_query(usage_query, (error_id, user_id, action_type, context_json))
-            
-            # Update usage count
-            update_query = "UPDATE java_errors SET usage_count = usage_count + 1 WHERE id = %s"
-            self.db.execute_query(update_query, (error_id,))
-            
-        except Exception as e:
-            logger.error(f"Error updating usage stats: {str(e)}")
     
     def get_error_statistics(self) -> Dict[str, Any]:
         """Get statistics about the error database."""

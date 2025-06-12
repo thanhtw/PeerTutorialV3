@@ -14,8 +14,7 @@ from ui.components.auth_ui import AuthUI
 # UI utilities
 from ui.utils.main_ui import (
     init_session_state,
-    render_llm_logs_tab,
-    create_enhanced_tabs,
+    render_llm_logs_tab,    
     render_sidebar,
     render_professional_sidebar
 )
@@ -34,8 +33,7 @@ __all__ = [
         
     # UI utilities - compact and professional
     'init_session_state',
-    'render_llm_logs_tab',
-    'create_enhanced_tabs',
+    'render_llm_logs_tab',    
     'render_sidebar',
     'render_professional_sidebar',
     

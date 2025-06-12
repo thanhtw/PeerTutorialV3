@@ -6,27 +6,15 @@ SET FOREIGN_KEY_CHECKS = 0;
 DROP VIEW IF EXISTS user_performance_summary;
 DROP VIEW IF EXISTS daily_activity_summary;
 DROP VIEW IF EXISTS badge_progress_summary; 
-DROP TABLE IF EXISTS badge_progress_logs;
-DROP TABLE IF EXISTS learning_achievements;
-DROP TABLE IF EXISTS user_engagement_metrics;
-
-
 
 DROP TABLE IF EXISTS user_badges;
 DROP TABLE IF EXISTS activity_log;
-DROP TABLE IF EXISTS error_usage_stats;
 DROP TABLE IF EXISTS java_errors;
 DROP TABLE IF EXISTS error_categories;
 DROP TABLE IF EXISTS badges;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS user_sessions;
 DROP TABLE IF EXISTS user_interactions;
-DROP TABLE IF EXISTS practice_sessions;
-DROP TABLE IF EXISTS workflow_tracking;
-DROP TABLE IF EXISTS tab_navigation;
-DROP TABLE IF EXISTS error_identification_analysis;
-DROP TABLE IF EXISTS learning_path_progress;
-DROP TABLE IF EXISTS error_category_stats;
 SET FOREIGN_KEY_CHECKS = 1;
 
 
@@ -97,44 +85,6 @@ CREATE TABLE IF NOT EXISTS user_sessions (
     INDEX idx_user_session (user_id, session_start DESC),
     INDEX idx_session_duration (session_duration_minutes DESC),
     INDEX idx_session_date (session_start)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- New Datatables
-CREATE TABLE badge_progress_logs (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id VARCHAR(36) NOT NULL,
-    badge_id VARCHAR(50) NOT NULL,
-    progress_type ENUM('criteria_met', 'progress_update', 'badge_awarded') NOT NULL,
-    criteria_key VARCHAR(100), 
-    old_value DECIMAL(10,2),
-    new_value DECIMAL(10,2),
-    progress_percentage DECIMAL(5,2),
-    is_completed BOOLEAN DEFAULT FALSE,
-    logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    context_data JSON,
-    
-    FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE,
-    FOREIGN KEY (badge_id) REFERENCES badges(badge_id) ON DELETE CASCADE,
-    INDEX idx_user_badge_progress (user_id, badge_id, logged_at DESC),
-    INDEX idx_progress_type (progress_type, logged_at DESC),
-    INDEX idx_badge_completion (badge_id, is_completed, logged_at DESC)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- Learning Achievements (Milestone Tracking)
-CREATE TABLE learning_achievements (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id VARCHAR(36) NOT NULL,
-    achievement_type ENUM('milestone', 'streak', 'mastery', 'speed', 'accuracy', 'exploration') NOT NULL,
-    achievement_name VARCHAR(100) NOT NULL,
-    description TEXT,
-    value DECIMAL(10,2), 
-    achieved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    context_data JSON,
-    
-    FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE,
-    INDEX idx_user_achievements (user_id, achieved_at DESC),
-    INDEX idx_achievement_type (achievement_type, achieved_at DESC),
-    INDEX idx_achievement_value (achievement_type, value DESC)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 
@@ -214,30 +164,12 @@ CREATE TABLE activity_log (
     INDEX idx_related_entity (related_entity_type, related_entity_id)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- Error usage statistics table
-CREATE TABLE error_usage_stats (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    error_id INT NOT NULL,
-    user_id VARCHAR(36),
-    session_id VARCHAR(36),
-    action_type ENUM('viewed', 'practiced', 'mastered', 'failed') NOT NULL,
-    context_data JSON,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    FOREIGN KEY (error_id) REFERENCES java_errors(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE SET NULL,
-    INDEX idx_error_user (error_id, user_id),
-    INDEX idx_session (session_id),
-    INDEX idx_action_type (action_type),
-    INDEX idx_created_at (created_at)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
 --User Interactions - Detailed interaction logging
 CREATE TABLE IF NOT EXISTS user_interactions (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     session_id VARCHAR(36) NOT NULL,
     user_id VARCHAR(36) NOT NULL,
-    interaction_type ENUM('tutorial_identification_attempt','start_practice_session','complete_tutorial_abandoned','complete_tutorial_incomplete','complete_tutorial_completed','tutorial_step_code_generate_complete','tutorial_step_code_generation_no_output','tutorial_step_code_generation_failed','tutorial_step_code_generation_started','tutorial_step_submit_again','tutorial_step_review_analysis_complete','tutorial_step_review_submitted','tutorial_step_ready_for_review','code_generation_exception','start_tutorial_error','start_tutorial_code_generation','filter_by_difficulty','filter_by_category','search_errors','regenerate_tutorial_code','restart_tutorial_session','review_processing_error','error_identification_attempt','start_tutorial_session_error','start_tutorial_session','access_tutorial_ui','action','error_identification','complete_workflow','start_workflow','status_change','start_session','step_change','access','click', 'submit', 'navigation', 'view', 'edit', 'download', 'upload', 'search', 'filter', 'error', 'success', 'warning','mode_change') NOT NULL,
+    interaction_type ENUM('review_analysis_complete','view_feedback_tab','view_code_generator','analysis_complete','review_analysis_start','start_review','code_ready_for_review','generate_completed','start_generate','view_progress_dashboard','view_badge_showcase','deselect_category','select_category','submit_review','view_code_display','tutorial_identification_attempt','start_practice_session','complete_tutorial_abandoned','complete_tutorial_incomplete','complete_tutorial_completed','tutorial_step_code_generate_complete','tutorial_step_code_generation_no_output','tutorial_step_code_generation_failed','tutorial_step_code_generation_started','tutorial_step_submit_again','tutorial_step_review_analysis_complete','tutorial_step_review_submitted','tutorial_step_ready_for_review','code_generation_exception','start_tutorial_error','start_tutorial_code_generation','filter_by_difficulty','filter_by_category','search_errors','regenerate_tutorial_code','restart_tutorial_session','review_processing_error','error_identification_attempt','start_tutorial_session_error','start_tutorial_session','access_tutorial_ui','action','error_identification','complete_workflow','start_workflow','status_change','start_session','step_change','access','click', 'submit', 'navigation', 'view', 'edit', 'download', 'upload', 'search', 'filter', 'error', 'success', 'warning','mode_change') NOT NULL,
     interaction_category VARCHAR(50) NOT NULL,
     component VARCHAR(100) NOT NULL, 
     action VARCHAR(100) NOT NULL, 
@@ -256,180 +188,6 @@ CREATE TABLE IF NOT EXISTS user_interactions (
     INDEX idx_success_errors (success, error_message(100))
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
---Practice Sessions - Specific to Error Explorer
-CREATE TABLE IF NOT EXISTS practice_sessions (
-    practice_session_id VARCHAR(36) PRIMARY KEY,
-    user_id VARCHAR(36) NOT NULL,
-    session_id VARCHAR(36),
-    error_code VARCHAR(50),
-    error_name VARCHAR(200),
-    error_category VARCHAR(100),
-    difficulty_level ENUM('easy', 'medium', 'hard') DEFAULT 'medium',
-    status ENUM('setup', 'code_ready', 'review_complete', 'abandoned') DEFAULT 'setup',
-    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    completed_at TIMESTAMP NULL,
-    total_duration_minutes INT DEFAULT 0,
-    practice_data JSON,
-    performance_metrics JSON,
-    
-    FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE,
-    FOREIGN KEY (session_id) REFERENCES user_sessions(session_id) ON DELETE SET NULL,
-    FOREIGN KEY (error_code) REFERENCES java_errors(error_code) ON DELETE SET NULL,
-    INDEX idx_user_practice (user_id, started_at DESC),
-    INDEX idx_error_practice (error_code, started_at DESC),
-    INDEX idx_status_time (status, total_duration_minutes)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- Workflow Tracking - Main workflow progress
-CREATE TABLE IF NOT EXISTS workflow_tracking (
-    workflow_id VARCHAR(36) PRIMARY KEY,
-    user_id VARCHAR(36) NOT NULL,
-    session_id VARCHAR(36),
-    workflow_type VARCHAR(50) DEFAULT 'main_workflow',
-    current_step VARCHAR(50),
-    total_steps_completed INT DEFAULT 0,
-    selected_categories JSON,
-    selected_errors JSON,
-    code_length VARCHAR(20),
-    difficulty_level VARCHAR(20),
-    status ENUM('in_progress', 'completed', 'abandoned') DEFAULT 'in_progress',
-    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    completed_at TIMESTAMP NULL,
-    final_results JSON,
-    performance_data JSON,
-    
-    FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE,
-    FOREIGN KEY (session_id) REFERENCES user_sessions(session_id) ON DELETE SET NULL,
-    INDEX idx_user_workflow (user_id, started_at DESC),
-    INDEX idx_workflow_status (status, started_at DESC),
-    INDEX idx_workflow_type (workflow_type, status)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- Tab Navigation Tracking
-CREATE TABLE IF NOT EXISTS tab_navigation (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    session_id VARCHAR(36) NOT NULL,
-    user_id VARCHAR(36) NOT NULL,
-    from_tab VARCHAR(50),
-    to_tab VARCHAR(50) NOT NULL,
-    tab_index INT,
-    time_spent_on_previous_tab_seconds INT DEFAULT 0,
-    navigation_trigger VARCHAR(50) DEFAULT 'click',
-    context_data JSON,
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    FOREIGN KEY (session_id) REFERENCES user_sessions(session_id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE,
-    INDEX idx_user_navigation (user_id, timestamp DESC),
-    INDEX idx_tab_usage (to_tab, timestamp DESC),
-    INDEX idx_session_navigation (session_id, timestamp)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- Learning Path Progress
-CREATE TABLE IF NOT EXISTS learning_path_progress (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id VARCHAR(36) NOT NULL,
-    error_category VARCHAR(100) NOT NULL,
-    total_encounters INT DEFAULT 0,
-    successful_identifications INT DEFAULT 0,
-    average_time_to_identify_seconds INT DEFAULT 0,
-    mastery_level DECIMAL(3,2) DEFAULT 0.00, 
-    progress_data JSON,
-    last_practice_date DATE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
-    FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE,
-    UNIQUE KEY unique_user_category (user_id, error_category),
-    INDEX idx_mastery (mastery_level DESC),
-    INDEX idx_last_practice (last_practice_date DESC)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- Error Category Statistics - User-specific category performance tracking
-CREATE TABLE IF NOT EXISTS error_category_stats (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id VARCHAR(36) NOT NULL,
-    category VARCHAR(100) NOT NULL,
-    encountered INT DEFAULT 0,
-    identified INT DEFAULT 0,
-    mastery_level DECIMAL(3,2) DEFAULT 0.00,
-    streak_count INT DEFAULT 0,
-    best_streak INT DEFAULT 0,
-    last_encounter_date DATE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
-    FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE,
-    UNIQUE KEY unique_user_category_stats (user_id, category),
-    INDEX idx_mastery_level (mastery_level DESC),
-    INDEX idx_streak (streak_count DESC)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- Error usage statistics table - Enhanced version for better analytics
-CREATE TABLE IF NOT EXISTS error_usage_stats (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    error_id INT NOT NULL,
-    user_id VARCHAR(36),
-    session_id VARCHAR(36),
-    practice_session_id VARCHAR(36) NULL,
-    workflow_id VARCHAR(36) NULL,
-    action_type ENUM('viewed', 'practiced', 'mastered', 'failed', 'skipped', 'reviewed') NOT NULL,
-    action_result ENUM('success', 'failure', 'partial', 'timeout') DEFAULT 'success',
-    time_spent_seconds INT DEFAULT 0,
-    attempts_count INT DEFAULT 1,
-    accuracy_score FLOAT DEFAULT 0.0,
-    difficulty_perceived ENUM('easy', 'medium', 'hard') NULL,
-    context_data JSON,
-    device_type VARCHAR(50),
-    interaction_source VARCHAR(100),
-    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    completed_at TIMESTAMP NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (error_id) REFERENCES java_errors(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE SET NULL,
-    FOREIGN KEY (session_id) REFERENCES user_sessions(session_id) ON DELETE SET NULL,
-    FOREIGN KEY (practice_session_id) REFERENCES practice_sessions(practice_session_id) ON DELETE SET NULL,
-    FOREIGN KEY (workflow_id) REFERENCES workflow_tracking(workflow_id) ON DELETE SET NULL,
-    INDEX idx_error_user_enhanced (error_id, user_id, action_type),
-    INDEX idx_session_enhanced (session_id, created_at),
-    INDEX idx_action_type_enhanced (action_type, action_result),
-    INDEX idx_performance (accuracy_score, time_spent_seconds),
-    INDEX idx_timestamps (started_at, completed_at)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- Error Identification Analysis
-CREATE TABLE IF NOT EXISTS error_identification_analysis (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id VARCHAR(36) NOT NULL,
-    session_id VARCHAR(36),
-    practice_session_id VARCHAR(36),
-    workflow_id VARCHAR(36),
-    error_code VARCHAR(50),
-    review_iteration INT DEFAULT 1,
-    review_text TEXT,
-    identified_correctly BOOLEAN DEFAULT FALSE,
-    time_to_identify_seconds INT DEFAULT 0,
-    confidence_score DECIMAL(3,2), 
-    hint_requests INT DEFAULT 0,
-    llm_analysis_data JSON,
-    analysis_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE,
-    FOREIGN KEY (session_id) REFERENCES user_sessions(session_id) ON DELETE SET NULL,
-    FOREIGN KEY (practice_session_id) REFERENCES practice_sessions(practice_session_id) ON DELETE SET NULL,
-    FOREIGN KEY (workflow_id) REFERENCES workflow_tracking(workflow_id) ON DELETE SET NULL,
-    FOREIGN KEY (error_code) REFERENCES java_errors(error_code) ON DELETE SET NULL,
-    INDEX idx_user_analysis (user_id, analysis_timestamp DESC),
-    INDEX idx_error_analysis (error_code, identified_correctly),
-    INDEX idx_performance (identified_correctly, time_to_identify_seconds)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
-
--- =====================================================
--- Create Views for Analytics
--- =====================================================
-
-
 -- User Performance Summary View
 CREATE VIEW user_performance_summary AS
 SELECT 
@@ -439,15 +197,12 @@ SELECT
     u.reviews_completed,
     u.total_points,
     u.consecutive_days,
-    COUNT(DISTINCT ub.badge_id) as total_badges,
-    COUNT(DISTINCT ps.practice_session_id) as practice_sessions,
+    COUNT(DISTINCT ub.badge_id) as total_badges,    
     AVG(ecs.mastery_level) as avg_mastery,
     (SELECT COUNT(*) FROM user_sessions WHERE user_id = u.uid) as total_sessions,
     COALESCE(SUM(us.session_duration_minutes), 0) as total_time_minutes
 FROM users u
 LEFT JOIN user_badges ub ON u.uid = ub.user_id
-LEFT JOIN practice_sessions ps ON u.uid = ps.user_id
-LEFT JOIN error_category_stats ecs ON u.uid = ecs.user_id
 LEFT JOIN user_sessions us ON u.uid = us.user_id
 GROUP BY u.uid;
 
@@ -486,7 +241,5 @@ SELECT 'Database tables created successfully!' as Status;
 SELECT COUNT(table_name) as Tables_Created 
 FROM information_schema.tables 
 WHERE table_schema = DATABASE() 
-AND table_name IN ('users', 'error_categories', 'java_errors', 'badges', 'user_badges', 'activity_log', 'error_usage_stats', 
-                   'user_sessions', 'user_interactions', 'practice_sessions', 'workflow_tracking', 
-                   'tab_navigation', 'error_identification_analysis', 'learning_path_progress','badge_progress_logs', 'error_category_stats', 'learning_achievements', 'user_engagement_metrics');   
+AND table_name IN ('users', 'error_categories', 'java_errors', 'badges', 'user_badges', 'activity_log', 'user_sessions', 'user_interactions');   
 

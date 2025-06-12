@@ -40,7 +40,7 @@ from ui.utils.main_ui import (
 # Import UI components
 from ui.components.code_generator import CodeGeneratorUI
 from ui.components.code_display import CodeDisplayUI, render_review_tab  
-from ui.components.feedback_system import render_enhanced_feedback_tab
+from ui.components.feedback_system import render_feedback_tab
 from ui.components.auth_ui import AuthUI
 
 from ui.components.tutorial import TutorialUI
@@ -245,7 +245,7 @@ def render_normal_interface(code_generator_ui, workflow, code_display_ui, auth_u
         render_enhanced_review_tab(workflow, code_display_ui, auth_ui)
     
     with tabs[3]:
-        render_enhanced_feedback_tab(workflow, auth_ui)
+        render_feedback_tab(workflow, auth_ui)
         
           
         

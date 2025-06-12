@@ -1,8 +1,5 @@
-# ui/components/code_display.py - FIXED version
-
 """
 Enhanced Code Display UI component for Java Peer Review Training System.
-
 proper session state management.
 """
 
@@ -13,9 +10,9 @@ import datetime
 import re
 from typing import List, Dict, Any, Optional, Callable
 
-from utils.code_utils import add_line_numbers
-from utils.language_utils import t
-from analytics.behavior_tracker import behavior_tracker
+from utils.code_utils import add_line_numbers, _log_user_interaction_code_display
+from utils.language_utils import t, get_current_language
+
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -28,6 +25,7 @@ class CodeDisplayUI:
     
     def __init__(self):
         """Initialize the CodeDisplayUI component."""
+        self.current_language = get_current_language()
         pass
 
     def render_code_display(self, code_snippet, known_problems: List[str] = None, instructor_mode: bool = False) -> None:
@@ -42,7 +40,7 @@ class CodeDisplayUI:
         if not code_snippet:
             self._render_no_code_message()
             return
-
+              
         # Extract and validate code content
         display_code = self._extract_code_content(code_snippet)
         if not display_code:
@@ -185,7 +183,7 @@ class CodeDisplayUI:
         self._render_enhanced_review_guidelines()
         
         # FIXED: Enhanced review input and submission
-        self._render_fixed_review_form(iteration_count, on_submit_callback)
+        self._render_review_form(iteration_count, on_submit_callback)
         
         # Close review container
         st.markdown('</div>', unsafe_allow_html=True)
@@ -334,11 +332,26 @@ class CodeDisplayUI:
             st.markdown(f"### 📝 {t('example_review_format')}")
             st.code(t('review_format_example'), language="text")
     
-    def _render_fixed_review_form(self, iteration_count: int, on_submit_callback: Callable) -> bool:
+    def _render_review_form(self, iteration_count: int, on_submit_callback: Callable) -> bool:
         """       
         Uses session state flags instead of immediate st.rerun() calls.
         """
-        
+        user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
+        code_snippet = getattr(st.session_state.workflow_state, 'code_snippet', None)
+        # Log start of review process
+        if user_id and iteration_count <= 1:  # Only log on first review attempt
+            _log_user_interaction_code_display(
+                user_id=user_id,
+                interaction_type="practice",
+                action="start_review",
+                component="code_review",
+                details={                   
+                    "language": self.current_language,
+                    "iteration": iteration_count,
+                    "review_step": "initial"
+                }
+            )
+            
         # Enhanced form header
         st.markdown(f"""
         <div class="enhanced-input-section-header">
@@ -356,14 +369,14 @@ class CodeDisplayUI:
         clear_button_key = f"clear_review"
         
         # FIXED: Check for success flag and clear input accordingly
-        success_flag = f"review_submitted_success_{iteration_count}"
+        success_flag = f"review_submitted_success"
         if st.session_state.get(success_flag, False):
             # Clear the success flag
             del st.session_state[success_flag]
             # Don't set initial value if review was just submitted
             initial_value = ""
         else:
-            initial_value = st.session_state.get(f"review_draft_{iteration_count}", "")
+            initial_value = st.session_state.get(f"review_draft", "")
         
         # Enhanced review input
         student_review_input = st.text_area(
@@ -378,7 +391,7 @@ class CodeDisplayUI:
         
         # Save draft to session state (for persistence)
         if student_review_input:
-            st.session_state[f"review_draft_{iteration_count}"] = student_review_input
+            st.session_state[f"review_draft"] = student_review_input
         
         # Enhanced buttons with better layout
         st.markdown('<div class="enhanced-button-container">', unsafe_allow_html=True)
@@ -405,16 +418,28 @@ class CodeDisplayUI:
         
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # FIXED: Handle clear button with session state flag - NO RERUN
+        
         if clear_button:
-            # Clear the draft
-            if f"review_draft_{iteration_count}" in st.session_state:
-                del st.session_state[f"review_draft_{iteration_count}"]
+            if f"review_draft" in st.session_state:
+                del st.session_state[f"review_draft"]
             st.info("Review cleared. Please refresh if the text area is not empty.")
             return False
         
-        # FIXED: Handle submit button with better error handling - NO IMMEDIATE RERUN
+        
         if submit_button:
+            _log_user_interaction_code_display(
+                user_id=user_id,
+                interaction_type="practice", 
+                action="submit_review",
+                component="code_review",
+                details={
+                    "review_length": len(student_review_input),
+                    "iteration": iteration_count,
+                    "review_attempt": iteration_count + 1,
+                    "has_content": bool(student_review_input.strip())
+                }
+            )
+           
             return self._process_review_submission(
                 student_review_input, 
                 iteration_count, 
@@ -466,7 +491,7 @@ class CodeDisplayUI:
                             st.session_state[success_flag] = True
                             
                             # Clear the draft
-                            draft_key = f"review_draft_{iteration_count}"
+                            draft_key = f"review_draft"
                             if draft_key in st.session_state:
                                 del st.session_state[draft_key]
                             
@@ -497,7 +522,6 @@ class CodeDisplayUI:
             logger.error(f"Exception in review submission processing: {str(e)}", exc_info=True)
             st.error(f"❌ {t('error')} {t('processing_review')}: {str(e)}")
             return False
-
 
 def render_review_tab(workflow, code_display_ui, auth_ui=None):
     """
@@ -602,9 +626,6 @@ def _extract_known_problems(state) -> List[str]:
     return known_problems
 
 def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
-    """
-    Handle review submission with better state management and NO automatic tab switching.
-    """
     # Get current review state
     state = st.session_state.workflow_state
     current_iteration = getattr(state, 'current_iteration', 1)
@@ -708,7 +729,7 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
                     identified_count = review_analysis.get(t("identified_count"), 0)
                     
                     # Create a unique key to prevent duplicate updates
-                    stats_key = f"review_tab_stats_updated_{current_iteration}_{identified_count}"
+                    stats_key = f"review_tab_stats_updated"
                     
                     if stats_key not in st.session_state:
                         logger.debug(f"Updating stats: accuracy={accuracy:.1f}%, score={identified_count}")
@@ -773,38 +794,27 @@ def _process_student_review_with_comprehensive_tracking(workflow, student_review
                 "max_iterations": max_iterations
             }
             
-            # Update workflow step
-            behavior_tracker.update_workflow_step(
-                user_id=user_id,
-                new_step="review_analysis",
-                step_data={
-                    "review_submitted": True,
-                    "review_iteration": current_iteration,
-                    "review_analysis": review_analysis
-                }
-            )
+            
         
         # Enhanced status tracking with detailed steps
         with st.status(t("processing_review"), expanded=True) as status:
-            
+            if user_id:
+                _log_user_interaction_code_display(
+                    user_id=user_id,
+                    interaction_type="practice",
+                    action="review_analysis_start",
+                    component="code_review",
+                    details={
+                        "analysis_step": "processing",
+                        "review_iteration": current_iteration
+                    }
+                )
             # Validation steps with tracking
             status.update(label="🔍 Validating workflow...", state="running")
             
             if not workflow:
                 error_msg = "No workflow provided"
-                logger.error(error_msg)
-                
-                if user_id:
-                    behavior_tracker.log_interaction(
-                        user_id=user_id,
-                        interaction_type="error",
-                        interaction_category="main_workflow",
-                        component="workflow_validator",
-                        action="workflow_validation_failed",
-                        success=False,
-                        error_message=error_msg
-                    )
-                
+                logger.error(error_msg)                
                 status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
                 st.error(f"❌ {error_msg}")
                 return False
@@ -858,24 +868,22 @@ def _process_student_review_with_comprehensive_tracking(workflow, student_review
                 analysis_start_time = time.time()
                 raw_updated_state = workflow.submit_review(st.session_state.workflow_state, student_review)
                 analysis_duration = time.time() - analysis_start_time
+
+                _log_user_interaction_code_display(
+                    user_id=user_id,
+                    interaction_type="practice",
+                    action="review_analysis_complete",
+                    component="code_review",
+                    details={
+                        "analysis_step": "completed",
+                        "analysis_duration": analysis_duration
+                    }
+                )
                 
                 logger.debug(f"Workflow analysis completed in {analysis_duration:.2f}s")
                 
                 if not raw_updated_state:
                     error_msg = "Workflow returned empty state"
-                    
-                    if user_id:
-                        behavior_tracker.log_interaction(
-                            user_id=user_id,
-                            interaction_type="error",
-                            interaction_category="main_workflow",
-                            component="workflow_execution",
-                            action="workflow_empty_response",
-                            success=False,
-                            error_message=error_msg,
-                            time_spent_seconds=int(analysis_duration)
-                        )
-                    
                     status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
                     st.error(f"❌ {error_msg}")
                     return False
@@ -884,19 +892,6 @@ def _process_student_review_with_comprehensive_tracking(workflow, student_review
                 analysis_duration = time.time() - analysis_start_time
                 error_msg = f"Workflow execution failed: {str(workflow_error)}"
                 logger.error(error_msg, exc_info=True)
-                
-                if user_id:
-                    behavior_tracker.log_interaction(
-                        user_id=user_id,
-                        interaction_type="error",
-                        interaction_category="main_workflow",
-                        component="workflow_execution",
-                        action="workflow_execution_exception",
-                        success=False,
-                        error_message=str(workflow_error),
-                        time_spent_seconds=int(analysis_duration)
-                    )
-                
                 status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
                 st.error(f"❌ {error_msg}")
                 return False
@@ -907,19 +902,6 @@ def _process_student_review_with_comprehensive_tracking(workflow, student_review
             error = getattr(raw_updated_state, 'error', None)
             if error:
                 logger.error(f"Workflow returned error: {error}")
-                
-                if user_id:
-                    behavior_tracker.log_interaction(
-                        user_id=user_id,
-                        interaction_type="error",
-                        interaction_category="main_workflow",
-                        component="workflow_result",
-                        action="workflow_result_error",
-                        success=False,
-                        error_message=error,
-                        time_spent_seconds=int(time.time() - review_start_time)
-                    )
-                
                 status.update(label=f"❌ {t('error')}: {error}", state="error")
                 st.error(f"❌ {error}")
                 return False
@@ -957,68 +939,17 @@ def _process_student_review_with_comprehensive_tracking(workflow, student_review
                             "accuracy_percentage": analysis_results.get(t('identified_percentage'), 0)
                         }
                     }
-                    
-                    behavior_tracker.log_interaction(
-                        user_id=user_id,
-                        interaction_type="success",
-                        interaction_category="main_workflow",
-                        component="review_processor",
-                        action="review_processing_success",
-                        time_spent_seconds=int(total_processing_time),
-                        details=processing_details
-                    )
-                    
-                    # Check for workflow completion
-                    if review_sufficient or current_iteration > getattr(raw_updated_state, 'max_iterations', 3):
-                        behavior_tracker.complete_workflow(
-                            user_id=user_id,
-                            final_results={
-                                "identified_count": analysis_results.get(t('identified_count'), 0),
-                                "total_problems": analysis_results.get(t('total_problems'), 0),
-                                "accuracy": analysis_results.get(t('identified_percentage'), 0),
-                                "iterations_used": current_iteration - 1,
-                                "review_sufficient": review_sufficient,
-                                "total_processing_time": total_processing_time
-                            }
-                        )
                 
                 status.update(label=f"✅ {t('analysis_complete_processed')}", state="complete")
                 return True
             else:
                 logger.warning("Review processing may not have completed properly - no review history found")
-                
-                if user_id:
-                    behavior_tracker.log_interaction(
-                        user_id=user_id,
-                        interaction_type="warning",
-                        interaction_category="main_workflow",
-                        component="review_processor",
-                        action="review_processing_incomplete",
-                        time_spent_seconds=int(total_processing_time),
-                        details={"warning": "No review history found"}
-                    )
-                
                 status.update(label="⚠️ Processing completed with warnings", state="complete")
                 return True
             
-    except Exception as e:
-        total_time = time.time() - review_start_time
+    except Exception as e:        
         error_msg = f"Exception in review processing: {str(e)}"
-        logger.error(error_msg, exc_info=True)
-        
-        # Track processing exception
-        if user_id:
-            behavior_tracker.log_interaction(
-                user_id=user_id,
-                interaction_type="error",
-                interaction_category="main_workflow",
-                component="review_processor",
-                action="review_processing_exception",
-                success=False,
-                error_message=str(e),
-                time_spent_seconds=int(total_time)
-            )
-        
+        logger.error(error_msg, exc_info=True)  
         st.error(f"❌ {error_msg}")
         return False
 

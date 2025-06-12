@@ -5,7 +5,7 @@ This module provides shared functionality for generating prompts,
 extracting code from responses, and handling error comments with improved
 organization, error handling, and type safety.
 """
-
+import streamlit as st
 import re
 import random
 import logging
@@ -14,7 +14,10 @@ from typing import List, Dict, Any, Optional, Tuple, Union
 from dataclasses import dataclass
 
 from utils.language_utils import t, get_llm_prompt_instructions, get_current_language
+from analytics.behavior_tracker import behavior_tracker
 from prompts import get_prompt_template, format_prompt_safely
+import time
+import uuid
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -136,7 +139,6 @@ def get_error_count_from_state(state) -> int:
         logger.error(f"Error getting error count from state: {str(e)}")
         return 0
 
-
 def _get_count_from_evaluation_result(state) -> int:
     """Extract error count from evaluation result."""
     if hasattr(state, 'evaluation_result') and state.evaluation_result:
@@ -145,13 +147,11 @@ def _get_count_from_evaluation_result(state) -> int:
         return len(found_errors) + len(missing_errors)
     return 0
 
-
 def _get_count_from_specific_errors(state) -> int:
     """Extract error count from selected specific errors."""
     if hasattr(state, 'selected_specific_errors') and state.selected_specific_errors:
         return len(state.selected_specific_errors)
     return 0
-
 
 def _get_count_from_code_snippet(state) -> int:
     """Extract error count from code snippet."""
@@ -159,7 +159,6 @@ def _get_count_from_code_snippet(state) -> int:
         hasattr(state.code_snippet, 'known_problems') and state.code_snippet.known_problems):
         return len(state.code_snippet.known_problems)
     return 0
-
 
 def _get_count_from_original_count(state) -> int:
     """Extract error count from original count attribute."""
@@ -415,8 +414,6 @@ def process_llm_response(response) -> str:
         logger.error(f"Error processing LLM response: {str(e)}")
         return ""
 
-
-
 # =============================================================================
 # Error Formatting Functions
 # =============================================================================
@@ -451,7 +448,6 @@ def format_errors_for_prompt(errors: List[Dict[str, Any]], language: str = None)
     
     return "\n\n".join(error_list)
 
-
 def format_problems_for_prompt(problems: List[str]) -> str:
     """
     Format problem list for prompt inclusion.
@@ -466,7 +462,6 @@ def format_problems_for_prompt(problems: List[str]) -> str:
         return t("no_problems_found")
     
     return "\n".join(f"- {problem}" for problem in problems if problem)
-
 
 def get_difficulty_instructions(difficulty_level: str) -> str:
     """
@@ -489,7 +484,6 @@ def get_difficulty_instructions(difficulty_level: str) -> str:
         return get_prompt_template(template_name) or ""
     
     return get_prompt_template("intermediate_instructions") or ""
-
 
 # =============================================================================
 # Prompt Creation Functions
@@ -541,7 +535,6 @@ def create_code_generation_prompt(code_length: str, difficulty_level: str,
         logger.error(f"Error creating code generation prompt: {str(e)}")
         return ""
 
-
 def create_evaluation_prompt(code: str, requested_errors: List[Dict]) -> str:
     """
     Create a prompt for evaluating whether code contains required errors.
@@ -575,7 +568,6 @@ def create_evaluation_prompt(code: str, requested_errors: List[Dict]) -> str:
     except Exception as e:
         logger.error(f"Error creating evaluation prompt: {str(e)}")
         return ""
-
 
 def create_regeneration_prompt(code: str, domain: str, missing_errors: List,
                               found_errors: List, requested_errors: List) -> str:
@@ -614,7 +606,6 @@ def create_regeneration_prompt(code: str, domain: str, missing_errors: List,
         logger.error(f"Error creating regeneration prompt: {str(e)}")
         return ""
 
-
 def create_review_analysis_prompt(code: str, known_problems: List[str], 
                                  student_review: str) -> str:
     """
@@ -650,7 +641,6 @@ def create_review_analysis_prompt(code: str, known_problems: List[str],
     except Exception as e:
         logger.error(f"Error creating review analysis prompt: {str(e)}")
         return ""
-
 
 def create_feedback_prompt(code: str, known_problems: List[str], 
                           review_analysis: Dict[str, Any]) -> str:
@@ -692,7 +682,6 @@ def create_feedback_prompt(code: str, known_problems: List[str],
         logger.error(f"Error creating feedback prompt: {str(e)}")
         return ""
 
-
 def create_comparison_report_prompt(evaluation_errors: List[str], 
                                    review_analysis: Dict[str, Any],
                                    review_history: List = None) -> str:
@@ -729,7 +718,6 @@ def create_comparison_report_prompt(evaluation_errors: List[str],
         logger.error(f"Error creating comparison report prompt: {str(e)}")
         return ""
 
-
 # =============================================================================
 # Helper Functions
 # =============================================================================
@@ -760,7 +748,6 @@ def _format_missing_errors(missing_errors: List) -> str:
     
     return "\n".join(formatted)
 
-
 def _format_found_errors(found_errors: List) -> str:
     """Format found errors for prompt inclusion."""
     if not found_errors:
@@ -781,7 +768,6 @@ def _format_found_errors(found_errors: List) -> str:
             continue
     
     return "\n".join(formatted)
-
 
 def _extract_problems_text(analysis: Dict[str, Any], key: str) -> str:
     """Extract and format problems text from analysis."""
@@ -804,14 +790,12 @@ def _extract_problems_text(analysis: Dict[str, Any], key: str) -> str:
     
     return "\n".join(formatted)
 
-
 def _format_progress_info(review_history: Optional[List]) -> str:
     """Format progress information from review history."""
     if not review_history or len(review_history) <= 1:
         return ""
     
     return f"This is attempt {len(review_history)} of the review process."
-
 
 def _get_category_icon(category_name: str) -> str:
         
@@ -882,6 +866,167 @@ def _get_difficulty_icon(difficulty_name: str) -> str:
         # Default fallback icon
     return "🐛"
 
+def _log_user_interaction_code_display( 
+                         user_id: str,
+                         interaction_type: str,
+                         action: str,
+                         component: str = "code_display_ui",
+                         success: bool = True,
+                         error_message: str = None,
+                         details: Dict[str, Any] = None,
+                         time_spent_seconds: int = None) -> None:
+    """
+    Centralized method to log all user interactions to the database.
+    
+    Args:
+        user_id: The user's ID
+        interaction_type: 'main_workflow' for main workflow interactions
+        action: Specific action taken
+        component: UI component name
+        success: Whether the action was successful
+        error_message: Error message if any
+        details: Additional details about the interaction
+        time_spent_seconds: Time spent on this interaction
+    """
+    try:
+        if not user_id:
+            return
+        
+        # Get or create session ID
+        session_id = st.session_state.get("session_id")
+        if not session_id:
+            session_id = str(uuid.uuid4())
+            st.session_state.session_id = session_id
+        
+        # Prepare context data
+        context_data = {            
+            "current_step": getattr(st.session_state.get("workflow_state"), 'current_step', 'unknown') if hasattr(st.session_state, 'workflow_state') else 'unknown',
+            "current_iteration": getattr(st.session_state.get("workflow_state"), 'current_iteration', 0) if hasattr(st.session_state, 'workflow_state') else 0,
+            "has_code_snippet": hasattr(st.session_state.get("workflow_state"), 'code_snippet') if hasattr(st.session_state, 'workflow_state') else False,
+            "language": get_current_language(),
+            "timestamp": time.time()
+        }
+        
+        # Add any additional details
+        if details:
+            context_data.update(details)
+        
+        # Log through behavior tracker
+        behavior_tracker.log_interaction(
+            user_id=user_id,
+            interaction_type=action,
+            interaction_category=interaction_type,
+            component=component,
+            action=action,
+            details=context_data,
+            time_spent_seconds=time_spent_seconds,
+            success=success,
+            error_message=error_message,
+            context_data=context_data
+        )
+        
+        logger.debug(f"Logged {interaction_type} interaction: {action} for user {user_id}")
+        
+    except Exception as e:
+        logger.error(f"Error logging user interaction: {str(e)}")
+
+def _log_user_interaction_code_generator( 
+                         user_id: str,
+                         interaction_type: str,
+                         action: str,
+                         component: str = "code_generator_ui",
+                         success: bool = True,
+                         error_message: str = None,
+                         details: Dict[str, Any] = None,
+                         time_spent_seconds: int = None) -> None:
+    """
+    Centralized method to log all user interactions to the database.
+    """
+    try:
+        if not user_id:
+            return
+        
+        session_id = st.session_state.get("session_id")
+        if not session_id:
+            session_id = str(uuid.uuid4())
+            st.session_state.session_id = session_id
+        
+        context_data = {            
+            "selected_categories": st.session_state.get("selected_categories", []),
+            "user_level": st.session_state.get("user_level", "medium"),
+            "workflow_step": "generate",
+            "language": get_current_language(),
+            "timestamp": time.time()
+        }
+        
+        if details:
+            context_data.update(details)
+        
+        behavior_tracker.log_interaction(
+            user_id=user_id,
+            interaction_type=action,
+            interaction_category=interaction_type,
+            component=component,
+            action=action,
+            details=context_data,
+            time_spent_seconds=time_spent_seconds,
+            success=success,
+            error_message=error_message,
+            context_data=context_data
+        )
+        
+        logger.debug(f"Logged {interaction_type} interaction: {action} for user {user_id}")
+        
+    except Exception as e:
+        logger.error(f"Error logging user interaction: {str(e)}")
+
+def _log_user_interaction_feedback_system( 
+                         user_id: str,
+                         interaction_type: str,
+                         action: str,
+                         component: str = "feedback_system",
+                         success: bool = True,
+                         error_message: str = None,
+                         details: Dict[str, Any] = None,
+                         time_spent_seconds: int = None) -> None:
+    """
+    Centralized method to log all user interactions to the database.
+    """
+    try:
+        if not user_id:
+            return
+        
+        session_id = st.session_state.get("session_id")
+        if not session_id:
+            session_id = str(uuid.uuid4())
+            st.session_state.session_id = session_id
+        
+        context_data = {          
+            "has_review_history": bool(getattr(st.session_state.get("workflow_state"), 'review_history', [])) if hasattr(st.session_state, 'workflow_state') else False,
+            "language": get_current_language(),
+            "timestamp": time.time()
+        }
+        
+        if details:
+            context_data.update(details)
+        
+        behavior_tracker.log_interaction(
+            user_id=user_id,
+            interaction_type=action,
+            interaction_category=interaction_type,
+            component=component,
+            action=action,
+            details=context_data,
+            time_spent_seconds=time_spent_seconds,
+            success=success,
+            error_message=error_message,
+            context_data=context_data
+        )
+        
+        logger.debug(f"Logged {interaction_type} interaction: {action} for user {user_id}")
+        
+    except Exception as e:
+        logger.error(f"Error logging user interaction: {str(e)}")
 # =============================================================================
 # Validation Functions
 # =============================================================================

@@ -270,9 +270,7 @@ class DatabaseSetup:
             
             # Check tables exist
             required_tables = [
-                'users', 'error_categories', 'java_errors', 'activity_log',
-                'error_usage_stats', 'badges', 'user_badges'
-            ]
+                'users', 'error_categories', 'java_errors', 'activity_log','badges', 'user_badges']
             
             tables_status = {}
             for table in required_tables:

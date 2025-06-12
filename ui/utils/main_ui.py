@@ -311,31 +311,3 @@ def render_professional_sidebar(llm_manager):
         </div>
         """, unsafe_allow_html=True)
 
-def track_tab_change(user_id: str, from_tab_index: int, to_tab_index: int):
-    tab_names = ["Generate", "Review", "Feedback", "Dashboard", "Tutorial"]
-    
-    from_tab = tab_names[from_tab_index] if 0 <= from_tab_index < len(tab_names) else None
-    to_tab = tab_names[to_tab_index] if 0 <= to_tab_index < len(tab_names) else "Unknown"
-    
-    behavior_tracker.track_tab_navigation(
-        user_id=user_id,
-        from_tab=from_tab,
-        to_tab=to_tab,
-        tab_index=to_tab_index,
-        trigger="click"
-    )
-
-def create_enhanced_tabs(tab_labels):
-    user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
-    
-    # Track current tab
-    current_tab = st.session_state.get("active_tab", 0)
-    
-    tabs = st.tabs(tab_labels)
-    
-    # Check if tab changed
-    new_tab = st.session_state.get("active_tab", 0)
-    if user_id and new_tab != current_tab:
-        track_tab_change(user_id, current_tab, new_tab)
-    
-    return tabs
