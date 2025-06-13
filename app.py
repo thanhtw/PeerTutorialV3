@@ -581,8 +581,8 @@ def process_student_review_enhanced(workflow, student_review: str) -> bool:
     """Enhanced review processing with comprehensive tracking and error handling."""
     try:
         # Use the existing processing function but with enhanced error handling
-        from ui.components.code_display import _process_student_review_with_comprehensive_tracking
-        return _process_student_review_with_comprehensive_tracking(workflow, student_review)
+        from ui.components.code_display import _process_student_review
+        return _process_student_review(workflow, student_review)
         
     except Exception as e:
         logger.error(f"Error in enhanced review processing: {str(e)}")

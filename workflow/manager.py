@@ -1,7 +1,8 @@
 """
-Enhanced Workflow Manager for Java Peer Review Training System.
+FIXED: Enhanced Workflow Manager for Java Peer Review Training System.
 
-FIXED: Removed _sanitize_workflow_state method and rely on Pydantic validation.
+FIXED: Separate workflows for code generation and review processing to prevent
+code regeneration during review submissions.
 """
 
 import logging
@@ -29,8 +30,10 @@ logger = logging.getLogger(__name__)
 
 class WorkflowManager:
     """
-    Enhanced manager class for the Java Code Review workflow system.
-    FIXED: Simplified state management by removing manual sanitization.
+    FIXED: Enhanced manager class with separate workflows for code generation and review processing.
+    
+    This prevents code regeneration during review submissions by using dedicated workflows
+    for each phase of the process.
     """
     def __init__(self, llm_manager):
         """
@@ -52,11 +55,16 @@ class WorkflowManager:
         self.workflow_nodes = self._create_workflow_nodes()
         self.conditions = WorkflowConditions()
         
-        # Build and compile the workflow graph
-        self.workflow = self._build_workflow_graph()
-        self._compiled_workflow = None
+        # FIXED: Build separate workflows for different phases
+        self.graph_builder = GraphBuilder(self.workflow_nodes)
+        self.code_generation_workflow = self._build_code_generation_workflow()
+        self.review_workflow = self._build_review_workflow()
         
-        logger.debug("WorkflowManager initialized successfully")
+        # Compiled workflows
+        self._compiled_code_workflow = None
+        self._compiled_review_workflow = None
+        
+        logger.debug("WorkflowManager initialized with separate workflows")
     
     def _initialize_domain_objects(self) -> None:
         """Initialize domain objects with appropriate LLMs."""
@@ -110,12 +118,175 @@ class WorkflowManager:
         
         return nodes
     
-    def _build_workflow_graph(self) -> StateGraph:
-        """Build the workflow graph using the graph builder."""
-        logger.debug("Building workflow graph")
-        self.graph_builder = GraphBuilder(self.workflow_nodes)
-        return self.graph_builder.build_graph()
+    def _build_code_generation_workflow(self) -> StateGraph:
+        """Build the code generation workflow."""
+        logger.debug("Building code generation workflow")
+        return self.graph_builder.build_code_generation_graph()
     
+    def _build_review_workflow(self) -> StateGraph:
+        """Build the review processing workflow."""
+        logger.debug("Building review processing workflow")
+        return self.graph_builder.build_review_graph()
+    
+    def execute_code_generation_workflow(self, workflow_state: WorkflowState) -> WorkflowState:
+        """
+        FIXED: Execute code generation workflow using dedicated code generation graph.
+        """
+        try:
+            logger.debug("Starting code generation workflow")
+            
+            # Set initial step
+            workflow_state.current_step = "generate"
+            # Ensure max attempts are set to prevent infinite loops
+            if not hasattr(workflow_state, 'max_evaluation_attempts') or int(workflow_state.max_evaluation_attempts) <= 0:
+                workflow_state.max_evaluation_attempts = 3
+
+            # Initialize review_sufficient if not set
+            if not hasattr(workflow_state, 'review_sufficient'):
+                workflow_state.review_sufficient = False
+
+            # Validate the state before processing
+            if not self.validate_workflow_state(workflow_state)[0]:
+                is_valid, error_msg = self.validate_workflow_state(workflow_state)
+                workflow_state.error = error_msg
+                return workflow_state
+            
+            # Get the compiled code generation workflow
+            compiled_workflow = self.get_compiled_code_workflow()
+            
+            # Execute the workflow with appropriate configuration
+            config = {"recursion_limit": 20}  # Lower limit for code generation only
+            
+            logger.debug("Invoking LangGraph code generation workflow")
+            raw_result = compiled_workflow.invoke(workflow_state, config)
+            
+            # Convert result (LangGraph returns AddableValuesDict, not WorkflowState)
+            if isinstance(raw_result, WorkflowState):
+                result = raw_result
+                logger.debug("LangGraph returned WorkflowState directly")
+            else:
+                logger.debug(f"LangGraph returned {type(raw_result)}, converting to WorkflowState")
+                result = self._convert_state_to_workflow_state(raw_result)
+            
+            # Validate the result
+            if hasattr(result, 'error') and result.error:
+                logger.error(f"Code generation workflow returned error: {result.error}")
+            else:
+                logger.debug("Code generation workflow completed successfully")
+                
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in code generation workflow: {str(e)}", exc_info=True)
+            workflow_state.error = f"Code generation workflow failed: {str(e)}"
+            return workflow_state
+
+    def execute_review_workflow(self, workflow_state: WorkflowState, student_review: str) -> WorkflowState:
+        """
+        FIXED: Execute review analysis workflow using dedicated review processing graph.
+        This ONLY processes reviews and does NOT regenerate code.
+        """
+        try:
+            logger.debug("=== STARTING REVIEW WORKFLOW (NO CODE REGENERATION) ===")
+            logger.debug(f"Student review length: {len(student_review)}")
+            
+            # Set the pending review for processing
+            workflow_state.pending_review = student_review.strip()
+            workflow_state.current_step = "review"
+            
+            # Ensure review_sufficient is initialized
+            if not hasattr(workflow_state, 'review_sufficient'):
+                workflow_state.review_sufficient = False
+            
+            logger.debug(f"Set pending_review: {workflow_state.pending_review[:50]}...")
+            logger.debug(f"Current iteration: {getattr(workflow_state, 'current_iteration', 1)}")
+            logger.debug(f"Review sufficient: {getattr(workflow_state, 'review_sufficient', False)}")
+            
+            # Validate state for review processing
+            from workflow.conditions import WorkflowConditions
+            if not WorkflowConditions.validate_state_for_review(workflow_state):
+                workflow_state.error = "State validation failed for review processing"
+                return workflow_state
+            
+            # Get compiled review workflow and execute
+            compiled_workflow = self.get_compiled_review_workflow()
+            config = {"recursion_limit": 10}  # Lower limit for review processing only
+            
+            logger.debug("Invoking LangGraph review processing workflow")
+            raw_result = compiled_workflow.invoke(workflow_state, config)
+            
+            # Convert result
+            if isinstance(raw_result, WorkflowState):
+                result = raw_result
+            else:
+                result = self._convert_state_to_workflow_state(raw_result)
+            
+            # Check result
+            review_history = getattr(result, 'review_history', [])
+            review_sufficient = getattr(result, 'review_sufficient', False)
+            
+            logger.debug(f"=== REVIEW WORKFLOW COMPLETE ===")
+            logger.debug(f"Review history entries: {len(review_history)}")
+            logger.debug(f"Review sufficient: {review_sufficient}")
+            
+            if review_history:
+                latest = review_history[-1]
+                has_analysis = hasattr(latest, 'analysis') and latest.analysis
+                logger.debug(f"Latest review has analysis: {has_analysis}")
+                if has_analysis:
+                    analysis = latest.analysis
+                    identified = analysis.get('identified_count', 0)
+                    total = analysis.get('total_problems', 0)
+                    logger.debug(f"Analysis results: {identified}/{total} errors identified")
+            
+            # Clear pending review in result
+            if hasattr(result, 'pending_review'):
+                result.pending_review = None
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in review workflow: {str(e)}")
+            workflow_state.error = f"Review workflow failed: {str(e)}"
+            return workflow_state
+
+    def get_compiled_code_workflow(self):
+        """Get the compiled code generation workflow."""
+        if self._compiled_code_workflow is None:
+            try:
+                logger.debug("Compiling LangGraph code generation workflow")
+                self._compiled_code_workflow = self.code_generation_workflow.compile()
+                logger.debug("Code generation workflow compiled successfully")
+            except Exception as e:
+                logger.error(f"Error compiling code generation workflow: {str(e)}")
+                raise
+        
+        return self._compiled_code_workflow
+
+    def get_compiled_review_workflow(self):
+        """Get the compiled review processing workflow."""
+        if self._compiled_review_workflow is None:
+            try:
+                logger.debug("Compiling LangGraph review processing workflow")
+                self._compiled_review_workflow = self.review_workflow.compile()
+                logger.debug("Review processing workflow compiled successfully")
+            except Exception as e:
+                logger.error(f"Error compiling review processing workflow: {str(e)}")
+                raise
+        
+        return self._compiled_review_workflow
+
+    def get_compiled_workflow(self):
+        """
+        Get the compiled workflow (legacy method for compatibility).
+        Returns the code generation workflow by default.
+        """
+        return self.get_compiled_code_workflow()
+
+    # =================================================================
+    # STATE CONVERSION METHODS (UNCHANGED)
+    # =================================================================
+
     def _safe_get_state_value(self, state, key: str, default=None):
         """
         Safely get a value from AddableValuesDict or other state objects.
@@ -363,31 +534,6 @@ class WorkflowManager:
                     # String fields and others
                     state_dict[field_name] = extracted_value
             
-            # Check for any additional fields in the source state that we might have missed
-            try:
-                if hasattr(state, 'keys'):
-                    source_keys = set(state.keys())
-                elif hasattr(state, '__dict__'):
-                    source_keys = set(state.__dict__.keys())
-                else:
-                    source_keys = set()
-                
-                known_keys = set(all_fields.keys())
-                missing_keys = source_keys - known_keys
-                
-                if missing_keys:
-                    logger.debug(f"Found additional fields in source state: {missing_keys}")
-                    # Add any missing fields to preserve data
-                    for key in missing_keys:
-                        if key not in state_dict:
-                            additional_value = self._safe_get_state_value(state, key)
-                            if additional_value is not None:
-                                logger.debug(f"Preserving additional field: {key}")
-                                # Note: These won't be part of WorkflowState schema, but we log them
-                                
-            except Exception as e:
-                logger.debug(f"Could not check for additional fields: {str(e)}")
-            
             # Create WorkflowState with all extracted data
             try:
                 new_state = WorkflowState(**state_dict)
@@ -406,123 +552,6 @@ class WorkflowManager:
         except Exception as e:
             logger.error(f"Error converting {type(state)} to WorkflowState: {str(e)}", exc_info=True)
             return WorkflowState(error=f"State conversion failed: {str(e)}")
-
-    def execute_code_generation_workflow(self, workflow_state: WorkflowState) -> WorkflowState:
-        """
-        Execute code generation workflow using LangGraph execution.
-        FIXED: Removed manual sanitization, rely on Pydantic validation.
-        """
-        try:
-            logger.debug("Starting code generation workflow")
-            
-            # Set initial step
-            workflow_state.current_step = "generate"
-            # Ensure max attempts are set to prevent infinite loops
-            if not hasattr(workflow_state, 'max_evaluation_attempts') or int(workflow_state.max_evaluation_attempts) <= 0:
-                workflow_state.max_evaluation_attempts = 3
-
-            # Validate the state before processing
-            if not self.validate_workflow_state(workflow_state)[0]:
-                is_valid, error_msg = self.validate_workflow_state(workflow_state)
-                workflow_state.error = error_msg
-                return workflow_state
-            
-            # Get the compiled workflow
-            compiled_workflow = self.get_compiled_workflow()
-            
-            # Execute the workflow with appropriate configuration
-            config = {"recursion_limit": 50}  # Reasonable limit for code generation
-            
-            logger.debug("Invoking LangGraph workflow for code generation")
-            raw_result = compiled_workflow.invoke(workflow_state, config)
-            
-            # Convert result (LangGraph returns AddableValuesDict, not WorkflowState)
-            if isinstance(raw_result, WorkflowState):
-                result = raw_result
-                logger.debug("LangGraph returned WorkflowState directly")
-            else:
-                logger.debug(f"LangGraph returned {type(raw_result)}, converting to WorkflowState")
-                result = self._convert_state_to_workflow_state(raw_result)
-            
-            # Validate the result
-            if hasattr(result, 'error') and result.error:
-                logger.error(f"Code generation workflow returned error: {result.error}")
-            else:
-                logger.debug("Code generation workflow completed successfully")
-                
-            return result
-            
-        except Exception as e:
-            logger.error(f"Error in code generation workflow: {str(e)}", exc_info=True)
-            workflow_state.error = f"Code generation workflow failed: {str(e)}"
-            return workflow_state
-
-    def execute_review_workflow(self, workflow_state: WorkflowState, student_review: str) -> WorkflowState:
-        """Execute review analysis workflow with enhanced debugging."""
-        try:
-            logger.debug("=== STARTING REVIEW WORKFLOW ===")
-            logger.debug(f"Student review length: {len(student_review)}")
-            
-            # Set the pending review
-            workflow_state.pending_review = student_review.strip()
-            workflow_state.current_step = "review"
-            
-            logger.debug(f"Set pending_review: {workflow_state.pending_review[:50]}...")
-            logger.debug(f"Current iteration: {getattr(workflow_state, 'current_iteration', 1)}")
-            
-            # Get compiled workflow and execute
-            compiled_workflow = self.get_compiled_workflow()
-            config = {"recursion_limit": 30}
-            
-            logger.debug("Invoking LangGraph workflow...")
-            raw_result = compiled_workflow.invoke(workflow_state, config)
-            
-            # Convert result
-            if isinstance(raw_result, WorkflowState):
-                result = raw_result
-            else:
-                result = self._convert_state_to_workflow_state(raw_result)
-            
-            # Check result
-            review_history = getattr(result, 'review_history', [])
-            logger.debug(f"=== REVIEW WORKFLOW COMPLETE ===")
-            logger.debug(f"Review history entries: {len(review_history)}")
-            
-            if review_history:
-                latest = review_history[-1]
-                has_analysis = hasattr(latest, 'analysis') and latest.analysis
-                logger.debug(f"Latest review has analysis: {has_analysis}")
-                if has_analysis:
-                    analysis = latest.analysis
-                    identified = analysis.get('identified_count', 0)
-                    total = analysis.get('total_problems', 0)
-                    logger.debug(f"Analysis results: {identified}/{total} errors identified")
-            
-            # Clear pending review in result
-            if hasattr(result, 'pending_review'):
-                result.pending_review = None
-            
-            return result
-            
-        except Exception as e:
-            logger.error(f"Error in review workflow: {str(e)}")
-            workflow_state.error = f"Review workflow failed: {str(e)}"
-            return workflow_state
-
-    def get_compiled_workflow(self):
-        """
-        Get the compiled workflow with enhanced error handling.
-        """
-        if self._compiled_workflow is None:
-            try:
-                logger.debug("Compiling LangGraph workflow")
-                self._compiled_workflow = self.workflow.compile()
-                logger.debug("LangGraph workflow compiled successfully")
-            except Exception as e:
-                logger.error(f"Error compiling workflow: {str(e)}")
-                raise
-        
-        return self._compiled_workflow
 
     def validate_workflow_state(self, state: WorkflowState) -> Tuple[bool, str]:
         """
@@ -570,6 +599,10 @@ class WorkflowManager:
                 
             if hasattr(state, 'max_evaluation_attempts') and int(state.max_evaluation_attempts)  <= 0:
                 return False, "Max evaluation attempts must be a positive integer"
+            
+            # Initialize review_sufficient if not set
+            if not hasattr(state, 'review_sufficient'):
+                state.review_sufficient = False
             
             logger.debug("Workflow state validation passed")
             return True, ""
@@ -645,5 +678,3 @@ class WorkflowManager:
                 "has_code": False,
                 "state_valid": False
             }
-    
-    

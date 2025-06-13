@@ -1,9 +1,9 @@
 """
-Simplified Workflow Nodes for Java Peer Review Training System.
+FIXED: Simplified Workflow Nodes for Java Peer Review Training System.
 
-This module contains the node implementations for the LangGraph workflow,
-with separated review nodes for clearer flow.
-FIXED: Enhanced review processing and better state management for submit button processing.
+This module contains the node implementations with proper separation between
+code generation and review phases, and clear review_sufficient logic.
+FIXED: No code regeneration during review phase, only review analysis.
 """
 
 import logging
@@ -20,10 +20,10 @@ logger = logging.getLogger(__name__)
 
 class WorkflowNodes:
     """
-    Node implementations for the Java Code Review workflow.
+    FIXED: Node implementations for the Java Code Review workflow with clear phase separation.
     
-    This class contains all node handlers with separated review nodes
-    for clearer phase separation and enhanced submit processing.
+    This class contains all node handlers with NO code regeneration during review phase
+    and proper review_sufficient evaluation logic.
     """
     
     def __init__(self, code_generator, code_evaluation, error_repository, llm_logger):
@@ -42,7 +42,7 @@ class WorkflowNodes:
         self.llm_logger = llm_logger
     
     # =================================================================
-    # PHASE 1: CODE GENERATION AND EVALUATION NODES
+    # PHASE 1: CODE GENERATION AND EVALUATION NODES (UNCHANGED)
     # =================================================================
     
     def generate_code_node(self, state: WorkflowState) -> WorkflowState:
@@ -301,71 +301,72 @@ class WorkflowNodes:
             return state
 
     # =================================================================
-    # PHASE 2: REVIEW PHASE NODE (ENHANCED FOR SUBMIT PROCESSING)
+    # PHASE 2: REVIEW PROCESSING NODES (FIXED - NO CODE REGENERATION)
     # =================================================================
     
-    def review_code_node(self, state: WorkflowState) -> WorkflowState:
+    def process_review_node(self, state: WorkflowState) -> WorkflowState:
         """
-        FIXED: Simplified review processing that doesn't duplicate entries.
+        FIXED: Process submitted review - ONLY handles review, NO code regeneration.
         """
         try:
             pending_review = getattr(state, "pending_review", None)
             current_iteration = getattr(state, "current_iteration", 1)
             
-            logger.debug(f"review_code_node: pending={bool(pending_review)}, iteration={current_iteration}")
+            logger.debug(f"PHASE 2: Processing review submission for iteration {current_iteration}")
             
-            # SCENARIO 1: Processing submitted review
-            if pending_review and pending_review.strip():
-                review_text = pending_review.strip()
-                
-                # Ensure review_history exists
-                if not hasattr(state, 'review_history'):
-                    state.review_history = []
-                
-                # Check if this review already exists for current iteration
-                needs_new_entry = True
-                for review in state.review_history:
-                    if review.iteration_number == current_iteration:
-                        # Update existing entry instead of creating new one
-                        review.student_review = review_text
-                        needs_new_entry = False
-                        logger.debug(f"Updated existing review for iteration {current_iteration}")
-                        break
-                
-                if needs_new_entry:
-                    # Create new review entry
-                    review_attempt = ReviewAttempt(
-                        student_review=review_text,
-                        iteration_number=current_iteration,
-                        analysis={},
-                        targeted_guidance=None
-                    )
-                    state.review_history.append(review_attempt)
-                    logger.debug(f"Created new review entry for iteration {current_iteration}")
-                
-                # The pending_review will be cleared in analyze_review_node
+            # Validate we have a pending review
+            if not pending_review or not pending_review.strip():
+                state.error = "No pending review to process"
+                logger.error("process_review_node: No pending review found")
                 return state
             
-            # SCENARIO 2: Initial setup or waiting
-            else:
-                logger.debug("review_code_node: Setting up or waiting for review")
-                state.current_step = "review"
-                return state
+            review_text = pending_review.strip()
+            
+            # Ensure review_history exists
+            if not hasattr(state, 'review_history'):
+                state.review_history = []
+            
+            # Check if this review already exists for current iteration
+            needs_new_entry = True
+            for review in state.review_history:
+                if review.iteration_number == current_iteration:
+                    # Update existing entry instead of creating new one
+                    review.student_review = review_text
+                    needs_new_entry = False
+                    logger.debug(f"Updated existing review for iteration {current_iteration}")
+                    break
+            
+            if needs_new_entry:
+                # Create new review entry
+                review_attempt = ReviewAttempt(
+                    student_review=review_text,
+                    iteration_number=current_iteration,
+                    analysis={},
+                    targeted_guidance=None
+                )
+                state.review_history.append(review_attempt)
+                logger.debug(f"Created new review entry for iteration {current_iteration}")
+            
+            # Clear pending review
+            state.pending_review = None
+            
+            # Set current step for analysis
+            state.current_step = "analyze"
+            
+            logger.debug("PHASE 2: Review processing completed, proceeding to analysis")
+            return state
                 
         except Exception as e:
-            logger.error(f"Error in review_code_node: {str(e)}")
-            state.error = f"Error in review phase: {str(e)}"
+            logger.error(f"Error in process_review_node: {str(e)}")
+            state.error = f"Error processing review: {str(e)}"
             return state
     
     def analyze_review_node(self, state: WorkflowState) -> WorkflowState:
         """
-        FIXED: Clear pending review first, then analyze.
+        FIXED: Analyze student review with proper review_sufficient evaluation.
         """
         try:
-            logger.debug("analyze_review_node: Starting analysis")
-            
-            # CRITICAL: Clear pending review immediately
-            state.pending_review = None
+            logger.debug("PHASE 2: Starting review analysis")
             
             # Validate we have review history
             if not hasattr(state, 'review_history') or not state.review_history:
@@ -387,6 +388,7 @@ class WorkflowNodes:
             
             # Extract known problems for analysis
             known_problems = self._extract_known_problems_for_analysis(state)
+            
             
             # Get evaluator
             evaluator = getattr(self, "evaluator", None)
@@ -419,7 +421,7 @@ class WorkflowNodes:
                     "error": f"Evaluation failed: {str(eval_error)}"
                 }
             
-            # Update analysis with proper metrics
+            # FIXED: Update analysis with proper metrics and review_sufficient evaluation
             original_error_count = getattr(state, 'original_error_count', 1)
             identified_count = analysis.get('identified_count', 0)
             
@@ -432,11 +434,17 @@ class WorkflowNodes:
             analysis['identified_percentage'] = (identified_count / original_error_count) * 100 if original_error_count > 0 else 0
             analysis['accuracy_percentage'] = analysis['identified_percentage']
             
-            # Check if review is sufficient
-            if identified_count >= original_error_count:
-                analysis['review_sufficient'] = True
-                state.review_sufficient = True
-                logger.debug(f"analyze_review_node: All {original_error_count} errors found!")
+            # FIXED: Evaluate review sufficiency using clear criteria
+            from workflow.conditions import WorkflowConditions
+            is_sufficient = WorkflowConditions.evaluate_review_sufficiency(state, analysis)
+            
+            analysis['review_sufficient'] = is_sufficient
+            state.review_sufficient = is_sufficient
+            
+            if is_sufficient:
+                logger.debug(f"REVIEW: Marked as sufficient - {identified_count}/{original_error_count} errors found")
+            else:
+                logger.debug(f"REVIEW: Not sufficient - {identified_count}/{original_error_count} errors found")
             
             # Update the review with analysis
             latest_review.analysis = analysis
@@ -447,7 +455,7 @@ class WorkflowNodes:
                 state.current_iteration = current_iteration + 1
                 logger.debug(f"analyze_review_node: Incremented to iteration {state.current_iteration}")
             
-            # Generate guidance if needed
+            # Generate guidance if needed (only if review not sufficient and more iterations allowed)
             if not state.review_sufficient and state.current_iteration <= max_iterations:
                 try:
                     guidance = evaluator.generate_targeted_guidance(
@@ -464,7 +472,7 @@ class WorkflowNodes:
                     logger.error(f"Failed to generate guidance: {str(guidance_error)}")
                     latest_review.targeted_guidance = None
             
-            logger.debug("analyze_review_node: Analysis completed successfully")
+            logger.debug(f"PHASE 2: Analysis completed successfully. Sufficient: {state.review_sufficient}")
             return state
             
         except Exception as e:
@@ -473,7 +481,7 @@ class WorkflowNodes:
             return state
 
     # =================================================================
-    # PHASE 3: FINAL REPORT GENERATION
+    # PHASE 3: FINAL REPORT GENERATION (UNCHANGED)
     # =================================================================
 
     def generate_comparison_report_node(self, state: WorkflowState) -> WorkflowState:
@@ -486,7 +494,7 @@ class WorkflowNodes:
             # Check if we have review history
             if not hasattr(state, 'review_history') or not state.review_history:
                 logger.warning("No review history found")
-                state.comparison_report = self._generate_fallback_comparison_report(state, None)
+                state.comparison_report = None
                 state.current_step = "complete"
                 return state
                     
@@ -519,13 +527,13 @@ class WorkflowNodes:
                             logger.debug("PHASE 3: Generated comparison report successfully")
                         except Exception as report_error:
                             logger.error(f"Failed to generate comparison report: {str(report_error)}")
-                            state.comparison_report = self._generate_fallback_comparison_report(state, latest_review)
+                            state.comparison_report = None
                     else:
                         # Fallback comparison report
-                        state.comparison_report = self._generate_fallback_comparison_report(state, latest_review)
+                        state.comparison_report = None
                 else:
                     # No evaluation result available
-                    state.comparison_report = self._generate_fallback_comparison_report(state, latest_review)
+                    state.comparison_report = None
             
             # Update state to complete
             state.current_step = "complete"
@@ -538,12 +546,15 @@ class WorkflowNodes:
                         analysis = latest_review.analysis
                         identified_count = analysis.get(t('identified_count'), 0)
                         original_error_count = getattr(state, 'original_error_count', 0)
+                        is_sufficient = getattr(state, 'review_sufficient', False)
                         
                         if original_error_count > 0:
                             percentage = (identified_count / original_error_count) * 100
-                            state.final_summary = f"Review completed: {identified_count}/{original_error_count} errors identified ({percentage:.1f}%)"
+                            suffix = " (Sufficient)" if is_sufficient else " (Needs Improvement)"
+                            state.final_summary = f"Review completed: {identified_count}/{original_error_count} errors identified ({percentage:.1f}%){suffix}"
                         else:
-                            state.final_summary = f"Review completed: {identified_count} errors identified"
+                            suffix = " (Sufficient)" if is_sufficient else " (Needs Improvement)"
+                            state.final_summary = f"Review completed: {identified_count} errors identified{suffix}"
                     else:
                         state.final_summary = "Review workflow completed"
                 else:
@@ -557,6 +568,10 @@ class WorkflowNodes:
             state.error = f"Error generating comparison report: {str(e)}"
             return state
 
+    # =================================================================
+    # HELPER METHODS (UNCHANGED)
+    # =================================================================
+
     def _extract_known_problems_for_analysis(self, state: WorkflowState) -> List[str]:
         """Helper to extract known problems from state."""
         known_problems = []
@@ -568,9 +583,9 @@ class WorkflowNodes:
                 if isinstance(raw_errors, dict) and "java_errors" in raw_errors:
                     for error in raw_errors["java_errors"]:
                         if isinstance(error, dict):
-                            error_name = error.get('error_name', error.get('name', ''))
-                            category = error.get('category', error.get('type', ''))
-                            description = error.get('description', '')
+                            error_name = error.get(t('error_name_variable'), error.get('name', ''))
+                            category = error.get(t('category'), error.get('type', ''))
+                            description = error.get(t('description'), '')
                             known_problems.append(f"{category} - {error_name}: {description}")
             
             logger.debug(f"Extracted {len(known_problems)} known problems for analysis")
@@ -579,43 +594,6 @@ class WorkflowNodes:
             logger.error(f"Error extracting known problems: {str(e)}")
         
         return known_problems
-
-    # =================================================================
-    # HELPER METHODS
-    # =================================================================
-
-    def _generate_fallback_comparison_report(self, state: WorkflowState, latest_review) -> str:
-        """Generate a basic comparison report as fallback."""
-        try:
-            if latest_review and hasattr(latest_review, 'analysis') and latest_review.analysis:
-                analysis = latest_review.analysis
-                identified_count = analysis.get(t('identified_count'), 0)
-                total_problems = analysis.get(t('total_problems'), 0)
-                accuracy = analysis.get(t('identified_percentage'), 0)
-                
-                report = f"""# {t('review_feedback')}
-
-## {t('performance_summary')}
-- {t('issues_identified')}: {identified_count}/{total_problems}
-- {t('accuracy')}: {accuracy:.1f}%
-- {t('review_attempts')}: {len(state.review_history) if hasattr(state, 'review_history') and state.review_history else 0}
-
-## {t('completion_status')}
-{"✅ " + t('all_issues_found') if identified_count == total_problems else "⚠️ " + t('some_issues_missed')}
-
-{t('review_completed_successfully')}
-"""
-            else:
-                report = f"""# {t('review_feedback')}
-
-## {t('completion_status')}
-{t('review_completed_successfully')}
-"""
-            
-            return report
-        except Exception as e:
-            logger.error(f"Error generating fallback report: {str(e)}")
-            return f"# {t('review_feedback')}\n\n{t('error_generating_report')}"
 
     def _process_evaluation_result(self, raw_result, requested_errors, original_error_count):
         """

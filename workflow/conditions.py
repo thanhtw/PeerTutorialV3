@@ -1,9 +1,9 @@
 """
-Schema-compliant Workflow Conditions for Java Peer Review Training System.
+FIXED: Schema-compliant Workflow Conditions for Java Peer Review Training System.
 
-This module contains the conditional logic for determining
-which paths to take in the LangGraph workflow using original condition names.
-FIXED: Enhanced submit processing and better conditional logic for review workflow.
+This module contains the conditional logic with clear separation between
+code generation and review phases, and proper use of review_sufficient.
+FIXED: Clear definition and usage of review_sufficient variable.
 """
 
 import logging
@@ -16,224 +16,188 @@ logger = logging.getLogger(__name__)
 
 class WorkflowConditions:
     """
-    Conditional logic for the Java Code Review workflow.
+    FIXED: Conditional logic for the Java Code Review workflow with clear phase separation.
     
-    This class contains all the conditional functions with clear separation
-    between code generation/evaluation and student review phases, with
-    enhanced submit processing support.
+    This class contains all the conditional functions with enhanced review_sufficient logic
+    and proper separation between code generation and review processing phases.
     """
     
     @staticmethod
-    def should_analyze_or_wait(state: WorkflowState) -> str:
-        """FIXED: Enhanced Review Input Decision with better state validation."""
-        try:
-            pending_review = getattr(state, "pending_review", None)
-            current_iteration = getattr(state, "current_iteration", 1)
-            max_iterations = getattr(state, "max_iterations", 3)
-            review_sufficient = getattr(state, "review_sufficient", False)
-            review_history = getattr(state, "review_history", [])
-            
-            logger.info(f"PHASE 2A Decision - Pending: {'Yes' if pending_review else 'No'}, "
-                        f"Iteration: {current_iteration}/{max_iterations}, "
-                        f"Sufficient: {review_sufficient}, "
-                        f"History: {len(review_history)} entries")
-            
-            # PRIORITY 1: If there's a valid pending review, ALWAYS analyze it
-            if pending_review and pending_review.strip():
-                review_text = pending_review.strip()
-                
-                # Basic validation only - don't be too restrictive
-                if len(review_text) >= 5:  # Reduced from 10
-                    logger.debug("PHASE 2A: Valid pending review found. Proceeding to analysis.")
-                    return "analyze_review"
-                else:
-                    logger.warning("PHASE 2A: Pending review too short")
-                    
-            # PRIORITY 2: Check completion conditions ONLY if no pending review
-            if current_iteration > max_iterations:
-                logger.debug("PHASE 2A: Max iterations exceeded")
-                return "wait_for_review"
-                
-            if review_sufficient:
-                logger.debug("PHASE 2A: Review marked as sufficient")
-                return "wait_for_review"
-                
-            # Check if all errors found
-            if review_history and len(review_history) > 0:
-                latest_review = review_history[-1]
-                if hasattr(latest_review, 'analysis') and latest_review.analysis:
-                    analysis = latest_review.analysis
-                    identified_count = analysis.get('identified_count', 0)
-                    total_problems = analysis.get('total_problems', 0)
-                    
-                    if identified_count >= total_problems and total_problems > 0:
-                        logger.debug("PHASE 2A: All errors found in latest review")
-                        return "wait_for_review"
-            
-            # Default: wait for student input
-            logger.debug("PHASE 2A: No pending review. Waiting for student input.")
-            return "wait_for_review"
-            
-        except Exception as e:
-            logger.error(f"Error in should_analyze_or_wait: {str(e)}")
-            return "wait_for_review"
-    
-    @staticmethod
-    def should_regenerate_or_review(state: WorkflowState) -> str:
+    def should_regenerate_or_complete(state: WorkflowState) -> str:
         """
-        PHASE 1: ENHANCED Code Generation Decision with safeguards.
+        PHASE 1: Code Generation Decision - Complete when code is ready for review.
+        FIXED: This should only handle code generation, not review logic.
         """
         try:
             evaluation_result = getattr(state, "evaluation_result", None)
             evaluation_attempts = getattr(state, "evaluation_attempts", 0)
             max_evaluation_attempts = getattr(state, "max_evaluation_attempts", 3)
-            code_snippet = getattr(state, "code_snippet", None)
-            
-            # ADDED: Check if we already have valid code and shouldn't regenerate
-            if code_snippet and hasattr(code_snippet, 'code') and code_snippet.code:
-                # ENHANCED: Check if code was recently generated (prevent unnecessary regeneration)
-                code_generation_timestamp = getattr(state, "code_generation_timestamp", None)
-                if code_generation_timestamp:
-                    import time
-                    current_time = time.time()
-                    # If code was generated within last 30 seconds, don't regenerate unless explicitly needed
-                    if current_time - code_generation_timestamp < 30:
-                        logger.debug("CODE GENERATION: Recent code exists, checking if regeneration is truly needed")
-                        
-                        # Only regenerate if there are specific missing errors and we haven't hit max attempts
-                        if evaluation_result:
-                            missing_errors = evaluation_result.get(t("missing_errors"), [])
-                            if len(missing_errors) == 0:
-                                logger.debug("CODE GENERATION: No missing errors, proceeding to review")
-                                return "review_code"
-                            elif evaluation_attempts >= max_evaluation_attempts:
-                                logger.debug("CODE GENERATION: Max attempts reached, proceeding to review despite missing errors")
-                                return "review_code"
             
             logger.debug(f"CODE GENERATION DECISION: "
                         f"valid={evaluation_result.get(t('valid'), False) if evaluation_result else False}, "
                         f"attempts={evaluation_attempts}/{max_evaluation_attempts}")
             
-            # ENHANCED: Check max attempts FIRST with better logging
+            # Check max attempts FIRST
             if evaluation_attempts >= max_evaluation_attempts:
                 logger.debug(f"CODE GENERATION: Max attempts ({max_evaluation_attempts}) reached. "
-                           f"Proceeding to review phase regardless of evaluation result.")
-                # ADDED: Mark generation as completed to prevent re-entry
-                state.code_generation_completed = True
-                return "review_code"
+                           f"Code generation complete.")
+                return "complete"
             
-            # ENHANCED: Validation check with better error handling
+            # Check evaluation result
             if evaluation_result:
                 is_valid = evaluation_result.get(t("valid"), False)
                 missing_errors = evaluation_result.get(t("missing_errors"), [])
-                found_errors = evaluation_result.get(t("found_errors"), [])
-                
-                logger.debug(f"CODE GENERATION: Found {len(found_errors)} errors, missing {len(missing_errors)}")
                 
                 if is_valid or len(missing_errors) == 0:
-                    logger.debug("CODE GENERATION: Evaluation passed. Starting review phase.")
-                    # ADDED: Set timestamp to track when we moved to review
-                    import time
-                    state.review_phase_started = time.time()
-                    return "review_code"
+                    logger.debug("CODE GENERATION: Evaluation passed. Code ready for review.")
+                    return "complete"
                 
-                # Check if we should regenerate
+                # Need regeneration if missing errors and under max attempts
                 if len(missing_errors) > 0 and evaluation_attempts < max_evaluation_attempts:
-                    logger.debug(f"CODE GENERATION: Missing {len(missing_errors)} errors. "
-                               f"Regenerating (attempt {evaluation_attempts + 1}/{max_evaluation_attempts})")
+                    logger.debug(f"CODE GENERATION: Missing {len(missing_errors)} errors. Regenerating.")
                     return "regenerate_code"
             
-            # ENHANCED: Better fallback logic
-            logger.debug("CODE GENERATION: No clear evaluation result, defaulting to review phase")
-            return "review_code"
+            # Default to complete (safety fallback)
+            logger.debug("CODE GENERATION: No clear evaluation result, completing generation")
+            return "complete"
             
         except Exception as e:
-            logger.error(f"Error in should_regenerate_or_review: {str(e)}")
-            # Safe fallback to prevent infinite loops
-            return "review_code"
-
+            logger.error(f"Error in should_regenerate_or_complete: {str(e)}")
+            return "complete"
+    
     @staticmethod
-    def should_continue_review(state: WorkflowState) -> str:
+    def should_continue_review_or_complete(state: WorkflowState) -> str:
         """
-        PHASE 2: ENHANCED Student Review Decision with completion safeguards.
+        PHASE 2: Review Decision - FIXED with clear review_sufficient logic.
+        
+        review_sufficient is set to True when:
+        1. Student has identified ALL errors in the code, OR
+        2. Student has identified a sufficient percentage (e.g., 80%+) of errors
+        
+        This method determines whether to continue waiting for more reviews
+        or to generate the final comparison report.
         """
         try:
             current_iteration = getattr(state, "current_iteration", 1)
             max_iterations = getattr(state, "max_iterations", 3)
             review_sufficient = getattr(state, "review_sufficient", False)
             review_history = getattr(state, "review_history", [])
-            workflow_completed = getattr(state, "workflow_completed", False)
+            original_error_count = getattr(state, "original_error_count", 0)
             
-            logger.debug(f"STUDENT REVIEW DECISION: "
+            logger.debug(f"REVIEW DECISION: "
                          f"iteration={current_iteration}/{max_iterations}, "
                          f"sufficient={review_sufficient}, "
                          f"review_count={len(review_history)}, "
-                         f"completed={workflow_completed}")
-         
-            # ADDED: Check if workflow is already marked as completed
-            if workflow_completed:
-                logger.debug("STUDENT REVIEW: Workflow already completed.")
-                return "generate_comparison_report"
-         
-            # ENHANCED: Check max iterations with better validation
-            if current_iteration > max_iterations:
-                logger.debug(f"STUDENT REVIEW: Max iterations ({max_iterations}) reached.")
-                state.workflow_completed = True
-                return "generate_comparison_report"
-         
-            # ENHANCED: Check if review is marked as sufficient
+                         f"original_errors={original_error_count}")
+            
+            # PRIORITY 1: Check if review is marked as sufficient
             if review_sufficient:
-                logger.debug("STUDENT REVIEW: Review marked as sufficient.")
-                state.workflow_completed = True
+                logger.debug("REVIEW: Review marked as sufficient. Generating final report.")
                 return "generate_comparison_report"
             
-            # ENHANCED: Check for completion based on review analysis
+            # PRIORITY 2: Check max iterations reached
+            if current_iteration > max_iterations:
+                logger.debug(f"REVIEW: Max iterations ({max_iterations}) reached. Generating final report.")
+                return "generate_comparison_report"
+            
+            # PRIORITY 3: Check if all errors found in latest review
             if review_history and len(review_history) > 0:
                 latest_review = review_history[-1]
-
                 if hasattr(latest_review, "analysis") and latest_review.analysis:
                     analysis = latest_review.analysis
                     identified_count = analysis.get(t("identified_count"), 0)
-                    total_problems = analysis.get(t("total_problems"), 0)
+                    total_problems = analysis.get(t("total_problems"), original_error_count)
                     
-                    # ENHANCED: More robust completion check
-                    if identified_count >= total_problems and total_problems > 0:              
+                    # FIXED: Clear definition of when review is sufficient
+                    if identified_count >= total_problems and total_problems > 0:
+                        logger.debug(f"REVIEW: All {total_problems} errors found. Review sufficient!")
+                        # Mark as sufficient for future checks
                         state.review_sufficient = True
-                        state.workflow_completed = True
-                        logger.debug(f"STUDENT REVIEW: All {total_problems} issues identified. Generating report.")
                         return "generate_comparison_report"
-                    else:
-                        logger.debug(f"STUDENT REVIEW: Progress - {identified_count}/{total_problems} identified")
+                    
+                    # Optional: Consider review sufficient if high percentage found
+                    if total_problems > 0:
+                        accuracy_percentage = (identified_count / total_problems) * 100
+                        if accuracy_percentage >= 90.0:  # 90% threshold for sufficient review
+                            logger.debug(f"REVIEW: High accuracy ({accuracy_percentage:.1f}%). Review sufficient!")
+                            state.review_sufficient = True
+                            return "generate_comparison_report"
+                        else:
+                            logger.debug(f"REVIEW: Progress - {identified_count}/{total_problems} "
+                                       f"({accuracy_percentage:.1f}%) identified")
             
-            # ENHANCED: Continuation logic with safeguards
+            # Continue waiting for more reviews
             if current_iteration <= max_iterations and not review_sufficient:
-                # ADDED: Additional check to prevent infinite loops
-                review_phase_started = getattr(state, "review_phase_started", None)
-                if review_phase_started:
-                    import time
-                    current_time = time.time()
-                    # If we've been in review phase for more than 10 minutes, force completion
-                    if current_time - review_phase_started > 600:  # 10 minutes
-                        logger.warning("STUDENT REVIEW: Review phase timeout. Forcing completion.")
-                        state.workflow_completed = True
-                        return "generate_comparison_report"
-                
-                logger.debug(f"STUDENT REVIEW: Continuing review phase (iteration {current_iteration}/{max_iterations})")
+                logger.debug(f"REVIEW: Continuing review phase (iteration {current_iteration}/{max_iterations})")
                 return "continue_review"
             else:
-                logger.debug("STUDENT REVIEW: Conditions met for completion. Generating report.")
-                state.workflow_completed = True
+                logger.debug("REVIEW: Conditions met for completion. Generating report.")
                 return "generate_comparison_report"
                 
         except Exception as e:
-            logger.error(f"Error in should_continue_review: {str(e)}")
-            # Safe fallback to prevent infinite loops
+            logger.error(f"Error in should_continue_review_or_complete: {str(e)}")
+            # Safe fallback
             return "generate_comparison_report"
     
-    @staticmethod 
+    @staticmethod
+    def evaluate_review_sufficiency(state: WorkflowState, analysis: Dict[str, Any]) -> bool:
+        """
+        HELPER: Evaluate if a review is sufficient based on analysis results.
+        
+        FIXED: Clear definition of review_sufficient criteria:
+        - Student found ALL errors (100% accuracy), OR
+        - Student found 90%+ of errors (high accuracy threshold)
+        
+        Args:
+            state: Current workflow state
+            analysis: Review analysis results
+            
+        Returns:
+            bool: True if review is sufficient, False otherwise
+        """
+        try:
+            identified_count = analysis.get(t("identified_count"), 0)
+            total_problems = analysis.get(t("total_problems"), 0)
+            original_error_count = getattr(state, "original_error_count", 0)
+            
+            # Use original_error_count as the authoritative source
+            if original_error_count > 0:
+                total_problems = original_error_count
+            
+            if total_problems <= 0:
+                logger.warning("No total problems to evaluate against")
+                return False
+            
+            # Calculate accuracy
+            accuracy_percentage = (identified_count / total_problems) * 100
+            
+            # FIXED: Clear sufficiency criteria
+            is_sufficient = False
+            
+            # Criterion 1: All errors found (100% accuracy)
+            if identified_count >= total_problems:
+                is_sufficient = True
+                logger.debug(f"Review sufficient: All {total_problems} errors found (100%)")
+            
+            # Criterion 2: High accuracy threshold (90%+)
+            elif accuracy_percentage >= 90.0:
+                is_sufficient = True
+                logger.debug(f"Review sufficient: High accuracy ({accuracy_percentage:.1f}% >= 90%)")
+            
+            else:
+                logger.debug(f"Review not sufficient: {identified_count}/{total_problems} "
+                           f"({accuracy_percentage:.1f}%) - needs 90%+ or all errors")
+            
+            return is_sufficient
+            
+        except Exception as e:
+            logger.error(f"Error evaluating review sufficiency: {str(e)}")
+            return False
+    
+    @staticmethod
     def validate_state_for_review(state: WorkflowState) -> bool:
         """
-        ENHANCED: Validate state with additional consistency checks.
+        ENHANCED: Validate state for review processing.
         """
         try:
             validation_errors = []
@@ -249,18 +213,6 @@ class WorkflowConditions:
             if original_error_count <= 0:
                 validation_errors.append("No valid original error count")
             
-            # ADDED: Check for evaluation result consistency
-            evaluation_result = getattr(state, 'evaluation_result', None)
-            if evaluation_result:
-                found_errors = evaluation_result.get(t('found_errors'), [])
-                missing_errors = evaluation_result.get(t('missing_errors'), [])
-                total_evaluation_errors = len(found_errors) + len(missing_errors)
-                
-                # Warn if there's a mismatch (but don't fail validation)
-                if total_evaluation_errors != original_error_count:
-                    logger.warning(f"Evaluation error count ({total_evaluation_errors}) "
-                                 f"doesn't match original ({original_error_count})")
-            
             # Check iteration settings with auto-correction
             max_iterations = getattr(state, 'max_iterations', 0)
             if max_iterations <= 0:
@@ -272,7 +224,12 @@ class WorkflowConditions:
                 logger.warning("Invalid current_iteration, setting to default (1)")
                 state.current_iteration = 1
             
-            # ADDED: Validate review history consistency
+            # FIXED: Initialize review_sufficient if not set
+            if not hasattr(state, 'review_sufficient'):
+                state.review_sufficient = False
+                logger.debug("Initialized review_sufficient to False")
+            
+            # Validate review history consistency
             review_history = getattr(state, 'review_history', [])
             if review_history:
                 for i, review in enumerate(review_history):
@@ -296,13 +253,7 @@ class WorkflowConditions:
     @staticmethod
     def get_review_progress_info(state: WorkflowState) -> Dict[str, Any]:
         """
-        HELPER: Get current review progress information.
-        
-        Args:
-            state: Current workflow state
-            
-        Returns:
-            Dictionary with progress information
+        HELPER: Get current review progress information with review_sufficient status.
         """
         try:
             current_iteration = getattr(state, "current_iteration", 1)
@@ -310,16 +261,24 @@ class WorkflowConditions:
             review_history = getattr(state, "review_history", [])
             review_sufficient = getattr(state, "review_sufficient", False)
             pending_review = getattr(state, "pending_review", None)
+            original_error_count = getattr(state, "original_error_count", 0)
             
             # Calculate progress
             progress_percentage = ((current_iteration - 1) / max_iterations) * 100
             
             # Get latest analysis if available
             latest_analysis = None
+            accuracy_percentage = 0
+            identified_count = 0
+            
             if review_history and len(review_history) > 0:
                 latest_review = review_history[-1]
                 if hasattr(latest_review, 'analysis'):
                     latest_analysis = latest_review.analysis
+                    identified_count = latest_analysis.get(t("identified_count"), 0)
+                    total_problems = latest_analysis.get(t("total_problems"), original_error_count)
+                    if total_problems > 0:
+                        accuracy_percentage = (identified_count / total_problems) * 100
             
             progress_info = {
                 "current_iteration": current_iteration,
@@ -329,15 +288,11 @@ class WorkflowConditions:
                 "has_pending_review": bool(pending_review and pending_review.strip()),
                 "progress_percentage": progress_percentage,
                 "latest_analysis": latest_analysis,
-                "can_continue": current_iteration <= max_iterations and not review_sufficient
+                "can_continue": current_iteration <= max_iterations and not review_sufficient,
+                "original_error_count": original_error_count,
+                "identified_count": identified_count,
+                "accuracy_percentage": accuracy_percentage
             }
-            
-            if latest_analysis:
-                progress_info.update({
-                    "identified_count": latest_analysis.get(t("identified_count"), 0),
-                    "total_problems": latest_analysis.get(t("total_problems"), 0),
-                    "accuracy_percentage": latest_analysis.get(t("identified_percentage"), 0)
-                })
             
             return progress_info
             

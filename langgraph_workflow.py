@@ -1,9 +1,9 @@
 """
-Simplified LangGraph Workflow for Java Peer Review Training System.
+FIXED: Simplified LangGraph Workflow for Java Peer Review Training System.
 
-This module implements the code review workflow as a LangGraph graph
-by leveraging the modular components from the workflow package.
-FIXED: Submit button now properly uses LangGraph workflow execution.
+This module implements the code review workflow using the fixed workflow manager
+with separate workflows for code generation and review processing.
+FIXED: Submit button now uses dedicated review workflow (no code regeneration).
 """
 
 __all__ = ['JavaCodeReviewGraph']
@@ -19,7 +19,6 @@ from workflow.manager import WorkflowManager
 from workflow.conditions import WorkflowConditions
 from utils.language_utils import t
 
-
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -30,11 +29,11 @@ logger = logging.getLogger(__name__)
 
 class JavaCodeReviewGraph:
     """
-    Simplified LangGraph implementation of the Java Code Review workflow.
+    FIXED: Simplified LangGraph implementation using separate workflows.
     
     This class provides a clean interface to the LangGraph workflow
-    with straightforward execution methods.
-    FIXED: Now properly uses LangGraph workflow execution for review processing.
+    with dedicated workflows for code generation and review processing.
+    FIXED: Review submissions no longer trigger code regeneration.
     """
     
     def __init__(self, llm_manager=None):
@@ -53,14 +52,11 @@ class JavaCodeReviewGraph:
         self.workflow_nodes = self.workflow_manager.workflow_nodes
         self.conditions = WorkflowConditions()
         
-        # Get the compiled workflow
-        self._compiled_workflow = self.workflow_manager.get_compiled_workflow()
-        
-        logger.debug("JavaCodeReviewGraph initialized successfully")
+        logger.debug("JavaCodeReviewGraph initialized with fixed workflow manager")
     
     def execute_code_generation(self, state: WorkflowState) -> WorkflowState:
         """
-        Execute code generation workflow.
+        FIXED: Execute code generation workflow using dedicated code generation graph.
         
         Args:
             state: Current workflow state
@@ -69,7 +65,7 @@ class JavaCodeReviewGraph:
             Updated workflow state after code generation and evaluation
         """
         try:
-            logger.debug("Executing code generation")
+            logger.debug("Executing code generation using dedicated workflow")
             
             # Validate the workflow state before proceeding
             is_valid, error_message = self.workflow_manager.validate_workflow_state(state)
@@ -81,7 +77,7 @@ class JavaCodeReviewGraph:
             # Set initial step
             state.current_step = "generate"
             
-            # Execute using the workflow manager
+            # FIXED: Execute using dedicated code generation workflow
             result = self.workflow_manager.execute_code_generation_workflow(state)
             
             # Log the workflow status
@@ -99,8 +95,7 @@ class JavaCodeReviewGraph:
     
     def submit_review(self, state: WorkflowState, student_review: str) -> WorkflowState:
         """
-        Submit a student review and update the state using proper LangGraph workflow execution.
-        FIXED: Now uses workflow manager instead of directly calling nodes.
+        FIXED: Submit a student review using dedicated review workflow (NO code regeneration).
         
         Args:
             state: Current workflow state
@@ -125,13 +120,16 @@ class JavaCodeReviewGraph:
                 state.error = "Student review too short (minimum 10 characters)"
                 return state
             
-            # FIXED: Use workflow manager to execute review workflow instead of direct node call
-            logger.debug("Executing review workflow through WorkflowManager")
+            # FIXED: Use dedicated review workflow (no code regeneration)
+            logger.debug("Executing review workflow through WorkflowManager (NO CODE REGENERATION)")
             updated_state = self.workflow_manager.execute_review_workflow(state, review_text)
             
             # Check if this is the last iteration or review is sufficient
-            if (updated_state.current_iteration > updated_state.max_iterations or 
-                updated_state.review_sufficient):
+            review_sufficient = getattr(updated_state, 'review_sufficient', False)
+            current_iteration = getattr(updated_state, 'current_iteration', 1)
+            max_iterations = getattr(updated_state, 'max_iterations', 3)
+            
+            if (current_iteration > max_iterations or review_sufficient):
                 # Generate comparison report for feedback tab
                 self._generate_review_feedback(updated_state)
             
@@ -146,7 +144,6 @@ class JavaCodeReviewGraph:
     def _generate_review_feedback(self, state: WorkflowState) -> None:
         """
         Generate feedback for review completion with proper language support.
-        Now also updates category statistics.
         
         Args:
             state: Current workflow state
@@ -158,14 +155,18 @@ class JavaCodeReviewGraph:
                 
         # Get latest review
         latest_review = state.review_history[-1]       
+        
         # Generate comparison report if not already generated
         if not state.comparison_report and state.evaluation_result:
             try:
                 logger.debug(t("generating_comparison_report"))
+                
                 # Extract error information from evaluation results
                 found_errors = state.evaluation_result.get(t('found_errors'), [])                
+                
                 # Get original error count for consistent metrics
                 original_error_count = state.original_error_count                
+                
                 # Update the analysis with the original error count if needed
                 if original_error_count > 0 and "original_error_count" not in latest_review.analysis:
                     latest_review.analysis["original_error_count"] = original_error_count
@@ -185,18 +186,19 @@ class JavaCodeReviewGraph:
                         "targeted_guidance": review.targeted_guidance
                     })
                         
-                if hasattr(self, "evaluator") and self.evaluator:
-                    state.comparison_report = self.evaluator.generate_comparison_report(
+                if hasattr(self.workflow_nodes, "evaluator") and self.workflow_nodes.evaluator:
+                    state.comparison_report = self.workflow_nodes.evaluator.generate_comparison_report(
                         found_errors,
                         latest_review.analysis,
                         converted_history
                     )
                     logger.debug(t("generated_comparison_report"))
                 
+                # Update user statistics if authenticated
                 if "auth" in st.session_state and st.session_state.auth.get("is_authenticated", False):
                     user_id = st.session_state.auth.get("user_id")
                     if user_id:
-                        # Check if badge manager is available
+                        # Update category statistics for badge tracking
                         try:
                             from analytics.badge_manager import BadgeManager
                             badge_manager = BadgeManager()
@@ -240,7 +242,6 @@ class JavaCodeReviewGraph:
                             logger.warning("Badge manager not available")
                         except Exception as e:
                             logger.error(f"Error updating category stats: {str(e)}")
-                
                     
             except Exception as e:
                 logger.error(f"{t('error')} {t('generating_comparison_report')}: {str(e)}")
@@ -259,8 +260,8 @@ class JavaCodeReviewGraph:
         return self.workflow_manager.get_workflow_status(state)
     
     def get_compiled_workflow(self):
-        """Get the compiled LangGraph workflow."""
-        return self._compiled_workflow
+        """Get the compiled LangGraph workflow (returns code generation workflow for compatibility)."""
+        return self.workflow_manager.get_compiled_workflow()
     
     def reset_workflow_state(self, state: WorkflowState) -> WorkflowState:
         """Reset the workflow state for a fresh start."""
@@ -273,7 +274,7 @@ class JavaCodeReviewGraph:
             state.code_snippet = None
             state.review_history = []
             state.current_iteration = 1
-            state.review_sufficient = False
+            state.review_sufficient = False  # FIXED: Properly reset review_sufficient
             state.comparison_report = None
             state.pending_review = None
             state.error = None

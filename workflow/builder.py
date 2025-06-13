@@ -1,9 +1,9 @@
 """
-Schema-compliant Workflow Builder for Java Peer Review Training System.
+FIXED: Schema-compliant Workflow Builder for Java Peer Review Training System.
 
-This module provides the GraphBuilder class that works with the existing
-WorkflowState schema constraints while maintaining logical separation.
-FIXED: Uses existing schema step names to avoid validation errors.
+This module provides the GraphBuilder class with dynamic entry points to prevent
+unnecessary code regeneration during review phase.
+FIXED: Separate entry points for code generation and review phases.
 """
 
 import logging
@@ -19,10 +19,10 @@ logger = logging.getLogger(__name__)
 
 class GraphBuilder:
     """
-    Builder for the Java Code Review workflow graph that complies with existing schema.
+    FIXED: Builder for the Java Code Review workflow graph with dynamic entry points.
     
-    This class builds the workflow using existing allowed step names while
-    maintaining the logical separation between code generation and review phases.
+    This class builds separate workflows for code generation and review phases
+    to prevent unnecessary code regeneration during review submissions.
     """
     
     def __init__(self, workflow_nodes: WorkflowNodes):
@@ -35,109 +35,88 @@ class GraphBuilder:
         self.workflow_nodes = workflow_nodes
         self.conditions = WorkflowConditions()
     
-    def build_graph(self) -> StateGraph:
+    def build_code_generation_graph(self) -> StateGraph:
         """
-        Build the complete LangGraph workflow using existing schema step names.
+        Build the code generation workflow (Phase 1 only).
         
         Returns:
-            StateGraph: The constructed workflow graph
+            StateGraph: The code generation workflow graph
         """
-        logger.debug("Building schema-compliant workflow graph")
+        logger.debug("Building code generation workflow graph")
         
         # Create a new graph with our state schema
         workflow = StateGraph(WorkflowState)
         
-        # Add all nodes to the graph
-        self._add_nodes(workflow)
-        
-        # Add standard edges to the graph
-        self._add_standard_edges(workflow)
-        
-        # Add conditional edges to the graph
-        self._add_conditional_edges(workflow)
-        
-        # Set the entry point
-        workflow.set_entry_point("generate_code")
-        
-        logger.debug("Schema-compliant workflow graph construction completed")
-        return workflow
-    
-    def _add_nodes(self, workflow: StateGraph) -> None:
-        """
-        Add all nodes to the workflow graph using existing schema-compliant names.
-        
-        Args:
-            workflow: StateGraph to add nodes to
-        """
-        # Code generation and evaluation phase nodes
+        # Add code generation nodes
         workflow.add_node("generate_code", self.workflow_nodes.generate_code_node)
         workflow.add_node("evaluate_code", self.workflow_nodes.evaluate_code_node)
         workflow.add_node("regenerate_code", self.workflow_nodes.regenerate_code_node)
         
-        # Review phase nodes - using existing schema names
-        workflow.add_node("review_code", self.workflow_nodes.review_code_node)  # Combined review handling
-        workflow.add_node("analyze_review", self.workflow_nodes.analyze_review_node)
-        
-        # Final phase node
-        workflow.add_node("generate_comparison_report", self.workflow_nodes.generate_comparison_report_node)
-        
-        logger.debug("Added all nodes to workflow graph with schema compliance")
-    
-    def _add_standard_edges(self, workflow: StateGraph) -> None:
-        """
-        Add standard (non-conditional) edges to the workflow graph.
-        
-        Args:
-            workflow: StateGraph to add edges to
-        """
-        # Code generation/evaluation phase edges
+        # Add edges for code generation phase
         workflow.add_edge("generate_code", "evaluate_code")
         workflow.add_edge("regenerate_code", "evaluate_code")
         
-        # Review phase edges - REMOVED automatic edge to prevent loops
-        # workflow.add_edge("review_code", "analyze_review")  # This caused the infinite loop!
-        
-        # Final edge
-        workflow.add_edge("generate_comparison_report", END)
-        
-        logger.debug("Added standard edges to workflow graph")
-    
-    def _add_conditional_edges(self, workflow: StateGraph) -> None:
-        """
-        Add conditional edges to the workflow graph with schema compliance.
-        
-        Args:
-            workflow: StateGraph to add conditional edges to
-        """
-        # PHASE 1: Code Generation/Evaluation Flow
+        # Add conditional edge for regeneration or completion
         workflow.add_conditional_edges(
             "evaluate_code",
-            self.conditions.should_regenerate_or_review,
+            self.conditions.should_regenerate_or_complete,
             {
                 "regenerate_code": "regenerate_code",
-                "review_code": "review_code"
+                "complete": END  # End when code generation is complete
             }
         )
         
-        # PHASE 2A: Review Setup and Input Handling
-        # Only proceed to analysis when there's a pending review, otherwise END workflow
-        workflow.add_conditional_edges(
-            "review_code",
-            self.conditions.should_analyze_or_wait,
-            {
-                "analyze_review": "analyze_review",  # Student submitted review
-                "wait_for_review": END               # Wait for student input (END workflow)
-            }
-        )
+        # Set entry point for code generation
+        workflow.set_entry_point("generate_code")
         
-        # PHASE 2B: Review Analysis and Continuation
+        logger.debug("Code generation workflow graph construction completed")
+        return workflow
+    
+    def build_review_graph(self) -> StateGraph:
+        """
+        Build the review processing workflow (Phase 2 only).
+        
+        Returns:
+            StateGraph: The review processing workflow graph
+        """
+        logger.debug("Building review processing workflow graph")
+        
+        # Create a new graph with our state schema
+        workflow = StateGraph(WorkflowState)
+        
+        # Add review processing nodes
+        workflow.add_node("process_review", self.workflow_nodes.process_review_node)
+        workflow.add_node("analyze_review", self.workflow_nodes.analyze_review_node)
+        workflow.add_node("generate_comparison_report", self.workflow_nodes.generate_comparison_report_node)
+        
+        # Add edges for review phase
+        workflow.add_edge("process_review", "analyze_review")
+        
+        # Add conditional edge for review continuation or completion
         workflow.add_conditional_edges(
             "analyze_review",
-            self.conditions.should_continue_review,
+            self.conditions.should_continue_review_or_complete,
             {
-                "continue_review": "review_code",
+                "continue_review": END,  # Wait for next review submission
                 "generate_comparison_report": "generate_comparison_report"
             }
         )
         
-        logger.debug("Added conditional edges to workflow graph with schema compliance")
+        # Add final edge
+        workflow.add_edge("generate_comparison_report", END)
+        
+        # Set entry point for review processing
+        workflow.set_entry_point("process_review")
+        
+        logger.debug("Review processing workflow graph construction completed")
+        return workflow
+    
+    def build_graph(self) -> StateGraph:
+        """
+        Build the complete LangGraph workflow (legacy method for compatibility).
+        This is mainly used for initial code generation.
+        
+        Returns:
+            StateGraph: The constructed workflow graph
+        """
+        return self.build_code_generation_graph()
