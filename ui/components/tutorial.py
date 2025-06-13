@@ -4,14 +4,12 @@ import logging
 import time
 from typing import Dict, List, Any, Optional
 from data.database_error_repository import DatabaseErrorRepository
-from utils.language_utils import t, get_current_language
-from utils.code_utils import _get_category_icon, _get_difficulty_icon, add_line_numbers
+from utils.language_utils import t
+from utils.code_utils import _get_category_icon, _get_difficulty_icon, add_line_numbers, _log_user_interaction_tutorial
 from state_schema import WorkflowState
 from ui.components.comparison_report_renderer import ComparisonReportRenderer
-import json
-import re
 from analytics.behavior_tracker import behavior_tracker
-import uuid
+
 
 
 logger = logging.getLogger(__name__)
@@ -63,257 +61,9 @@ class TutorialUI:
             logger.error(f"Error loading Tutorial CSS: {str(e)}")
             st.warning(t("css_loading_warning"))
 
-    # ==========================================
-    # ENHANCED USER INTERACTION LOGGING
-    # ==========================================
-
-    def _log_user_interaction(self, 
-                             user_id: str,
-                             interaction_type: str,  # 'tutorial' or 'practice'
-                             action: str,
-                             component: str = "tutorial_ui",
-                             success: bool = True,
-                             error_message: str = None,
-                             details: Dict[str, Any] = None,
-                             time_spent_seconds: int = None) -> None:
-        """
-        Centralized method to log all user interactions to the database.
-        
-        Args:
-            user_id: The user's ID
-            interaction_type: 'tutorial' for exploration, 'practice' for practice sessions
-            action: Specific action taken
-            component: UI component name
-            success: Whether the action was successful
-            error_message: Error message if any
-            details: Additional details about the interaction
-            time_spent_seconds: Time spent on this interaction
-        """
-        try:
-            if not user_id:
-                return
-            
-            # Get or create session ID
-            session_id = st.session_state.get("session_id")
-            if not session_id:
-                session_id = str(uuid.uuid4())
-                st.session_state.session_id = session_id
-            
-            # Prepare context data
-            context_data = {
-                "tutorial_mode": not st.session_state.get("practice_mode_active", False),
-                "practice_mode": st.session_state.get("practice_mode_active", False),
-                "current_error": st.session_state.get("selected_error_code"),
-                "practice_session_id": self.current_practice_session_id,
-                "load_time": time.time() - st.session_state.get("tutorial_load_time", time.time()),
-                "language": get_current_language(),
-                "timestamp": time.time()
-            }
-            
-            # Add any additional details
-            if details:
-                context_data.update(details)
-            
-            # Log through behavior tracker
-            self.behavior_tracker.log_interaction(
-                user_id=user_id,
-                interaction_type=action,  # Use action as interaction_type for database
-                interaction_category=interaction_type,  # 'tutorial' or 'practice'
-                component=component,
-                action=action,
-                details=context_data,
-                time_spent_seconds=time_spent_seconds,
-                success=success,
-                error_message=error_message,
-                context_data=context_data
-            )
-            
-            logger.debug(f"Logged {interaction_type} interaction: {action} for user {user_id}")
-            
-        except Exception as e:
-            logger.error(f"Error logging user interaction: {str(e)}")
-
-    def _start_practice_session(self, 
-                               user_id: str,
-                               error_code: str,
-                               error_name: str,
-                               error_category: str,
-                               difficulty_level: str) -> str:
-        """
-        Start a practice session with comprehensive tracking.
-        
-        Args:
-            user_id: The user's ID
-            error_code: Code of the error being practiced
-            error_name: Name of the error
-            error_category: Category of the error
-            difficulty_level: Difficulty level
-            
-        Returns:
-            Practice session ID
-        """
-        try:
-            # Generate practice session ID
-            practice_session_id = str(uuid.uuid4())
-            self.current_practice_session_id = practice_session_id
-            self.practice_start_time = time.time()
-            
-            # Store in session state for persistence
-            st.session_state.practice_session_id = practice_session_id
-            st.session_state.practice_start_time = self.practice_start_time
-            
-            # Log practice session start
-            self._log_user_interaction(
-                user_id=user_id,
-                interaction_type="tutorial",
-                action="start_tutorial_session",
-                component="practice_session_manager",
-                details={
-                    "practice_session_id": practice_session_id,
-                    "error_code": error_code,
-                    "error_name": error_name,
-                    "error_category": error_category,
-                    "difficulty_level": difficulty_level,
-                    "session_start_time": self.practice_start_time
-                }
-            )
-            
-            logger.info(f"Started practice session {practice_session_id} for error {error_code}")
-            return practice_session_id
-            
-        except Exception as e:
-            logger.error(f"Error starting practice session: {str(e)}")
-            # Log error
-            self._log_user_interaction(
-                user_id=user_id,
-                interaction_type="tutorial",
-                action="start_tutorial_session_error",
-                component="tutorial_session_manager",
-                success=False,
-                error_message=str(e)
-            )
-            return str(uuid.uuid4())  # Return a fallback ID
-
-    def _update_practice_session(self,
-                                user_id: str,
-                                step_name: str,
-                                step_data: Dict[str, Any] = None,
-                                time_spent_seconds: int = None) -> None:
-        """
-        Log practice session step updates.
-        
-        Args:
-            user_id: The user's ID
-            step_name: Name of the step
-            step_data: Additional data for this step
-            time_spent_seconds: Time spent on this step
-        """
-        try:
-            # Calculate time spent if not provided
-            if time_spent_seconds is None and self.practice_start_time:
-                time_spent_seconds = int(time.time() - self.practice_start_time)
-            
-            # Prepare step details
-            details = {
-                "practice_session_id": self.current_practice_session_id,
-                "step_name": step_name,
-                "step_data": step_data or {},
-                "timestamp": time.time()
-            }
-            
-            # Log the step update
-            self._log_user_interaction(
-                user_id=user_id,
-                interaction_type="tutorial",
-                action=f"tutorial_step_{step_name}",
-                component="tutorial_workflow",
-                time_spent_seconds=time_spent_seconds,
-                details=details
-            )
-            
-            logger.debug(f"Updated practice session step: {step_name}")
-            
-        except Exception as e:
-            logger.error(f"Error updating practice session step: {str(e)}")
-
-    def _complete_practice_session(self,
-                                  user_id: str,
-                                  completion_status: str,
-                                  final_results: Dict[str, Any] = None) -> None:
-        """
-        Complete the practice session with final results.
-        
-        Args:
-            user_id: The user's ID
-            completion_status: Final status ('completed', 'abandoned', 'timeout')
-            final_results: Final metrics and results
-        """
-        try:
-            if not self.current_practice_session_id:
-                logger.warning("No active practice session to complete")
-                return
-            
-            # Calculate total session duration
-            total_duration = 0
-            if self.practice_start_time:
-                total_duration = int(time.time() - self.practice_start_time)
-            
-            # Prepare completion data
-            completion_data = {
-                "practice_session_id": self.current_practice_session_id,
-                "completion_status": completion_status,
-                "total_duration_seconds": total_duration,
-                "final_results": final_results or {},
-                "completion_timestamp": time.time()
-            }
-            
-            
-            self._log_user_interaction(
-                    user_id=user_id,
-                    interaction_type="tutorial",
-                    action=f"complete_tutorial_{completion_status}",
-                    component="review_processor",
-                    success=False,
-                    details=completion_data
-            )
-            
-            # Track error identification if results available
-            if final_results and "error_code" in final_results:
-                self._log_user_interaction(
-                    user_id=user_id,
-                    interaction_type="tutorial",
-                    action="tutorial_identification_attempt",
-                    component="tutorial_analyzer",
-                    success=final_results.get("identified_correctly", False),
-                    details={
-                        "error_code": final_results["error_code"],
-                        "identified_correctly": final_results.get("identified_correctly", False),
-                        "accuracy": final_results.get("accuracy", 0),
-                        "attempts_used": final_results.get("review_iterations", 1)
-                    }
-                )
-            
-            # Clear practice session state
-            self.current_practice_session_id = None
-            self.practice_start_time = None
-            if "practice_session_id" in st.session_state:
-                del st.session_state["practice_session_id"]
-            if "practice_start_time" in st.session_state:
-                del st.session_state["practice_start_time"]
-            
-            logger.info(f"Completed practice session with status: {completion_status}")
-            
-        except Exception as e:
-            logger.error(f"Error completing practice session: {str(e)}")
-
-    # ==========================================
-    # MAIN RENDER METHODS
-    # ==========================================
-
+   
     def render(self, workflow=None):
         """Render the complete tutorial interface."""
-        user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
-
         # Only update workflow if one is provided, otherwise keep the existing one
         if workflow is not None:
             self.workflow = workflow
@@ -367,16 +117,19 @@ class TutorialUI:
             user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
             workflow_state = st.session_state.practice_workflow_state
             
-            if user_id:
-                # Update practice session: review submitted
-                self._update_practice_session(
+            if user_id:                         
+                
+                _log_user_interaction_tutorial(
                     user_id=user_id,
-                    step_name="review_submitted",
-                    step_data={
+                    interaction_type="tutorial",
+                    action="submit_review",
+                    success=True,                    
+                    details= {
                         "review_length": len(student_review),
                         "review_iteration": getattr(workflow_state, 'current_iteration', 1),
                         "word_count": len(student_review.split())
-                    }
+                    },
+                    time_spent_seconds=0
                 )
 
             with st.spinner(f"🔄 {t('analyzing_your_review')}"):
@@ -390,72 +143,55 @@ class TutorialUI:
                 current_iteration = getattr(updated_state, 'current_iteration', 1)
                 max_iterations = getattr(updated_state, 'max_iterations', 3)
                 
-                if user_id:
-                    # Get analysis results for tracking
+             
+                if review_sufficient or current_iteration > max_iterations:
+                    st.session_state.practice_workflow_status = "review_complete"
                     latest_review = updated_state.review_history[-1] if updated_state.review_history else None
                     analysis = latest_review.analysis if latest_review else {}
                     identified_count = analysis.get(t('identified_count'), 0)
                     total_problems = analysis.get(t('total_problems'), 0)
                     accuracy = (identified_count / total_problems * 100) if total_problems > 0 else 0
                     
-                    # Track analysis completion
-                    self._update_practice_session(
-                        user_id=user_id,
-                        step_name="review_analysis_complete",
-                        step_data={
-                            "identified_count": identified_count,
-                            "total_problems": total_problems,
-                            "accuracy": accuracy,
-                            "review_sufficient": review_sufficient,
-                            "iteration": current_iteration,
-                            "analysis_data": analysis
-                        }
-                    )
-                    
-                # Complete or continue practice session
-                if review_sufficient or current_iteration > max_iterations:
-                    st.session_state.practice_workflow_status = "review_complete"
-                    
-                    if user_id:
-                        # Determine if user passed
-                        passed = review_sufficient and identified_count == total_problems
-                        
-                        practice_error = st.session_state.get("practice_error_data", {})
-                        final_results = {
-                            "accuracy": accuracy,
-                            "identified_count": identified_count,
-                            "total_problems": total_problems,
-                            "iterations_used": current_iteration,
-                            "review_sufficient": review_sufficient,
-                            "identified_correctly": identified_count == total_problems,
-                            "error_code": practice_error.get('error_code', ''),
-                            "final_review_text": student_review,
-                            "review_iterations": current_iteration,
-                            "analysis_data": analysis,
-                            "passed": passed
-                        }
-                        
-                        completion_status = "completed" if review_sufficient else "incomplete"
-                        
-                        self._complete_practice_session(
+                    if user_id:                       
+                        passed = review_sufficient and identified_count == total_problems                        
+                        practice_error = st.session_state.get("practice_error_data", {})                        
+                        _log_user_interaction_tutorial(
                             user_id=user_id,
-                            completion_status=completion_status,
-                            final_results=final_results
+                            interaction_type="tutorial",
+                            action="review_analysis_complete",                            
+                            success=True,                           
+                            details={
+                                "accuracy": accuracy,
+                                "identified_count": identified_count,
+                                "total_problems": total_problems,
+                                "iterations_used": current_iteration,
+                                "review_sufficient": review_sufficient,
+                                "identified_correctly": identified_count == total_problems,
+                                "error_code": practice_error.get('error_code', ''),
+                                "final_review_text": student_review,
+                                "review_iterations": current_iteration,
+                                "analysis_data": analysis,
+                                "passed": passed
+                            },
+                            time_spent_seconds=0
                         )
-                    
+
                     st.success(f"✅ {t('review_analysis_complete')}")
                 else:
                     # Track need to submit again
-                    if user_id:
-                        self._update_practice_session(
+                    if user_id:                        
+                        _log_user_interaction_tutorial(
                             user_id=user_id,
-                            step_name="submit_again",
-                            step_data={
+                            interaction_type="tutorial",
+                            action="submit_again",                           
+                            success=True,                           
+                            details= {
                                 "current_accuracy": accuracy,
                                 "iteration": current_iteration,
                                 "max_iterations": max_iterations,
                                 "needs_improvement": True
-                            }
+                            },
+                            time_spent_seconds=0
                         )
                     
                     st.info(f"📝 {t('review_submitted_try_improve')}")
@@ -464,19 +200,7 @@ class TutorialUI:
                 st.rerun()
                 
         except Exception as e:
-            logger.error(f"Error processing practice review: {str(e)}")
-            
-            # Track error
-            if user_id:
-                self._log_user_interaction(
-                    user_id=user_id,
-                    interaction_type="tutorial",
-                    action="review_processing_error",
-                    component="review_processor",
-                    success=False,
-                    error_message=str(e)
-                )
-            
+            logger.error(f"Error processing practice review: {str(e)}")            
             st.error(f"❌ {t('error_processing_review')}: {str(e)}")
     
     def _exit_practice_mode_with_tracking(self):
@@ -485,17 +209,18 @@ class TutorialUI:
         
         if user_id and self.current_practice_session_id:
             # Complete practice session as abandoned
-            final_results = {
-                "abandoned": True,
-                "exit_reason": "user_requested",
-                "practice_error": st.session_state.get("practice_error_data", {}),
-                "workflow_status": st.session_state.get("practice_workflow_status", "unknown")
-            }
-            
-            self._complete_practice_session(
+            _log_user_interaction_tutorial(
                 user_id=user_id,
-                completion_status="abandoned",
-                final_results=final_results
+                interaction_type="tutorial",
+                action="complete_tutorial_abandoned",                
+                success=True,                
+                details= {
+                    "abandoned": True,
+                    "exit_reason": "user_requested",
+                    "practice_error": st.session_state.get("practice_error_data", {}),
+                    "workflow_status": st.session_state.get("practice_workflow_status", "unknown")
+                },
+                time_spent_seconds=0
             )
         
         # Clear all practice-related session state
@@ -511,16 +236,14 @@ class TutorialUI:
         user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
         
         if user_id:
-            self._log_user_interaction(
-                user_id=user_id,
-                interaction_type="tutorial",
-                action="restart_tutorial_session",
-                component="practice_controls"
-            )
-        
-        # Clear practice session state but keep error data
-        practice_error = st.session_state.get("practice_error_data", {})
-        
+            _log_user_interaction_tutorial(
+                    user_id=user_id,
+                    interaction_type="tutorial",
+                    action="restart_tutorial_session",                  
+                    success=True,                   
+                    details=None,
+                    time_spent_seconds=0
+                )
         keys_to_clear = [
             "practice_code_generated",
             "practice_workflow_state", 
@@ -539,12 +262,15 @@ class TutorialUI:
         user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
         
         if user_id:
-            self._log_user_interaction(
+            _log_user_interaction_tutorial(
                 user_id=user_id,
                 interaction_type="tutorial",
-                action="regenerate_tutorial_code",
-                component="code_generator"
+                action="regenerate_tutorial_code",               
+                success=True,                
+                details=None,
+                time_spent_seconds=0
             )
+            
 
         # Clear code generation state
         if "practice_code_generated" in st.session_state:
@@ -616,14 +342,16 @@ class TutorialUI:
             
             # Log search interactions
             if search_term and search_term != st.session_state.get("last_search_term", ""):
-                if user_id:
-                    self._log_user_interaction(
+                if user_id:                    
+                    _log_user_interaction_tutorial(
                         user_id=user_id,
                         interaction_type="tutorial",
-                        action="search_errors",
-                        component="search_filter",
-                        details={"search_term": search_term}
+                        action="regenerate_tutorial_code",                        
+                        success=True,                        
+                        details={"search_term": search_term},
+                        time_spent_seconds=0
                     )
+                    
                 st.session_state.last_search_term = search_term
         
         with col2:
@@ -637,14 +365,17 @@ class TutorialUI:
             
             # Log category filter changes
             if selected_category != st.session_state.get("last_category_filter", ""):
-                if user_id:
-                    self._log_user_interaction(
+                if user_id:                    
+
+                    _log_user_interaction_tutorial(
                         user_id=user_id,
                         interaction_type="tutorial",
-                        action="filter_by_category",
-                        component="search_filter",
-                        details={"selected_category": selected_category}
+                        action="filter_by_category",                        
+                        success=True,                       
+                        details={"selected_category": selected_category},
+                        time_spent_seconds=0
                     )
+
                 st.session_state.last_category_filter = selected_category
         
         with col3:
@@ -658,13 +389,14 @@ class TutorialUI:
             
             # Log difficulty filter changes
             if selected_difficulty != st.session_state.get("last_difficulty_filter", ""):
-                if user_id:
-                    self._log_user_interaction(
+                if user_id:                   
+                    _log_user_interaction_tutorial(
                         user_id=user_id,
                         interaction_type="tutorial",
-                        action="filter_by_difficulty",
-                        component="search_filter",
-                        details={"selected_difficulty": selected_difficulty}
+                        action="filter_by_difficulty",                       
+                        success=True,                        
+                        details={"selected_difficulty": selected_difficulty},
+                        time_spent_seconds=0
                     )
                 st.session_state.last_difficulty_filter = selected_difficulty
         
@@ -924,19 +656,40 @@ class TutorialUI:
                 help=t('generate_practice_code_with_error_type')
             ):
                 if user_id:
-                    self._log_user_interaction(
+                    _log_user_interaction_tutorial(
                         user_id=user_id,
                         interaction_type="tutorial",
-                        action="start_tutorial_code_generation",
-                        component="tutorial_interface",
+                        action="start_tutorial_code_generation",                        
+                        success=True,                       
                         details={
                             "error_code": error_code,
                             "error_name": error_name,
                             "difficulty": difficulty
-                        }
+                        },
+                        time_spent_seconds=0
                     )
-                
                 self._start_practice_session_flow(error)
+
+    def _start_practice_session_flow(self, error: Dict[str, Any]):
+        """Enhanced practice session start with comprehensive tracking."""
+        try:
+           
+            error_name = error.get(t("error_name_variable"), t("unknown_error"))
+            logger.info(f"Starting practice session for error: {error_name}")
+            st.session_state.practice_mode_active = True
+            st.session_state.practice_error_data = error
+            st.session_state.practice_workflow_status = "setup"
+            
+            # Show immediate feedback
+            st.success(t('starting_practice_session_with').format(error_name=error_name))
+            st.info(f"✨ {t('practice_mode_activated_interface_reload')}")
+            
+            time.sleep(0.5)
+            st.rerun()
+            
+        except Exception as e:
+            logger.error(f"Error starting practice session: {str(e)}", exc_info=True)            
+            st.error(f"❌ {t('error_setting_up_practice_session')}: {str(e)}")
 
     def _prepare_practice_workflow_state(self, error: Dict[str, Any]) -> Optional[WorkflowState]:
         """Prepare a WorkflowState specifically for practice sessions with a single error."""
@@ -996,56 +749,6 @@ class TutorialUI:
         except Exception as e:
             logger.error(f"Error preparing practice workflow state: {str(e)}")
             return None
-    
-    def _start_practice_session_flow(self, error: Dict[str, Any]):
-        """Enhanced practice session start with comprehensive tracking."""
-        try:
-            user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
-            error_name = error.get(t("error_name_variable"), t("unknown_error"))
-            error_code = error.get('error_code', f"error_{hash(error_name) % 10000}")
-            error_category = error.get('category', 'Unknown')
-            difficulty = error.get('difficulty_level', 'medium')
-            
-            logger.info(f"Starting practice session for error: {error_name}")
-            
-            # Start practice session tracking
-            if user_id:
-                practice_session_id = self._start_practice_session(
-                    user_id=user_id,
-                    error_code=error_code,
-                    error_name=error_name,
-                    error_category=error_category,
-                    difficulty_level=difficulty
-                )
-            
-            # Set session state flags
-            st.session_state.practice_mode_active = True
-            st.session_state.practice_error_data = error
-            st.session_state.practice_workflow_status = "setup"
-            
-            # Show immediate feedback
-            st.success(t('starting_practice_session_with').format(error_name=error_name))
-            st.info(f"✨ {t('practice_mode_activated_interface_reload')}")
-            
-            time.sleep(0.5)
-            st.rerun()
-            
-        except Exception as e:
-            logger.error(f"Error starting practice session: {str(e)}", exc_info=True)
-            
-            # Track error
-            if user_id:
-                self._log_user_interaction(
-                    user_id=user_id,
-                    interaction_type="tutorial",
-                    action="start_tutorial_error",
-                    component="practice_starter",
-                    success=False,
-                    error_message=str(e),
-                    details={"error_code": error_code}
-                )
-            
-            st.error(f"❌ {t('error_setting_up_practice_session')}: {str(e)}")
     
     def _render_professional_practice_header(self, error_name: str, difficulty: str, category: str):
         """Render enhanced professional practice mode header."""
@@ -1213,18 +916,20 @@ class TutorialUI:
             return
         
         try:
-            generation_start_time = time.time()
-            
+            generation_start_time = time.time()            
             # Update practice session: starting code generation
-            if user_id:
-                self._update_practice_session(
+            if user_id:       
+                _log_user_interaction_tutorial(
                     user_id=user_id,
-                    step_name="code_generation_started",
-                    step_data={
+                    interaction_type="tutorial",
+                    action="submit_again",                    
+                    success=True,                    
+                    details= {
                         "error_code": practice_error.get('error_code', ''),
                         "error_name": practice_error.get(t("error_name_variable"), ''),
                         "difficulty": practice_error.get('difficulty_level', 'medium')
-                    }
+                    },
+                    time_spent_seconds=0
                 )
             
             # Enhanced status display
@@ -1243,35 +948,11 @@ class TutorialUI:
                 
                 # Validate and handle result
                 if hasattr(updated_state, 'error') and updated_state.error:
-                    error_msg = updated_state.error
-                    
-                    # Track generation failure
-                    if user_id:
-                        self._update_practice_session(
-                            user_id=user_id,
-                            step_name="code_generation_failed",
-                            step_data={
-                                "error_message": error_msg,
-                                "generation_duration": generation_duration,
-                                "generation_attempts": getattr(updated_state, 'evaluation_attempts', 1)
-                            },
-                            time_spent_seconds=int(generation_duration)
-                        )
-                        
+                    error_msg = updated_state.error    
                     st.error(f"❌ {t('failed_to_generate_practice_code')}: {error_msg}")
                     return
                 
                 if not hasattr(updated_state, 'code_snippet') or not updated_state.code_snippet:
-                    # Track generation failure
-                    if user_id:
-                        self._update_practice_session(
-                            user_id=user_id,
-                            step_name="code_generation_no_output",
-                            step_data={
-                                "generation_duration": generation_duration
-                            },
-                            time_spent_seconds=int(generation_duration)
-                        )
                     
                     st.error(f"❌ {t('failed_to_generate_practice_code')}: No code generated")
                     return
@@ -1285,11 +966,13 @@ class TutorialUI:
                         "has_clean_code": hasattr(code_snippet, 'clean_code') and bool(code_snippet.clean_code),
                         "expected_errors": getattr(code_snippet, 'expected_error_count', 0)
                     }
-                    
-                    self._update_practice_session(
+
+                    _log_user_interaction_tutorial(
                         user_id=user_id,
-                        step_name="code_generate_complete",
-                        step_data={
+                        interaction_type="tutorial",
+                        action="code_generate_complete",                       
+                        success=True,                       
+                        details= {
                             "generation_successful": True,
                             "generation_duration": generation_duration,
                             "generation_attempts": getattr(updated_state, 'evaluation_attempts', 1),
@@ -1298,6 +981,7 @@ class TutorialUI:
                         },
                         time_spent_seconds=int(generation_duration)
                     )
+            
     
             # Store results and update status
             st.session_state.practice_workflow_state = updated_state
@@ -1305,14 +989,18 @@ class TutorialUI:
             st.session_state.practice_workflow_status = "code_ready"
             
             # Update to ready for review step
-            if user_id:
-                self._update_practice_session(
+            if user_id:               
+
+                _log_user_interaction_tutorial(
                     user_id=user_id,
-                    step_name="ready_for_review",
-                    step_data={
+                    interaction_type="tutorial",
+                    action="code_ready_for_review",                    
+                    success=True,                   
+                    details= {
                         "code_ready": True,
                         "total_generation_time": generation_duration
-                    }
+                    },
+                    time_spent_seconds=int(generation_duration)
                 )
             
             st.success("✅ Practice challenge ready!")
@@ -1322,18 +1010,6 @@ class TutorialUI:
             
         except Exception as e:
             logger.error(f"Error generating practice code: {str(e)}", exc_info=True)
-            
-            # Track unexpected error
-            if user_id:
-                self._log_user_interaction(
-                    user_id=user_id,
-                    interaction_type="tutorial",
-                    action="code_generation_exception",
-                    component="code_generator",
-                    success=False,
-                    error_message=str(e)
-                )
-            
             st.error(f"❌ {t('error_setting_up_practice_session')}: {str(e)}")
 
     def _render_practice_review(self):

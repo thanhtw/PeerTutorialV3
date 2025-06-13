@@ -70,23 +70,6 @@ CREATE TABLE IF NOT EXISTS badges (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- User Sessions - Track overall user sessions
-CREATE TABLE IF NOT EXISTS user_sessions (
-    session_id VARCHAR(36) PRIMARY KEY,
-    user_id VARCHAR(36) NOT NULL,
-    session_start TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    session_end TIMESTAMP NULL,
-    session_duration_minutes INT DEFAULT 0,
-    total_interactions INT DEFAULT 0,   
-    language_preference VARCHAR(10) DEFAULT 'en',     
-    tabs_visited JSON NULL,   
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE,
-    INDEX idx_user_session (user_id, session_start DESC),
-    INDEX idx_session_duration (session_duration_minutes DESC),
-    INDEX idx_session_date (session_start)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
 
 -- Error categories table
 CREATE TABLE error_categories (
@@ -166,80 +149,27 @@ CREATE TABLE activity_log (
 
 --User Interactions - Detailed interaction logging
 CREATE TABLE IF NOT EXISTS user_interactions (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    session_id VARCHAR(36) NOT NULL,
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,    
     user_id VARCHAR(36) NOT NULL,
-    interaction_type ENUM('review_analysis_complete','view_feedback_tab','view_code_generator','analysis_complete','review_analysis_start','start_review','code_ready_for_review','generate_completed','start_generate','view_progress_dashboard','view_badge_showcase','deselect_category','select_category','submit_review','view_code_display','tutorial_identification_attempt','start_practice_session','complete_tutorial_abandoned','complete_tutorial_incomplete','complete_tutorial_completed','tutorial_step_code_generate_complete','tutorial_step_code_generation_no_output','tutorial_step_code_generation_failed','tutorial_step_code_generation_started','tutorial_step_submit_again','tutorial_step_review_analysis_complete','tutorial_step_review_submitted','tutorial_step_ready_for_review','code_generation_exception','start_tutorial_error','start_tutorial_code_generation','filter_by_difficulty','filter_by_category','search_errors','regenerate_tutorial_code','restart_tutorial_session','review_processing_error','error_identification_attempt','start_tutorial_session_error','start_tutorial_session','access_tutorial_ui','action','error_identification','complete_workflow','start_workflow','status_change','start_session','step_change','access','click', 'submit', 'navigation', 'view', 'edit', 'download', 'upload', 'search', 'filter', 'error', 'success', 'warning','mode_change') NOT NULL,
-    interaction_category VARCHAR(50) NOT NULL,
-    component VARCHAR(100) NOT NULL, 
+    interaction_type ENUM('submit_again','review_analysis_complete','view_feedback_tab','view_code_generator','analysis_complete','review_analysis_start','start_review','code_ready_for_review','generate_completed','start_generate','view_badge_showcase','deselect_category','select_category','submit_review','complete_tutorial_abandoned','code_generate_complete','start_tutorial_code_generation','filter_by_difficulty','filter_by_category','regenerate_tutorial_code') NOT NULL,
+    interaction_category VARCHAR(50) NOT NULL,    
     action VARCHAR(100) NOT NULL, 
     details JSON,
     time_spent_seconds INT DEFAULT 0,
-    success BOOLEAN DEFAULT TRUE,
-    error_message TEXT,
-    context_data JSON,
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    FOREIGN KEY (session_id) REFERENCES user_sessions(session_id) ON DELETE CASCADE,
+    success BOOLEAN DEFAULT TRUE,      
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,    
+   
     FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE,
     INDEX idx_user_timestamp (user_id, timestamp DESC),
     INDEX idx_interaction_type (interaction_type, timestamp DESC),
-    INDEX idx_category_action (interaction_category, action),
-    INDEX idx_success_errors (success, error_message(100))
+    INDEX idx_category_action (interaction_category, action)    
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- User Performance Summary View
-CREATE VIEW user_performance_summary AS
-SELECT 
-    u.uid,
-    u.display_name_en,
-    u.display_name_zh,
-    u.reviews_completed,
-    u.total_points,
-    u.consecutive_days,
-    COUNT(DISTINCT ub.badge_id) as total_badges,    
-    AVG(ecs.mastery_level) as avg_mastery,
-    (SELECT COUNT(*) FROM user_sessions WHERE user_id = u.uid) as total_sessions,
-    COALESCE(SUM(us.session_duration_minutes), 0) as total_time_minutes
-FROM users u
-LEFT JOIN user_badges ub ON u.uid = ub.user_id
-LEFT JOIN user_sessions us ON u.uid = us.user_id
-GROUP BY u.uid;
-
--- Daily Activity Summary View
-CREATE VIEW daily_activity_summary AS
-SELECT 
-    DATE(timestamp) as activity_date,
-    COUNT(DISTINCT user_id) as active_users,
-    COUNT(*) as total_interactions,
-    AVG(time_spent_seconds) as avg_interaction_time,
-    COUNT(CASE WHEN success = FALSE THEN 1 END) as error_count,
-    COUNT(CASE WHEN interaction_type = 'submit' THEN 1 END) as submissions
-FROM user_interactions
-WHERE timestamp >= DATE_SUB(CURRENT_DATE, INTERVAL 30 DAY)
-GROUP BY DATE(timestamp)
-ORDER BY activity_date DESC;
-
--- Badge Progress Summary View
-CREATE VIEW badge_progress_summary AS
-SELECT 
-    b.badge_id,
-    b.name_en,
-    b.category,
-    b.difficulty,
-    COUNT(ub.user_id) as users_earned,
-    AVG(DATEDIFF(ub.awarded_at, (
-        SELECT MIN(created_at) FROM activity_log WHERE user_id = ub.user_id
-    ))) as avg_days_to_earn
-FROM badges b
-LEFT JOIN user_badges ub ON b.badge_id = ub.badge_id
-GROUP BY b.badge_id
-ORDER BY users_earned DESC;
 
 -- Verification and status
 SELECT 'Database tables created successfully!' as Status;
 SELECT COUNT(table_name) as Tables_Created 
 FROM information_schema.tables 
 WHERE table_schema = DATABASE() 
-AND table_name IN ('users', 'error_categories', 'java_errors', 'badges', 'user_badges', 'activity_log', 'user_sessions', 'user_interactions');   
+AND table_name IN ('users', 'error_categories', 'java_errors', 'badges', 'user_badges', 'activity_log','user_interactions');   
 

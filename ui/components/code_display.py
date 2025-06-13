@@ -343,8 +343,7 @@ class CodeDisplayUI:
             _log_user_interaction_code_display(
                 user_id=user_id,
                 interaction_type="practice",
-                action="start_review",
-                component="code_review",
+                action="start_review",               
                 details={                   
                     "language": self.current_language,
                     "iteration": iteration_count,
@@ -430,8 +429,7 @@ class CodeDisplayUI:
             _log_user_interaction_code_display(
                 user_id=user_id,
                 interaction_type="practice", 
-                action="submit_review",
-                component="code_review",
+                action="submit_review",               
                 details={
                     "review_length": len(student_review_input),
                     "iteration": iteration_count,
@@ -802,8 +800,7 @@ def _process_student_review_with_comprehensive_tracking(workflow, student_review
                 _log_user_interaction_code_display(
                     user_id=user_id,
                     interaction_type="practice",
-                    action="review_analysis_start",
-                    component="code_review",
+                    action="review_analysis_start",                   
                     details={
                         "analysis_step": "processing",
                         "review_iteration": current_iteration
@@ -872,8 +869,7 @@ def _process_student_review_with_comprehensive_tracking(workflow, student_review
                 _log_user_interaction_code_display(
                     user_id=user_id,
                     interaction_type="practice",
-                    action="review_analysis_complete",
-                    component="code_review",
+                    action="review_analysis_complete",                    
                     details={
                         "analysis_step": "completed",
                         "analysis_duration": analysis_duration

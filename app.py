@@ -58,18 +58,9 @@ st.set_page_config(
 
 css_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "css")
 
-def cleanup_session():
-    """Clean up user session on app exit."""
-    try:
-        user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
-        if user_id:
-            behavior_tracker.end_user_session(user_id)
-    except Exception as e:
-        logger.error(f"Error during session cleanup: {str(e)}")
 
 try:
-    load_css(css_directory=css_dir)
-    atexit.register(cleanup_session)
+    load_css(css_directory=css_dir)    
 except Exception as e:
     logger.warning(f"CSS loading failed: {str(e)}")
 
@@ -81,13 +72,6 @@ def main():
 
     # Initialize the authentication UI
     auth_ui = AuthUI()
-
-    if auth_ui.is_authenticated():
-        user_id = st.session_state.auth.get("user_id")
-        if user_id and "session_tracking_started" not in st.session_state:
-            behavior_tracker.start_user_session(user_id)
-            st.session_state.session_tracking_started = True
-
     # Check if the user is authenticated
     if not auth_ui.is_authenticated():
         # Render the authentication page

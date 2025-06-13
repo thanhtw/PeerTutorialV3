@@ -869,10 +869,8 @@ def _get_difficulty_icon(difficulty_name: str) -> str:
 def _log_user_interaction_code_display( 
                          user_id: str,
                          interaction_type: str,
-                         action: str,
-                         component: str = "code_display_ui",
-                         success: bool = True,
-                         error_message: str = None,
+                         action: str,                        
+                         success: bool = True,                        
                          details: Dict[str, Any] = None,
                          time_spent_seconds: int = None) -> None:
     """
@@ -881,10 +879,8 @@ def _log_user_interaction_code_display(
     Args:
         user_id: The user's ID
         interaction_type: 'main_workflow' for main workflow interactions
-        action: Specific action taken
-        component: UI component name
-        success: Whether the action was successful
-        error_message: Error message if any
+        action: Specific action taken       
+        success: Whether the action was successful       
         details: Additional details about the interaction
         time_spent_seconds: Time spent on this interaction
     """
@@ -892,11 +888,6 @@ def _log_user_interaction_code_display(
         if not user_id:
             return
         
-        # Get or create session ID
-        session_id = st.session_state.get("session_id")
-        if not session_id:
-            session_id = str(uuid.uuid4())
-            st.session_state.session_id = session_id
         
         # Prepare context data
         context_data = {            
@@ -907,22 +898,16 @@ def _log_user_interaction_code_display(
             "timestamp": time.time()
         }
         
-        # Add any additional details
-        if details:
-            context_data.update(details)
-        
         # Log through behavior tracker
         behavior_tracker.log_interaction(
             user_id=user_id,
             interaction_type=action,
             interaction_category=interaction_type,
-            component=component,
             action=action,
             details=context_data,
             time_spent_seconds=time_spent_seconds,
-            success=success,
-            error_message=error_message,
-            context_data=context_data
+            success=success
+                        
         )
         
         logger.debug(f"Logged {interaction_type} interaction: {action} for user {user_id}")
@@ -933,10 +918,8 @@ def _log_user_interaction_code_display(
 def _log_user_interaction_code_generator( 
                          user_id: str,
                          interaction_type: str,
-                         action: str,
-                         component: str = "code_generator_ui",
-                         success: bool = True,
-                         error_message: str = None,
+                         action: str,                         
+                         success: bool = True,                        
                          details: Dict[str, Any] = None,
                          time_spent_seconds: int = None) -> None:
     """
@@ -946,11 +929,6 @@ def _log_user_interaction_code_generator(
         if not user_id:
             return
         
-        session_id = st.session_state.get("session_id")
-        if not session_id:
-            session_id = str(uuid.uuid4())
-            st.session_state.session_id = session_id
-        
         context_data = {            
             "selected_categories": st.session_state.get("selected_categories", []),
             "user_level": st.session_state.get("user_level", "medium"),
@@ -959,20 +937,16 @@ def _log_user_interaction_code_generator(
             "timestamp": time.time()
         }
         
-        if details:
-            context_data.update(details)
-        
+       
         behavior_tracker.log_interaction(
             user_id=user_id,
             interaction_type=action,
             interaction_category=interaction_type,
-            component=component,
             action=action,
             details=context_data,
             time_spent_seconds=time_spent_seconds,
-            success=success,
-            error_message=error_message,
-            context_data=context_data
+            success=success
+                    
         )
         
         logger.debug(f"Logged {interaction_type} interaction: {action} for user {user_id}")
@@ -983,10 +957,8 @@ def _log_user_interaction_code_generator(
 def _log_user_interaction_feedback_system( 
                          user_id: str,
                          interaction_type: str,
-                         action: str,
-                         component: str = "feedback_system",
-                         success: bool = True,
-                         error_message: str = None,
+                         action: str,                        
+                         success: bool = True,                        
                          details: Dict[str, Any] = None,
                          time_spent_seconds: int = None) -> None:
     """
@@ -996,37 +968,82 @@ def _log_user_interaction_feedback_system(
         if not user_id:
             return
         
-        session_id = st.session_state.get("session_id")
-        if not session_id:
-            session_id = str(uuid.uuid4())
-            st.session_state.session_id = session_id
         
         context_data = {          
             "has_review_history": bool(getattr(st.session_state.get("workflow_state"), 'review_history', [])) if hasattr(st.session_state, 'workflow_state') else False,
             "language": get_current_language(),
             "timestamp": time.time()
         }
-        
-        if details:
-            context_data.update(details)
+      
         
         behavior_tracker.log_interaction(
             user_id=user_id,
             interaction_type=action,
-            interaction_category=interaction_type,
-            component=component,
+            interaction_category=interaction_type,            
             action=action,
             details=context_data,
             time_spent_seconds=time_spent_seconds,
-            success=success,
-            error_message=error_message,
-            context_data=context_data
+            success=success
+            
         )
         
         logger.debug(f"Logged {interaction_type} interaction: {action} for user {user_id}")
         
     except Exception as e:
         logger.error(f"Error logging user interaction: {str(e)}")
+
+def _log_user_interaction_tutorial(user_id: str,
+                         interaction_type: str,
+                         action: str,                        
+                         success: bool = True,                        
+                         details: Dict[str, Any] = None,
+                         time_spent_seconds: int = None) -> None:
+    """
+    Centralized method to log all user interactions to the database.
+    
+    Args:
+        user_id: The user's ID
+        interaction_type: Type of interaction (e.g., 'tutorial', 'practice')
+        action: Specific action taken        
+        success: Whether the action was successful
+        details: Additional details about the interaction
+        time_spent_seconds: Time spent on this interaction
+    """
+    try:
+        if not user_id:
+            return
+        
+               
+        context_data = {
+            "language": get_current_language(),
+            "timestamp": time.time()
+        }
+               
+        if hasattr(st.session_state, 'workflow_state') and st.session_state.workflow_state:
+            context_data.update({
+                "current_step": getattr(st.session_state.workflow_state, 'current_step', 'unknown'),
+                "current_iteration": getattr(st.session_state.workflow_state, 'current_iteration', 0),
+                "has_code_snippet": hasattr(st.session_state.workflow_state, 'code_snippet')
+            })
+             
+        
+        # Log through behavior tracker
+        behavior_tracker.log_interaction(
+            user_id=user_id,
+            interaction_type=action,
+            interaction_category=interaction_type,           
+            action=action,
+            details=context_data,
+            time_spent_seconds=time_spent_seconds,
+            success=success,                    
+        )
+        
+        logger.info(f"Logged {interaction_type} interaction: {action} for user {user_id}")
+        
+    except Exception as e:
+        logger.error(f"Error logging user interaction: {str(e)}")
+
+
 # =============================================================================
 # Validation Functions
 # =============================================================================

@@ -13,7 +13,7 @@ from data.database_error_repository import DatabaseErrorRepository
 from utils.language_utils import get_current_language, t
 from state_schema import WorkflowState
 from utils.code_utils import _get_category_icon, _log_user_interaction_code_generator
-from analytics.behavior_tracker import behavior_tracker
+
 # Configure logging 
 logging.basicConfig(level=logging.INFO) 
 logger = logging.getLogger(__name__)
@@ -262,8 +262,7 @@ class CodeGeneratorUI:
             _log_user_interaction_code_generator(
                 user_id=user_id,
                 interaction_type="practice",
-                action=action,
-                component="category_generator",
+                action=action,               
                 details={"category": category_name}
             )
             
@@ -590,8 +589,7 @@ class CodeGeneratorUI:
                     _log_user_interaction_code_generator(
                         user_id=user_id,
                         interaction_type="practice",
-                        action="start_generate",
-                        component="code_generator",
+                        action="start_generate",                        
                         details={
                             "selected_categories": st.session_state.get("selected_categories", []),
                             "categories_count": len(st.session_state.get("selected_categories", [])),
@@ -608,8 +606,7 @@ class CodeGeneratorUI:
                     _log_user_interaction_code_generator(
                         user_id=user_id,
                         interaction_type="pratice",
-                        action="generate_completed",
-                        component="code_generator",
+                        action="generate_completed",                       
                         success=True,
                         time_spent_seconds=generation_time,
                         details={                            
@@ -626,8 +623,7 @@ class CodeGeneratorUI:
                 _log_user_interaction_code_generator(
                     user_id=user_id,
                     interaction_type="practice",
-                    action="code_ready_for_review",
-                    component="code_generator",
+                    action="code_ready_for_review",                    
                     details={
                         "has_code_snippet": bool(code_snippet),
                         "ready_for_review": True,
