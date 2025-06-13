@@ -71,7 +71,7 @@ class BehaviorTracker:
             details_json = json.dumps(details) if details else None
             time_spent_seconds = 0
             # Log the data being inserted for debugging
-            logger.info(f"Attempting to log interaction - User: {user_id}, Type: {interaction_type}, Category: {interaction_category}")
+            logger.debug(f"Attempting to log interaction - User: {user_id}, Type: {interaction_type}, Category: {interaction_category}")
             
             # Insert interaction record with proper error handling
             query = """
@@ -98,7 +98,7 @@ class BehaviorTracker:
             
             # Verify insertion was successful
             if result is not None:
-                logger.info(f"Successfully logged interaction: {interaction_category}.for user {user_id}")
+                logger.debug(f"Successfully logged interaction: {interaction_category}.for user {user_id}")
             else:
                 logger.warning(f"Query executed but no result returned for interaction: {interaction_category}")
             

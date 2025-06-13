@@ -8,6 +8,7 @@ __all__ = ['WorkflowState', 'CodeSnippet', 'ReviewAttempt']
 
 from typing import List, Dict, Any, Optional, Literal
 from pydantic import BaseModel, Field
+import time
 
 # --- Code Snippet Data ---
 class CodeSnippet(BaseModel):
@@ -71,3 +72,19 @@ class WorkflowState(BaseModel):
     comparison_report: Optional[str] = Field(None, description="Comparison report")
     error: Optional[str] = Field(None, description="Error message if any")
     final_summary: Optional[str] = Field(None, description="Final summary of the workflow")
+
+     # ADDED: Missing fields that were causing AttributeError
+    workflow_completed: bool = Field(False, description="Whether the workflow has been marked as completed")
+    code_generation_completed: bool = Field(False, description="Whether code generation phase is completed")
+    review_phase_started: Optional[float] = Field(None, description="Timestamp when review phase started")
+    code_generation_timestamp: Optional[float] = Field(None, description="Timestamp when code was generated")
+    
+    # ADDED: Additional tracking fields for robustness
+    last_update_timestamp: float = Field(default_factory=time.time, description="Last time state was updated")
+    session_id: Optional[str] = Field(None, description="Session identifier for debugging")
+    debug_info: Dict[str, Any] = Field(default_factory=dict, description="Debug information")
+    
+    class Config:
+        """Pydantic configuration"""
+        arbitrary_types_allowed = True
+        extra = "allow"  # Allow additional fields for flexibility

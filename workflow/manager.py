@@ -512,7 +512,7 @@ class WorkflowManager:
             # Execute the workflow with proper configuration
             config = {"recursion_limit": 30}  # Reasonable limit for review processing
             
-            logger.info("Invoking LangGraph workflow for review processing")
+            logger.debug("Invoking LangGraph workflow for review processing")
             raw_result = compiled_workflow.invoke(workflow_state, config)
             
             # Convert result (LangGraph returns AddableValuesDict, not WorkflowState)

@@ -238,6 +238,7 @@ class FeedbackSystem:
         if hasattr(state, 'review_history') and state.review_history and len(state.review_history) > 0:
             latest_review = state.review_history[-1]
             analysis = latest_review.analysis if hasattr(latest_review, 'analysis') else {}
+            print(f"Latest review analysis: {analysis}")
             identified_count = analysis[t('identified_count')]
             total_problems = analysis[t('total_problems')]
             
@@ -305,7 +306,7 @@ class FeedbackSystem:
                         latest_review.analysis,
                         review_history
                     )
-                    logger.info(t("generated_comparison_report"))
+                    logger.debug(t("generated_comparison_report"))
                 else:
                     logger.error("Evaluator not available for generating comparison report")
                     state.comparison_report = (

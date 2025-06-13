@@ -26,17 +26,7 @@ class WorkflowConditions:
     @staticmethod
     def should_analyze_or_wait(state: WorkflowState) -> str:
         """
-        PHASE 2A: Review Input Decision
-        Determine if there's a pending review to analyze or if we should wait for student input.
-        
-        FIXED: Enhanced logic for better submit button processing support.
-        
-        Args:
-            state: Current workflow state
-            
-        Returns:
-            "analyze_review" if there's a pending review to analyze
-            "wait_for_review" if still waiting for student input (END workflow)
+        PHASE 2A: ENHANCED Review Input Decision with better state validation.
         """
         try:
             pending_review = getattr(state, "pending_review", None)
@@ -45,32 +35,47 @@ class WorkflowConditions:
             review_sufficient = getattr(state, "review_sufficient", False)
             review_history = getattr(state, "review_history", [])
             
+            # ADDED: Check for workflow completion flags first
+            workflow_completed = getattr(state, "workflow_completed", False)
+            if workflow_completed:
+                logger.debug("PHASE 2A: Workflow already completed.")
+                return "wait_for_review"
+            
             logger.debug(f"PHASE 2A Decision - Pending: {'Yes' if pending_review else 'No'}, "
                         f"Iteration: {current_iteration}/{max_iterations}, "
                         f"Sufficient: {review_sufficient}, "
                         f"History: {len(review_history)} entries")
             
-            # FIXED: Enhanced pending review detection
+            # ENHANCED: Better pending review validation with state consistency check
             if pending_review and pending_review.strip():
-                # Additional validation for meaningful review content
                 review_text = pending_review.strip()
-                if len(review_text) >= 10:  # Minimum meaningful review length
+                
+                # ADDED: Check if this review was already processed
+                if review_history:
+                    latest_review = review_history[-1]
+                    if hasattr(latest_review, 'student_review') and latest_review.student_review == review_text:
+                        logger.debug("PHASE 2A: This review appears to already be processed. Ending workflow.")
+                        return "wait_for_review"
+                
+                # Validate review quality
+                if len(review_text) >= 10 and len(review_text.split()) >= 3:
                     logger.debug("PHASE 2A: Valid pending review found. Proceeding to analysis.")
                     return "analyze_review"
                 else:
-                    logger.warning("PHASE 2A: Pending review too short, treating as no review")
+                    logger.warning("PHASE 2A: Pending review insufficient quality, treating as no review")
             
-            # Check if we've exceeded max iterations
+            # ENHANCED: Comprehensive completion checks
+            completion_reasons = []
+            
+            # Check max iterations
             if current_iteration > max_iterations:
-                logger.debug(f"PHASE 2A: Max iterations ({max_iterations}) exceeded. Ending workflow.")
-                return "wait_for_review"
+                completion_reasons.append(f"max iterations ({max_iterations}) exceeded")
             
-            # Check if review is sufficient
+            # Check review sufficiency
             if review_sufficient:
-                logger.debug("PHASE 2A: Review marked as sufficient. Ending workflow.")
-                return "wait_for_review"
+                completion_reasons.append("review marked as sufficient")
             
-            # Check if all errors found by looking at latest review analysis
+            # Check if all errors found in latest review
             if review_history and len(review_history) > 0:
                 latest_review = review_history[-1]
                 if hasattr(latest_review, 'analysis') and latest_review.analysis:
@@ -79,107 +84,207 @@ class WorkflowConditions:
                     total_problems = analysis.get(t('total_problems'), 0)
                     
                     if identified_count >= total_problems and total_problems > 0:
-                        logger.debug(f"PHASE 2A: All {total_problems} errors found. Ending workflow.")
-                        return "wait_for_review"
+                        completion_reasons.append(f"all {total_problems} errors found")
+                        # ADDED: Mark workflow as completed to prevent re-entry
+                        state.workflow_completed = True
+            
+            # If any completion reason exists, end workflow
+            if completion_reasons:
+                logger.debug(f"PHASE 2A: Ending workflow - {', '.join(completion_reasons)}")
+                return "wait_for_review"
             
             # Default: wait for student input
             logger.debug("PHASE 2A: No pending review. Ending workflow to wait for student input.")
-            return "wait_for_review"  # This will END the workflow
+            return "wait_for_review"
             
         except Exception as e:
             logger.error(f"Error in should_analyze_or_wait: {str(e)}")
-            # Safe fallback
             return "wait_for_review"
     
     @staticmethod
     def should_regenerate_or_review(state: WorkflowState) -> str:
         """
-        PHASE 1: Code Generation/Evaluation Decision (original name)
-        Determine if we should regenerate code or start the review phase.
-        
-        This condition ONLY considers code generation and evaluation results,
-        NOT student review submissions.
-        
-        Args:
-            state: Current workflow state
-            
-        Returns:
-            "regenerate_code" if we need to regenerate code based on evaluation feedback
-            "review_code" if the code is valid or we've reached max generation attempts
+        PHASE 1: ENHANCED Code Generation Decision with safeguards.
         """
         try:
             evaluation_result = getattr(state, "evaluation_result", None)
             evaluation_attempts = getattr(state, "evaluation_attempts", 0)
             max_evaluation_attempts = getattr(state, "max_evaluation_attempts", 3)
-           
+            code_snippet = getattr(state, "code_snippet", None)
+            
+            # ADDED: Check if we already have valid code and shouldn't regenerate
+            if code_snippet and hasattr(code_snippet, 'code') and code_snippet.code:
+                # ENHANCED: Check if code was recently generated (prevent unnecessary regeneration)
+                code_generation_timestamp = getattr(state, "code_generation_timestamp", None)
+                if code_generation_timestamp:
+                    import time
+                    current_time = time.time()
+                    # If code was generated within last 30 seconds, don't regenerate unless explicitly needed
+                    if current_time - code_generation_timestamp < 30:
+                        logger.debug("CODE GENERATION: Recent code exists, checking if regeneration is truly needed")
+                        
+                        # Only regenerate if there are specific missing errors and we haven't hit max attempts
+                        if evaluation_result:
+                            missing_errors = evaluation_result.get(t("missing_errors"), [])
+                            if len(missing_errors) == 0:
+                                logger.debug("CODE GENERATION: No missing errors, proceeding to review")
+                                return "review_code"
+                            elif evaluation_attempts >= max_evaluation_attempts:
+                                logger.debug("CODE GENERATION: Max attempts reached, proceeding to review despite missing errors")
+                                return "review_code"
+            
             logger.debug(f"CODE GENERATION DECISION: "
                         f"valid={evaluation_result.get(t('valid'), False) if evaluation_result else False}, "
                         f"attempts={evaluation_attempts}/{max_evaluation_attempts}")
             
-            # Check max attempts FIRST to prevent infinite loops in code generation
+            # ENHANCED: Check max attempts FIRST with better logging
             if evaluation_attempts >= max_evaluation_attempts:
-                logger.debug(f"Max code generation attempts ({max_evaluation_attempts}) reached. Starting review phase.")
+                logger.debug(f"CODE GENERATION: Max attempts ({max_evaluation_attempts}) reached. "
+                           f"Proceeding to review phase regardless of evaluation result.")
+                # ADDED: Mark generation as completed to prevent re-entry
+                state.code_generation_completed = True
                 return "review_code"
             
-            # If evaluation result is valid, we can start the review phase
-            if evaluation_result and evaluation_result.get(t("valid"), False):
-                logger.debug("Code evaluation passed. Starting review phase.")
-                return "review_code"
-
-            # Check if we have missing errors and are under max attempts
+            # ENHANCED: Validation check with better error handling
             if evaluation_result:
+                is_valid = evaluation_result.get(t("valid"), False)
                 missing_errors = evaluation_result.get(t("missing_errors"), [])
+                found_errors = evaluation_result.get(t("found_errors"), [])
+                
+                logger.debug(f"CODE GENERATION: Found {len(found_errors)} errors, missing {len(missing_errors)}")
+                
+                if is_valid or len(missing_errors) == 0:
+                    logger.debug("CODE GENERATION: Evaluation passed. Starting review phase.")
+                    # ADDED: Set timestamp to track when we moved to review
+                    import time
+                    state.review_phase_started = time.time()
+                    return "review_code"
+                
+                # Check if we should regenerate
                 if len(missing_errors) > 0 and evaluation_attempts < max_evaluation_attempts:
-                    logger.debug(f"Found {len(missing_errors)} missing errors in code. "
-                            f"Regenerating code (attempt {evaluation_attempts + 1}/{max_evaluation_attempts})")
+                    logger.debug(f"CODE GENERATION: Missing {len(missing_errors)} errors. "
+                               f"Regenerating (attempt {evaluation_attempts + 1}/{max_evaluation_attempts})")
                     return "regenerate_code"
             
-            # Default to starting review if we can't determine what to do
-            logger.debug("Defaulting to review phase")
+            # ENHANCED: Better fallback logic
+            logger.debug("CODE GENERATION: No clear evaluation result, defaulting to review phase")
             return "review_code"
             
         except Exception as e:
             logger.error(f"Error in should_regenerate_or_review: {str(e)}")
-            # Safe fallback
+            # Safe fallback to prevent infinite loops
             return "review_code"
     
     @staticmethod
+    def should_regenerate_or_review(state: WorkflowState) -> str:
+        """
+        PHASE 1: ENHANCED Code Generation Decision with safeguards.
+        """
+        try:
+            evaluation_result = getattr(state, "evaluation_result", None)
+            evaluation_attempts = getattr(state, "evaluation_attempts", 0)
+            max_evaluation_attempts = getattr(state, "max_evaluation_attempts", 3)
+            code_snippet = getattr(state, "code_snippet", None)
+            
+            # ADDED: Check if we already have valid code and shouldn't regenerate
+            if code_snippet and hasattr(code_snippet, 'code') and code_snippet.code:
+                # ENHANCED: Check if code was recently generated (prevent unnecessary regeneration)
+                code_generation_timestamp = getattr(state, "code_generation_timestamp", None)
+                if code_generation_timestamp:
+                    import time
+                    current_time = time.time()
+                    # If code was generated within last 30 seconds, don't regenerate unless explicitly needed
+                    if current_time - code_generation_timestamp < 30:
+                        logger.debug("CODE GENERATION: Recent code exists, checking if regeneration is truly needed")
+                        
+                        # Only regenerate if there are specific missing errors and we haven't hit max attempts
+                        if evaluation_result:
+                            missing_errors = evaluation_result.get(t("missing_errors"), [])
+                            if len(missing_errors) == 0:
+                                logger.debug("CODE GENERATION: No missing errors, proceeding to review")
+                                return "review_code"
+                            elif evaluation_attempts >= max_evaluation_attempts:
+                                logger.debug("CODE GENERATION: Max attempts reached, proceeding to review despite missing errors")
+                                return "review_code"
+            
+            logger.debug(f"CODE GENERATION DECISION: "
+                        f"valid={evaluation_result.get(t('valid'), False) if evaluation_result else False}, "
+                        f"attempts={evaluation_attempts}/{max_evaluation_attempts}")
+            
+            # ENHANCED: Check max attempts FIRST with better logging
+            if evaluation_attempts >= max_evaluation_attempts:
+                logger.debug(f"CODE GENERATION: Max attempts ({max_evaluation_attempts}) reached. "
+                           f"Proceeding to review phase regardless of evaluation result.")
+                # ADDED: Mark generation as completed to prevent re-entry
+                state.code_generation_completed = True
+                return "review_code"
+            
+            # ENHANCED: Validation check with better error handling
+            if evaluation_result:
+                is_valid = evaluation_result.get(t("valid"), False)
+                missing_errors = evaluation_result.get(t("missing_errors"), [])
+                found_errors = evaluation_result.get(t("found_errors"), [])
+                
+                logger.debug(f"CODE GENERATION: Found {len(found_errors)} errors, missing {len(missing_errors)}")
+                
+                if is_valid or len(missing_errors) == 0:
+                    logger.debug("CODE GENERATION: Evaluation passed. Starting review phase.")
+                    # ADDED: Set timestamp to track when we moved to review
+                    import time
+                    state.review_phase_started = time.time()
+                    return "review_code"
+                
+                # Check if we should regenerate
+                if len(missing_errors) > 0 and evaluation_attempts < max_evaluation_attempts:
+                    logger.debug(f"CODE GENERATION: Missing {len(missing_errors)} errors. "
+                               f"Regenerating (attempt {evaluation_attempts + 1}/{max_evaluation_attempts})")
+                    return "regenerate_code"
+            
+            # ENHANCED: Better fallback logic
+            logger.debug("CODE GENERATION: No clear evaluation result, defaulting to review phase")
+            return "review_code"
+            
+        except Exception as e:
+            logger.error(f"Error in should_regenerate_or_review: {str(e)}")
+            # Safe fallback to prevent infinite loops
+            return "review_code"
+
+    @staticmethod
     def should_continue_review(state: WorkflowState) -> str:
         """
-        PHASE 2: Student Review Decision
-        Determine if we should continue with another review iteration or generate comparison report.
-        
-        FIXED: Enhanced logic for better submit processing support.
-        
-        Args:
-            state: Current workflow state
-            
-        Returns:
-            "continue_review" if more review iterations are needed
-            "generate_comparison_report" if the review is sufficient or max iterations reached
+        PHASE 2: ENHANCED Student Review Decision with completion safeguards.
         """
         try:
             current_iteration = getattr(state, "current_iteration", 1)
             max_iterations = getattr(state, "max_iterations", 3)
             review_sufficient = getattr(state, "review_sufficient", False)
             review_history = getattr(state, "review_history", [])
+            workflow_completed = getattr(state, "workflow_completed", False)
             
             logger.debug(f"STUDENT REVIEW DECISION: "
                          f"iteration={current_iteration}/{max_iterations}, "
                          f"sufficient={review_sufficient}, "
-                         f"review_count={len(review_history)}")
+                         f"review_count={len(review_history)}, "
+                         f"completed={workflow_completed}")
          
-            # Check max iterations FIRST to prevent infinite loops in review phase
-            if current_iteration > max_iterations:
-                logger.debug(f"Max review iterations ({max_iterations}) reached. Generating final report.")
+            # ADDED: Check if workflow is already marked as completed
+            if workflow_completed:
+                logger.debug("STUDENT REVIEW: Workflow already completed.")
                 return "generate_comparison_report"
          
-            # Check if review is marked as sufficient
+            # ENHANCED: Check max iterations with better validation
+            if current_iteration > max_iterations:
+                logger.debug(f"STUDENT REVIEW: Max iterations ({max_iterations}) reached.")
+                state.workflow_completed = True
+                return "generate_comparison_report"
+         
+            # ENHANCED: Check if review is marked as sufficient
             if review_sufficient:
-                logger.debug("Review marked as sufficient. Generating final report.")
+                logger.debug("STUDENT REVIEW: Review marked as sufficient.")
+                state.workflow_completed = True
                 return "generate_comparison_report"
             
-            # FIXED: Enhanced check for all issues identified
+            # ENHANCED: Check for completion based on review analysis
             if review_history and len(review_history) > 0:
                 latest_review = review_history[-1]
 
@@ -188,67 +293,98 @@ class WorkflowConditions:
                     identified_count = analysis.get(t("identified_count"), 0)
                     total_problems = analysis.get(t("total_problems"), 0)
                     
-                    # Check if all issues have been identified
+                    # ENHANCED: More robust completion check
                     if identified_count >= total_problems and total_problems > 0:              
                         state.review_sufficient = True
-                        logger.debug(f"All {total_problems} issues identified by student. Generating final report.")
+                        state.workflow_completed = True
+                        logger.debug(f"STUDENT REVIEW: All {total_problems} issues identified. Generating report.")
                         return "generate_comparison_report"
                     else:
-                        logger.debug(f"Still missing issues: {identified_count}/{total_problems} identified")
+                        logger.debug(f"STUDENT REVIEW: Progress - {identified_count}/{total_problems} identified")
             
-            # FIXED: Enhanced continuation logic
-            # Continue review if we haven't reached max iterations and review isn't sufficient
-            if current_iteration <= max_iterations:
-                logger.debug(f"Continuing review phase (iteration {current_iteration}/{max_iterations})")
+            # ENHANCED: Continuation logic with safeguards
+            if current_iteration <= max_iterations and not review_sufficient:
+                # ADDED: Additional check to prevent infinite loops
+                review_phase_started = getattr(state, "review_phase_started", None)
+                if review_phase_started:
+                    import time
+                    current_time = time.time()
+                    # If we've been in review phase for more than 10 minutes, force completion
+                    if current_time - review_phase_started > 600:  # 10 minutes
+                        logger.warning("STUDENT REVIEW: Review phase timeout. Forcing completion.")
+                        state.workflow_completed = True
+                        return "generate_comparison_report"
+                
+                logger.debug(f"STUDENT REVIEW: Continuing review phase (iteration {current_iteration}/{max_iterations})")
                 return "continue_review"
             else:
-                # This should not happen due to the max_iterations check above, but safety fallback
-                logger.warning("Unexpected state: iteration exceeds max but not caught earlier. Generating report.")
+                logger.debug("STUDENT REVIEW: Conditions met for completion. Generating report.")
+                state.workflow_completed = True
                 return "generate_comparison_report"
                 
         except Exception as e:
             logger.error(f"Error in should_continue_review: {str(e)}")
-            # Safe fallback - generate report rather than continue to prevent infinite loops
+            # Safe fallback to prevent infinite loops
             return "generate_comparison_report"
     
     @staticmethod 
     def validate_state_for_review(state: WorkflowState) -> bool:
         """
-        HELPER: Validate that the state is ready for review processing.
-        
-        Args:
-            state: Current workflow state
-            
-        Returns:
-            True if state is valid for review processing
+        ENHANCED: Validate state with additional consistency checks.
         """
         try:
+            validation_errors = []
+            
             # Check for required code snippet
             if not hasattr(state, 'code_snippet') or not state.code_snippet:
-                logger.error("State validation failed: No code snippet")
-                return False
+                validation_errors.append("No code snippet")
+            elif not hasattr(state.code_snippet, 'code') or not state.code_snippet.code:
+                validation_errors.append("Code snippet has no code content")
             
             # Check for required error information
-            if not hasattr(state, 'original_error_count') or state.original_error_count <= 0:
-                logger.error("State validation failed: No valid original error count")
-                return False
+            original_error_count = getattr(state, 'original_error_count', 0)
+            if original_error_count <= 0:
+                validation_errors.append("No valid original error count")
             
-            # Check for evaluation result
-            if not hasattr(state, 'evaluation_result') or not state.evaluation_result:
-                logger.warning("State validation warning: No evaluation result")
-                # Not a failure, but worth noting
+            # ADDED: Check for evaluation result consistency
+            evaluation_result = getattr(state, 'evaluation_result', None)
+            if evaluation_result:
+                found_errors = evaluation_result.get(t('found_errors'), [])
+                missing_errors = evaluation_result.get(t('missing_errors'), [])
+                total_evaluation_errors = len(found_errors) + len(missing_errors)
+                
+                # Warn if there's a mismatch (but don't fail validation)
+                if total_evaluation_errors != original_error_count:
+                    logger.warning(f"Evaluation error count ({total_evaluation_errors}) "
+                                 f"doesn't match original ({original_error_count})")
             
-            # Check iteration settings
-            if not hasattr(state, 'max_iterations') or state.max_iterations <= 0:
-                logger.warning("State validation warning: Invalid max_iterations, using default")
+            # Check iteration settings with auto-correction
+            max_iterations = getattr(state, 'max_iterations', 0)
+            if max_iterations <= 0:
+                logger.warning("Invalid max_iterations, setting to default (3)")
                 state.max_iterations = 3
             
-            if not hasattr(state, 'current_iteration') or state.current_iteration <= 0:
-                logger.warning("State validation warning: Invalid current_iteration, using default")
+            current_iteration = getattr(state, 'current_iteration', 0)
+            if current_iteration <= 0:
+                logger.warning("Invalid current_iteration, setting to default (1)")
                 state.current_iteration = 1
             
-            logger.debug("State validation passed for review processing")
-            return True
+            # ADDED: Validate review history consistency
+            review_history = getattr(state, 'review_history', [])
+            if review_history:
+                for i, review in enumerate(review_history):
+                    if not hasattr(review, 'student_review') or not review.student_review:
+                        validation_errors.append(f"Review {i+1} has no content")
+                    if not hasattr(review, 'iteration_number') or review.iteration_number <= 0:
+                        validation_errors.append(f"Review {i+1} has invalid iteration number")
+            
+            # Log validation results
+            if validation_errors:
+                logger.error(f"State validation failed: {'; '.join(validation_errors)}")
+                return False
+            else:
+                logger.debug("State validation passed for review processing")
+                return True
             
         except Exception as e:
             logger.error(f"Error validating state for review: {str(e)}")

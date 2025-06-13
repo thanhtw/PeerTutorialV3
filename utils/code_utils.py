@@ -1034,7 +1034,7 @@ def _log_user_interaction_tutorial(user_id: str,
             success=success,                    
         )
         
-        logger.info(f"Logged {interaction_type} interaction: {action} for user {user_id}")
+        logger.debug(f"Logged {interaction_type} interaction: {action} for user {user_id}")
         
     except Exception as e:
         logger.error(f"Error logging user interaction: {str(e)}")

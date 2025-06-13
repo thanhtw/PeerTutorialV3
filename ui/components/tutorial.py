@@ -31,7 +31,7 @@ class TutorialUI:
         
         # Log workflow initialization for debugging
         if workflow:
-            logger.info(f"Tutorial initialized with workflow: {type(workflow)}")
+            logger.debug(f"Tutorial initialized with workflow: {type(workflow)}")
         else:
             logger.warning("Tutorial initialized without workflow - practice mode will not work")
         
@@ -659,7 +659,7 @@ class TutorialUI:
         try:
            
             error_name = error.get(t("error_name_variable"), t("unknown_error"))
-            logger.info(f"Starting practice session for error: {error_name}")
+            logger.debug(f"Starting practice session for error: {error_name}")
             st.session_state.practice_mode_active = True
             st.session_state.practice_error_data = error
             st.session_state.practice_workflow_status = "setup"
@@ -911,7 +911,7 @@ class TutorialUI:
                     st.error(f"❌ {t('failed_prepare_practice_session')}")
                     return
                 
-                logger.info(f"Executing code generation with workflow: {type(self.workflow)}")
+                logger.debug(f"Executing code generation with workflow: {type(self.workflow)}")
                 updated_state = self.workflow.execute_code_generation(workflow_state)
                 
                 generation_duration = time.time() - generation_start_time

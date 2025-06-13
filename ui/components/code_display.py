@@ -334,63 +334,71 @@ class CodeDisplayUI:
     
     def _render_review_form(self, iteration_count: int, on_submit_callback: Callable) -> bool:
         """       
-        Uses session state flags instead of immediate st.rerun() calls.
+        Enhanced state management to prevent data loss during reruns.
         """
         user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
-        code_snippet = getattr(st.session_state.workflow_state, 'code_snippet', None)
-        # Log start of review process
-        if user_id and iteration_count <= 1:  # Only log on first review attempt
-            _log_user_interaction_code_display(
-                user_id=user_id,
-                interaction_type="practice",
-                action="start_review",               
-                details={                   
-                    "language": self.current_language,
-                    "iteration": iteration_count,
-                    "review_step": "initial"
-                }
-            )
-            
+        
+        # FIXED: Use iteration-specific keys to prevent conflicts
+        iteration_key = f"iter_{iteration_count}"
+        text_area_key = f"review_input_{iteration_key}"
+        submit_button_key = f"submit_review_{iteration_key}"
+        clear_button_key = f"clear_review_{iteration_key}"
+        
+        # FIXED: More robust state management with workflow step tracking
+        workflow_step = getattr(st.session_state.get('workflow_state'), 'current_step', 'unknown')
+        review_processing_key = f"review_processing_{iteration_key}"
+        
+        # Check if we're currently processing a review (prevents multiple submissions)
+        if st.session_state.get(review_processing_key, False):
+            st.info("⏳ Processing your review... Please wait.")
+            return False
+        
+        # FIXED: Better success flag management
+        success_flag = f"review_submitted_{iteration_key}"
+        if st.session_state.get(success_flag, False):
+            # Clear success flag and draft
+            if success_flag in st.session_state:
+                del st.session_state[success_flag]
+            draft_key = f"review_draft_{iteration_key}"
+            if draft_key in st.session_state:
+                del st.session_state[draft_key]
+            initial_value = ""
+            st.success("✅ Review submitted successfully!")
+        else:
+            # Preserve draft content with iteration-specific key
+            draft_key = f"review_draft_{iteration_key}"
+            initial_value = st.session_state.get(draft_key, "")
+        
         # Enhanced form header
         st.markdown(f"""
         <div class="enhanced-input-section-header">
             <h4>
                 <span class="input-icon">✍️</span>
-                {t('your_review')}
+                {t('your_review')} (Attempt {iteration_count})
             </h4>
             <p>{t('write_comprehensive_review')}</p>
         </div>
         """, unsafe_allow_html=True)
         
-        # FIXED: Use timestamp-based keys to avoid conflicts
-        text_area_key = f"review_input"
-        submit_button_key = f"submit_review"
-        clear_button_key = f"clear_review"
+        # Enhanced review input with workflow-aware placeholder
+        placeholder_text = t("review_placeholder")
+        if workflow_step == "review":
+            placeholder_text += f"\n\n💡 This is attempt {iteration_count}. Be specific about line numbers and error types."
         
-        # FIXED: Check for success flag and clear input accordingly
-        success_flag = f"review_submitted_success"
-        if st.session_state.get(success_flag, False):
-            # Clear the success flag
-            del st.session_state[success_flag]
-            # Don't set initial value if review was just submitted
-            initial_value = ""
-        else:
-            initial_value = st.session_state.get(f"review_draft", "")
-        
-        # Enhanced review input
         student_review_input = st.text_area(
             t("enter_your_review"),
             value=initial_value, 
             height=350,
             key=text_area_key,
-            placeholder=t("review_placeholder"),
+            placeholder=placeholder_text,
             label_visibility="collapsed",
             help=t("review_help_text")
         )
         
-        # Save draft to session state (for persistence)
+        # FIXED: Save draft with iteration-specific key to prevent conflicts
         if student_review_input:
-            st.session_state[f"review_draft"] = student_review_input
+            draft_key = f"review_draft_{iteration_key}"
+            st.session_state[draft_key] = student_review_input
         
         # Enhanced buttons with better layout
         st.markdown('<div class="enhanced-button-container">', unsafe_allow_html=True)
@@ -398,13 +406,14 @@ class CodeDisplayUI:
         col1, col2 = st.columns([8, 2])
         
         with col1:
-            submit_text = t("submit_review_button") if iteration_count == 1 else f"{t('submit_review_button')} ({t('attempt')} {iteration_count})"
+            submit_text = f"{t('submit_review_button')} (Attempt {iteration_count})"
             submit_button = st.button(
                 f"🚀 {submit_text}", 
                 type="primary", 
                 use_container_width=True,
                 help=t("submit_review_help"),
-                key=submit_button_key
+                key=submit_button_key,
+                disabled=st.session_state.get(review_processing_key, False)  # Disable during processing
             )
             
         with col2:
@@ -412,94 +421,114 @@ class CodeDisplayUI:
                 f"🗑️ {t('clear')}", 
                 use_container_width=True,
                 help=t("clear_review_help"),
-                key=clear_button_key
+                key=clear_button_key,
+                disabled=st.session_state.get(review_processing_key, False)  # Disable during processing
             )
         
         st.markdown('</div>', unsafe_allow_html=True)
         
-        
+        # Handle clear button
         if clear_button:
-            if f"review_draft" in st.session_state:
-                del st.session_state[f"review_draft"]
-            st.info("Review cleared. Please refresh if the text area is not empty.")
+            draft_key = f"review_draft_{iteration_key}"
+            if draft_key in st.session_state:
+                del st.session_state[draft_key]
+            st.info("✅ Review cleared.")
+            st.rerun()
             return False
         
-        
+        # Handle submit button
         if submit_button:
-            _log_user_interaction_code_display(
-                user_id=user_id,
-                interaction_type="practice", 
-                action="submit_review",               
-                details={
-                    "review_length": len(student_review_input),
-                    "iteration": iteration_count,
-                    "review_attempt": iteration_count + 1,
-                    "has_content": bool(student_review_input.strip())
-                }
-            )
-           
+            # Set processing flag to prevent multiple submissions
+            st.session_state[review_processing_key] = True
+            
+            # Log interaction
+            if user_id:
+                _log_user_interaction_code_display(
+                    user_id=user_id,
+                    interaction_type="practice", 
+                    action="submit_review",               
+                    details={
+                        "review_length": len(student_review_input),
+                        "iteration": iteration_count,
+                        "workflow_step": workflow_step,
+                        "has_content": bool(student_review_input.strip())
+                    }
+                )
+        
             return self._process_review_submission(
                 student_review_input, 
                 iteration_count, 
                 on_submit_callback,
-                success_flag
+                success_flag,
+                review_processing_key
             )
         
         return False
+
     
     def _process_review_submission(self, review_text: str, iteration_count: int, 
-                                 on_submit_callback: Callable, success_flag: str) -> bool:
+                                      on_submit_callback: Callable, success_flag: str,
+                                      processing_flag: str) -> bool:
         """
-        FIXED: Process review submission without causing setIn errors and only rerun when complete.
+        Process review submission with better error handling and state management.
         """
         try:
-            logger.info(f"Processing review submission for iteration {iteration_count}")
-            logger.info(f"Review text length: {len(review_text)} characters")
+            logger.debug(f"Processing review submission for iteration {iteration_count}")
             
             # Validate input
             if not review_text or not review_text.strip():
                 st.error(f"❌ {t('please_enter_review')}")
+                # Clear processing flag
+                if processing_flag in st.session_state:
+                    del st.session_state[processing_flag]
                 return False
             
             cleaned_review = review_text.strip()
             
             if len(cleaned_review) < 20:
                 st.warning(t("review_too_short_warning"))
+                # Clear processing flag
+                if processing_flag in st.session_state:
+                    del st.session_state[processing_flag]
                 return False
             
-            # Additional validation - check for meaningful content
+            # Additional validation
             if len(cleaned_review.split()) < 5:
                 st.warning("Please provide a more detailed review with at least 5 words.")
+                # Clear processing flag
+                if processing_flag in st.session_state:
+                    del st.session_state[processing_flag]
                 return False
             
             # Show processing indicator
             with st.spinner(f"🔄 {t('processing_review')}..."):
-                logger.info(f"Calling submit callback with review: '{cleaned_review[:100]}...'")
+                logger.debug(f"Calling submit callback with review: '{cleaned_review[:100]}...'")
                 
                 # Call the submit callback
                 if on_submit_callback:
                     try:
-                        logger.info("Executing callback function...")
+                        logger.debug("Executing callback function...")
                         result = on_submit_callback(cleaned_review)
-                        logger.info(f"Callback returned: {result} (type: {type(result)})")
+                        logger.debug(f"Callback returned: {result} (type: {type(result)})")
                         
-                        # FIXED: More lenient success check
-                        if result is True or result is None:  # Accept True or None as success
-                          
+                        # Clear processing flag
+                        if processing_flag in st.session_state:
+                            del st.session_state[processing_flag]
+                        
+                        # ENHANCED: More robust success check
+                        if result is True or result is None:
+                            # Set success flag
                             st.session_state[success_flag] = True
                             
                             # Clear the draft
-                            draft_key = f"review_draft"
+                            draft_key = f"review_draft_iter_{iteration_count}"
                             if draft_key in st.session_state:
                                 del st.session_state[draft_key]
                             
-                            logger.info(f"Review successfully submitted for iteration {iteration_count}")
+                            logger.debug(f"Review successfully submitted for iteration {iteration_count}")
                             
-                            # Show success message without immediate rerun
-                            st.success("✅ Review submitted successfully!")       
-                            
-                            # FIXED: Only rerun after a delay to ensure processing is complete
-                            time.sleep(1)
+                            # FIXED: Only rerun after ensuring all state is properly set
+                            time.sleep(0.5)  # Small delay to ensure state persistence
                             st.rerun()
                             return True
                         else:
@@ -508,15 +537,24 @@ class CodeDisplayUI:
                             return False
                             
                     except Exception as callback_error:
+                        # Clear processing flag
+                        if processing_flag in st.session_state:
+                            del st.session_state[processing_flag]
                         logger.error(f"Exception in submit callback: {str(callback_error)}", exc_info=True)
                         st.error(f"❌ {t('error')} {t('processing_review')}: {str(callback_error)}")
                         return False
                 else:
+                    # Clear processing flag
+                    if processing_flag in st.session_state:
+                        del st.session_state[processing_flag]
                     logger.error("No submit callback provided")
                     st.error(f"❌ {t('error')}: No submission handler available")
                     return False
                     
         except Exception as e:
+            # Clear processing flag
+            if processing_flag in st.session_state:
+                del st.session_state[processing_flag]
             logger.error(f"Exception in review submission processing: {str(e)}", exc_info=True)
             st.error(f"❌ {t('error')} {t('processing_review')}: {str(e)}")
             return False
@@ -629,7 +667,7 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
     current_iteration = getattr(state, 'current_iteration', 1)
     max_iterations = getattr(state, 'max_iterations', 3)
     
-    logger.info(f"Handling review submission - iteration {current_iteration}/{max_iterations}")
+    logger.debug(f"Handling review submission - iteration {current_iteration}/{max_iterations}")
     
     # Get review data
     review_history = getattr(state, 'review_history', None)
@@ -660,8 +698,8 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
         def on_submit_review(review_text):
             """FIXED: Submit callback with enhanced error handling and debugging."""
             try:
-                logger.info(f"Submit callback triggered for iteration {current_iteration}")
-                logger.info(f"Review text: '{review_text[:100]}...' (length: {len(review_text)})")
+                logger.debug(f"Submit callback triggered for iteration {current_iteration}")
+                logger.debug(f"Review text: '{review_text[:100]}...' (length: {len(review_text)})")
                 
                 # Validate workflow and state
                 if not workflow:
@@ -675,15 +713,15 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
                     return False
                 
                 # Process the student review
-                logger.info("Calling _process_student_review...")
+                logger.debug("Calling _process_student_review...")
                 result = _process_student_review_with_comprehensive_tracking(workflow, review_text)
-                logger.info(f"_process_student_review returned: {result}")
+                logger.debug(f"_process_student_review returned: {result}")
                 
                 if result is True:
-                    logger.info(f"Review processing completed successfully for iteration {current_iteration}")
+                    logger.debug(f"Review processing completed successfully for iteration {current_iteration}")
                     return True
                 elif result is None:
-                    logger.info(f"Review processing completed (returned None) for iteration {current_iteration}")
+                    logger.debug(f"Review processing completed (returned None) for iteration {current_iteration}")
                     return True  # Treat None as success
                 else:
                     logger.warning(f"Review processing returned: {result} for iteration {current_iteration}")
@@ -695,7 +733,7 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
                 return False
         
         # Render the review input with the callback
-        logger.info("Rendering review input with callback")
+        logger.debug("Rendering review input with callback")
         code_display_ui.render_review_input(
             student_review=student_review,
             on_submit_callback=on_submit_review,

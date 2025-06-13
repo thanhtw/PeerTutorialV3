@@ -310,7 +310,7 @@ class WorkflowNodes:
         CORRECTED: Proper state management for all scenarios.
         """
         try:
-            logger.info("PHASE 2: Review code node - Enhanced processing")
+            logger.debug("PHASE 2: Review code node - Enhanced processing")
             
             # Get current state information
             current_iteration = getattr(state, "current_iteration", 1)
@@ -319,14 +319,14 @@ class WorkflowNodes:
             pending_review = getattr(state, "pending_review", None)
             review_sufficient = getattr(state, "review_sufficient", False)
             
-            logger.info(f"PHASE 2: Current iteration: {current_iteration}/{max_iterations}, "
+            logger.debug(f"PHASE 2: Current iteration: {current_iteration}/{max_iterations}, "
                         f"Review history count: {len(review_history)}, "
                         f"Pending review: {'Yes' if pending_review else 'No'}, "
                         f"Review sufficient: {review_sufficient}")
             
             # SCENARIO 1: Processing submitted review (highest priority)
             if pending_review and pending_review.strip():
-                logger.info(f"PHASE 2: Processing submitted review for iteration {current_iteration}")
+                logger.debug(f"PHASE 2: Processing submitted review for iteration {current_iteration}")
                 
                 # Validate the pending review
                 review_text = pending_review.strip()
@@ -430,7 +430,7 @@ class WorkflowNodes:
         FIXED: Better error handling and state management for submit processing.
         """
         try:
-            logger.info("PHASE 2: Starting enhanced review analysis")
+            logger.debug("PHASE 2: Starting enhanced review analysis")
             
             # FIXED: Clear the pending review FIRST to prevent infinite loops
             if hasattr(state, 'pending_review'):
@@ -472,7 +472,7 @@ class WorkflowNodes:
                                 description = error.get(t('description'), '')   
                                 known_problems.append(f"{category} - {error_name}: {description}")
 
-                logger.info(f"PHASE 2: Extracted {len(known_problems)} known problems")
+                logger.debug(f"PHASE 2: Extracted {len(known_problems)} known problems")
 
             except Exception as extraction_error:
                 logger.error(f"Error extracting known problems: {str(extraction_error)}")
