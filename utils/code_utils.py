@@ -902,8 +902,7 @@ def _log_user_interaction_code_display(
         behavior_tracker.log_interaction(
             user_id=user_id,
             interaction_type=action,
-            interaction_category=interaction_type,
-            action=action,
+            interaction_category=interaction_type,           
             details=context_data,
             time_spent_seconds=time_spent_seconds,
             success=success
@@ -941,8 +940,7 @@ def _log_user_interaction_code_generator(
         behavior_tracker.log_interaction(
             user_id=user_id,
             interaction_type=action,
-            interaction_category=interaction_type,
-            action=action,
+            interaction_category=interaction_type,           
             details=context_data,
             time_spent_seconds=time_spent_seconds,
             success=success
@@ -979,8 +977,7 @@ def _log_user_interaction_feedback_system(
         behavior_tracker.log_interaction(
             user_id=user_id,
             interaction_type=action,
-            interaction_category=interaction_type,            
-            action=action,
+            interaction_category=interaction_type,     
             details=context_data,
             time_spent_seconds=time_spent_seconds,
             success=success
@@ -1031,8 +1028,7 @@ def _log_user_interaction_tutorial(user_id: str,
         behavior_tracker.log_interaction(
             user_id=user_id,
             interaction_type=action,
-            interaction_category=interaction_type,           
-            action=action,
+            interaction_category=interaction_type,      
             details=context_data,
             time_spent_seconds=time_spent_seconds,
             success=success,                    
@@ -1042,7 +1038,6 @@ def _log_user_interaction_tutorial(user_id: str,
         
     except Exception as e:
         logger.error(f"Error logging user interaction: {str(e)}")
-
 
 # =============================================================================
 # Validation Functions

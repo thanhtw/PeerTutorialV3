@@ -177,23 +177,7 @@ class TutorialUI:
                         )
 
                     st.success(f"✅ {t('review_analysis_complete')}")
-                else:
-                    # Track need to submit again
-                    if user_id:                        
-                        _log_user_interaction_tutorial(
-                            user_id=user_id,
-                            interaction_type="tutorial",
-                            action="submit_again",                           
-                            success=True,                           
-                            details= {
-                                "current_accuracy": accuracy,
-                                "iteration": current_iteration,
-                                "max_iterations": max_iterations,
-                                "needs_improvement": True
-                            },
-                            time_spent_seconds=0
-                        )
-                    
+                else:                    
                     st.info(f"📝 {t('review_submitted_try_improve')}")
                 
                 time.sleep(1)
@@ -916,21 +900,7 @@ class TutorialUI:
             return
         
         try:
-            generation_start_time = time.time()            
-            # Update practice session: starting code generation
-            if user_id:       
-                _log_user_interaction_tutorial(
-                    user_id=user_id,
-                    interaction_type="tutorial",
-                    action="submit_again",                    
-                    success=True,                    
-                    details= {
-                        "error_code": practice_error.get('error_code', ''),
-                        "error_name": practice_error.get(t("error_name_variable"), ''),
-                        "difficulty": practice_error.get('difficulty_level', 'medium')
-                    },
-                    time_spent_seconds=0
-                )
+            generation_start_time = time.time()     
             
             # Enhanced status display
             with st.status(f"🚀 {t('generating_practice_challenge')}", expanded=True) as status:

@@ -30,8 +30,7 @@ class BehaviorTracker:
     def log_interaction(self, 
                        user_id: str,
                        interaction_type: str,
-                       interaction_category: str,                       
-                       action: str,
+                       interaction_category: str,    
                        details: Dict[str, Any] = None,
                        time_spent_seconds: int = 0,
                        success: bool = True) -> None:
@@ -41,47 +40,73 @@ class BehaviorTracker:
         Args:
             user_id: The user's ID
             interaction_type: Type of interaction (e.g., 'click', 'submit', 'navigation')
-            interaction_category: Category (e.g., 'code_generation', 'review', 'practice')           
-            action: Specific action taken
+            interaction_category: Category (e.g., 'code_generation', 'review', 'practice')   
             details: Additional details about the interaction
             time_spent_seconds: Time spent on this interaction
             success: Whether the interaction was successful
-            error_message: Error message if any           
         """
         try:
-            session_id = st.session_state.get("session_id")
-            if not session_id:
+            # Validate required parameters
+            if not user_id or not interaction_type or not interaction_category:
+                logger.error(f"Missing required parameters: user_id={user_id}, interaction_type={interaction_type}, interaction_category={interaction_category}")
                 return
             
-            # Increment interaction counter
-            st.session_state.interaction_count = st.session_state.get("interaction_count", 0) + 1
+            # Check database connection
+            if not self.db:
+                logger.error("Database connection not initialized")
+                return
             
-            # Prepare data
+            # Test database connection
+            try:
+                self.db.execute_query("SELECT 1", ())
+            except Exception as db_test_error:
+                logger.error(f"Database connection test failed: {str(db_test_error)}")
+                return
+            
+            # Increment interaction counter (optional - only if session state is available)
+            if hasattr(st, 'session_state'):
+                st.session_state.interaction_count = st.session_state.get("interaction_count", 0) + 1
+            
+            # Prepare data with validation
             details_json = json.dumps(details) if details else None
+            time_spent_seconds = 0
+            # Log the data being inserted for debugging
+            logger.info(f"Attempting to log interaction - User: {user_id}, Type: {interaction_type}, Category: {interaction_category}")
             
-            
-            # Insert interaction record
+            # Insert interaction record with proper error handling
             query = """
             INSERT INTO user_interactions 
             (user_id, interaction_type, interaction_category, 
-             action, details, time_spent_seconds, success)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+             details, time_spent_seconds, success)
+            VALUES (%s, %s, %s, %s, %s, %s)
             """
             
-            self.db.execute_query(query, (               
+            params = (               
                 user_id,
                 interaction_type,
-                interaction_category,                
-                action,
+                interaction_category,   
                 details_json,
                 time_spent_seconds,
                 success              
-            ))
+            )
             
-            logger.debug(f"Logged interaction: {interaction_category}.{action} for user {user_id}")
+            # Log parameters for debugging
+            logger.debug(f"Query parameters: {params}")
+            
+            # Execute with better error handling
+            result = self.db.execute_query(query, params)
+            
+            # Verify insertion was successful
+            if result is not None:
+                logger.info(f"Successfully logged interaction: {interaction_category}.for user {user_id}")
+            else:
+                logger.warning(f"Query executed but no result returned for interaction: {interaction_category}")
             
         except Exception as e:
             logger.error(f"Error logging interaction: {str(e)}")
-    
-    
+            logger.error(f"Error type: {type(e).__name__}")
+            # Log the full traceback for debugging
+            import traceback
+            logger.error(f"Full traceback: {traceback.format_exc()}")
+     
 behavior_tracker = BehaviorTracker()
