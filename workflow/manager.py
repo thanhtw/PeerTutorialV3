@@ -458,144 +458,55 @@ class WorkflowManager:
             return workflow_state
 
     def execute_review_workflow(self, workflow_state: WorkflowState, student_review: str) -> WorkflowState:
-        """
-        Execute review analysis workflow using LangGraph execution.
-        FIXED: Removed manual sanitization, rely on Pydantic validation.
-        """
+        """Execute review analysis workflow with enhanced debugging."""
         try:
-            logger.debug("Starting review workflow")
-            logger.debug(f"Processing review: {student_review[:100]}...")  # Log first 100 chars
+            logger.debug("=== STARTING REVIEW WORKFLOW ===")
+            logger.debug(f"Student review length: {len(student_review)}")
             
-            # Enhanced review validation
-            if not student_review or not student_review.strip():
-                error_msg = "Student review cannot be empty"
-                logger.error(error_msg)
-                workflow_state.error = error_msg
-                return workflow_state
-            
-            review_text = student_review.strip()
-            if len(review_text) < 10:
-                error_msg = "Student review too short (minimum 10 characters)"
-                logger.error(error_msg)
-                workflow_state.error = error_msg
-                return workflow_state
-            
-            # Set the pending review and current step
-            workflow_state.pending_review = review_text
+            # Set the pending review
+            workflow_state.pending_review = student_review.strip()
             workflow_state.current_step = "review"
-            logger.debug(f"Pending review set: {workflow_state.pending_review[:100]}...")  # Log first 100 chars
             
-            # Ensure max iterations are set
-            if not hasattr(workflow_state, 'max_iterations') or int(workflow_state.max_iterations) <= 0:
-                workflow_state.max_iterations = 3
-                
-            # Validate current state
-            current_iteration = getattr(workflow_state, 'current_iteration', 1)
-            max_iterations = getattr(workflow_state, 'max_iterations', 3)
+            logger.debug(f"Set pending_review: {workflow_state.pending_review[:50]}...")
+            logger.debug(f"Current iteration: {getattr(workflow_state, 'current_iteration', 1)}")
             
-            if current_iteration > max_iterations:
-                error_msg = f"Current iteration ({current_iteration}) exceeds max iterations ({max_iterations})"
-                logger.warning(error_msg)
-                workflow_state.error = error_msg
-                return workflow_state
-            
-            # Validate workflow state
-            if not self.conditions.validate_state_for_review(workflow_state):
-                error_msg = "Workflow state not ready for review processing"
-                logger.error(error_msg)
-                workflow_state.error = error_msg
-                return workflow_state
-            
-            # Get the compiled workflow
+            # Get compiled workflow and execute
             compiled_workflow = self.get_compiled_workflow()
+            config = {"recursion_limit": 30}
             
-            # Execute the workflow with proper configuration
-            config = {"recursion_limit": 30}  # Reasonable limit for review processing
-            
-            logger.debug("Invoking LangGraph workflow for review processing")
+            logger.debug("Invoking LangGraph workflow...")
             raw_result = compiled_workflow.invoke(workflow_state, config)
             
-            # Convert result (LangGraph returns AddableValuesDict, not WorkflowState)
+            # Convert result
             if isinstance(raw_result, WorkflowState):
                 result = raw_result
-                logger.debug("LangGraph returned WorkflowState directly")
             else:
-                logger.debug(f"LangGraph returned {type(raw_result)}, converting to WorkflowState")
                 result = self._convert_state_to_workflow_state(raw_result)
             
-            # Enhanced result validation
-            if hasattr(result, 'error') and result.error:
-                logger.error(f"Review workflow returned error: {result.error}")
-            else:
-                # Verify that the review was actually processed
-                review_history = getattr(result, 'review_history', [])
-                if review_history and len(review_history) > 0:
-                    logger.debug(f"Review workflow completed successfully. History has {len(review_history)} entries.")
-                else:
-                    logger.warning("Review workflow completed but no review history found")
-                    
-                # Clear pending review if processing was successful
-                if hasattr(result, 'pending_review'):
-                    result.pending_review = None
+            # Check result
+            review_history = getattr(result, 'review_history', [])
+            logger.debug(f"=== REVIEW WORKFLOW COMPLETE ===")
+            logger.debug(f"Review history entries: {len(review_history)}")
+            
+            if review_history:
+                latest = review_history[-1]
+                has_analysis = hasattr(latest, 'analysis') and latest.analysis
+                logger.debug(f"Latest review has analysis: {has_analysis}")
+                if has_analysis:
+                    analysis = latest.analysis
+                    identified = analysis.get('identified_count', 0)
+                    total = analysis.get('total_problems', 0)
+                    logger.debug(f"Analysis results: {identified}/{total} errors identified")
+            
+            # Clear pending review in result
+            if hasattr(result, 'pending_review'):
+                result.pending_review = None
             
             return result
             
         except Exception as e:
-            logger.error(f"Error in review workflow: {str(e)}", exc_info=True)
+            logger.error(f"Error in review workflow: {str(e)}")
             workflow_state.error = f"Review workflow failed: {str(e)}"
-            return workflow_state
-
-    def execute_full_workflow(self, workflow_state: WorkflowState) -> WorkflowState:
-        """
-        Execute the complete workflow using LangGraph execution.
-        FIXED: Removed manual sanitization, rely on Pydantic validation.
-        """
-        try:
-            logger.debug("Executing full workflow")
-            
-            # Set initial step
-            workflow_state.current_step = "generate"
-            
-            # Ensure all limits are set
-            if not hasattr(workflow_state, 'max_evaluation_attempts') or int(workflow_state.max_evaluation_attempts) <= 0:
-                workflow_state.max_evaluation_attempts = 3
-            if not hasattr(workflow_state, 'max_iterations') or int(workflow_state.max_iterations) <= 0:
-                workflow_state.max_iterations = 3
-            
-            # Validate the initial state
-            is_valid, error_msg = self.validate_workflow_state(workflow_state)
-            if not is_valid:
-                workflow_state.error = error_msg
-                return workflow_state
-            
-            # Get the compiled workflow
-            compiled_workflow = self.get_compiled_workflow()
-            
-            # Execute the workflow with increased recursion limit for full workflow
-            config = {"recursion_limit": 100}  # Higher limit for full workflow
-            
-            logger.debug("Invoking LangGraph workflow for full execution")
-            raw_result = compiled_workflow.invoke(workflow_state, config)
-            
-            # Convert result (LangGraph returns AddableValuesDict, not WorkflowState)
-            if isinstance(raw_result, WorkflowState):
-                result = raw_result
-                logger.debug("LangGraph returned WorkflowState directly")
-            else:
-                logger.debug(f"LangGraph returned {type(raw_result)}, converting to WorkflowState")
-                result = self._convert_state_to_workflow_state(raw_result)
-            
-            # Validate completion
-            if hasattr(result, 'error') and result.error:
-                logger.error(f"Full workflow returned error: {result.error}")
-            else:
-                logger.debug("Full workflow completed successfully")
-            
-            return result
-            
-        except Exception as e:
-            logger.error(f"Error executing full workflow: {str(e)}", exc_info=True)
-            workflow_state.error = f"Full workflow execution failed: {str(e)}"
             return workflow_state
 
     def get_compiled_workflow(self):
@@ -613,14 +524,6 @@ class WorkflowManager:
         
         return self._compiled_workflow
 
-    def get_all_error_categories(self) -> Dict[str, List[str]]:
-        """Get all available error categories."""
-        try:
-            return self.error_repository.get_all_categories()
-        except Exception as e:
-            logger.error(f"Error getting error categories: {str(e)}")
-            return {}
-    
     def validate_workflow_state(self, state: WorkflowState) -> Tuple[bool, str]:
         """
         Validate that the workflow state is ready for execution.
@@ -743,49 +646,4 @@ class WorkflowManager:
                 "state_valid": False
             }
     
-    def debug_state_info(self, state: WorkflowState) -> Dict[str, Any]:
-        """
-        Get detailed debug information about the current state.
-        Useful for troubleshooting submit button issues.
-        """
-        try:
-            debug_info = {
-                "state_type": type(state).__name__,
-                "has_pending_review": hasattr(state, 'pending_review'),
-                "pending_review_value": getattr(state, 'pending_review', None),
-                "pending_review_length": len(getattr(state, 'pending_review', '') or ''),
-                "current_iteration": getattr(state, 'current_iteration', None),
-                "max_iterations": getattr(state, 'max_iterations', None),
-                "review_history_count": len(getattr(state, 'review_history', [])),
-                "review_sufficient": getattr(state, 'review_sufficient', None),
-                "current_step": getattr(state, 'current_step', None),
-                "has_code_snippet": hasattr(state, 'code_snippet') and state.code_snippet is not None,
-                "has_evaluation_result": hasattr(state, 'evaluation_result') and state.evaluation_result is not None,
-                "workflow_error": getattr(state, 'error', None)
-            }
-            
-            # Add review history details
-            if hasattr(state, 'review_history') and state.review_history:
-                review_details = []
-                for i, review in enumerate(state.review_history):
-                    review_info = {
-                        "index": i,
-                        "iteration_number": getattr(review, 'iteration_number', None),
-                        "has_analysis": hasattr(review, 'analysis') and review.analysis is not None,
-                        "review_length": len(getattr(review, 'student_review', '') or ''),
-                        "has_guidance": hasattr(review, 'targeted_guidance') and review.targeted_guidance is not None
-                    }
-                    if hasattr(review, 'analysis') and review.analysis:
-                        analysis = review.analysis
-                        review_info.update({
-                            "identified_count": analysis.get(t("identified_count"), 0),
-                            "total_problems": analysis.get(t("total_problems"), 0)
-                        })
-                    review_details.append(review_info)
-                debug_info["review_history_details"] = review_details
-            
-            return debug_info
-            
-        except Exception as e:
-            logger.error(f"Error getting debug state info: {str(e)}")
-            return {"error": f"Debug info failed: {str(e)}"}
+    
