@@ -421,8 +421,8 @@ class FeedbackSystem:
         if user_id:
             _log_user_interaction_feedback_system(
                 user_id=user_id,
-                interaction_type="practice",
-                action="view_badge_showcase",
+                interaction_category="practice",
+                interaction_type="view_badge_showcase",
                 component="badge_showcase",
                 details={"badges_count": len(badges)}
             )

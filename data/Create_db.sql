@@ -151,7 +151,7 @@ CREATE TABLE activity_log (
 CREATE TABLE IF NOT EXISTS user_interactions (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,    
     user_id VARCHAR(36) NOT NULL,
-    interaction_type ENUM('review_analysis_complete','view_feedback_tab','view_code_generator','analysis_complete','review_analysis_start','start_review','code_ready_for_review','generate_completed','start_generate','view_badge_showcase','deselect_category','select_category','submit_review','complete_tutorial_abandoned','code_generate_complete','start_tutorial_code_generation','filter_by_difficulty','filter_by_category','regenerate_tutorial_code') NOT NULL,
+    interaction_type ENUM('review_processing_complete','review_analysis_complete','view_feedback_tab','view_code_generator','analysis_complete','review_analysis_start','start_review','code_ready_for_review','generate_completed','start_generate','view_badge_showcase','deselect_category','select_category','submit_review','complete_tutorial_abandoned','code_generate_complete','start_tutorial_code_generation','filter_by_difficulty','filter_by_category','regenerate_tutorial_code') NOT NULL,
     interaction_category VARCHAR(50) NOT NULL,   
     details JSON,
     time_spent_seconds INT DEFAULT 0,

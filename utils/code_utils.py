@@ -868,8 +868,8 @@ def _get_difficulty_icon(difficulty_name: str) -> str:
 
 def _log_user_interaction_code_display( 
                          user_id: str,
-                         interaction_type: str,
-                         action: str,                        
+                         interaction_category: str,
+                         interaction_type: str,                        
                          success: bool = True,                        
                          details: Dict[str, Any] = None,
                          time_spent_seconds: int = None) -> None:
@@ -901,23 +901,23 @@ def _log_user_interaction_code_display(
         # Log through behavior tracker
         behavior_tracker.log_interaction(
             user_id=user_id,
-            interaction_type=action,
-            interaction_category=interaction_type,           
+            interaction_category=interaction_category,
+            interaction_type=interaction_type,           
             details=context_data,
             time_spent_seconds=time_spent_seconds,
             success=success
                         
         )
         
-        logger.debug(f"Logged {interaction_type} interaction: {action} for user {user_id}")
+        logger.debug(f"Logged {interaction_type} interaction: {interaction_category} for user {user_id}")
         
     except Exception as e:
         logger.error(f"Error logging user interaction: {str(e)}")
 
 def _log_user_interaction_code_generator( 
                          user_id: str,
-                         interaction_type: str,
-                         action: str,                         
+                         interaction_category: str,
+                         interaction_type: str,                         
                          success: bool = True,                        
                          details: Dict[str, Any] = None,
                          time_spent_seconds: int = None) -> None:
@@ -939,23 +939,23 @@ def _log_user_interaction_code_generator(
        
         behavior_tracker.log_interaction(
             user_id=user_id,
-            interaction_type=action,
-            interaction_category=interaction_type,           
+            interaction_category=interaction_category,
+            interaction_type=interaction_type,           
             details=context_data,
             time_spent_seconds=time_spent_seconds,
             success=success
                     
         )
         
-        logger.debug(f"Logged {interaction_type} interaction: {action} for user {user_id}")
+        logger.debug(f"Logged {interaction_type} interaction: {interaction_category} for user {user_id}")
         
     except Exception as e:
         logger.error(f"Error logging user interaction: {str(e)}")
 
 def _log_user_interaction_feedback_system( 
                          user_id: str,
-                         interaction_type: str,
-                         action: str,                        
+                         interaction_category: str,
+                         interaction_type: str,                        
                          success: bool = True,                        
                          details: Dict[str, Any] = None,
                          time_spent_seconds: int = None) -> None:
@@ -976,22 +976,22 @@ def _log_user_interaction_feedback_system(
         
         behavior_tracker.log_interaction(
             user_id=user_id,
-            interaction_type=action,
-            interaction_category=interaction_type,     
+            interaction_category=interaction_category,
+            interaction_type=interaction_type,     
             details=context_data,
             time_spent_seconds=time_spent_seconds,
             success=success
             
         )
         
-        logger.debug(f"Logged {interaction_type} interaction: {action} for user {user_id}")
+        logger.debug(f"Logged {interaction_type} interaction: {interaction_category} for user {user_id}")
         
     except Exception as e:
         logger.error(f"Error logging user interaction: {str(e)}")
 
 def _log_user_interaction_tutorial(user_id: str,
-                         interaction_type: str,
-                         action: str,                        
+                         interaction_category: str,
+                         interaction_type: str,                        
                          success: bool = True,                        
                          details: Dict[str, Any] = None,
                          time_spent_seconds: int = None) -> None:
@@ -1027,14 +1027,14 @@ def _log_user_interaction_tutorial(user_id: str,
         # Log through behavior tracker
         behavior_tracker.log_interaction(
             user_id=user_id,
-            interaction_type=action,
-            interaction_category=interaction_type,      
+            interaction_category=interaction_category,
+            interaction_type=interaction_type,      
             details=context_data,
             time_spent_seconds=time_spent_seconds,
             success=success,                    
         )
         
-        logger.debug(f"Logged {interaction_type} interaction: {action} for user {user_id}")
+        logger.debug(f"Logged {interaction_type} interaction: {interaction_category} for user {user_id}")
         
     except Exception as e:
         logger.error(f"Error logging user interaction: {str(e)}")

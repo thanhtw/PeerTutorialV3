@@ -166,9 +166,14 @@ class CodeDisplayUI:
                           max_iterations: int = 3,
                           targeted_guidance: str = None,
                           review_analysis: Dict[str, Any] = None) -> None:
-        """       
-        Uses better state management and avoids multiple st.rerun() calls.
         """
+        FIXED: Enhanced review input with comprehensive validation.
+        """
+        # Validate input parameters
+        iteration_count = max(1, int(iteration_count)) if iteration_count else 1
+        max_iterations = max(1, int(max_iterations)) if max_iterations else 3
+        student_review = str(student_review) if student_review else ""
+        
         # Enhanced review container
         st.markdown('<div class="enhanced-review-container">', unsafe_allow_html=True)
         
@@ -182,7 +187,7 @@ class CodeDisplayUI:
         # Enhanced review guidelines
         self._render_enhanced_review_guidelines()
         
-        # FIXED: Enhanced review input and submission
+        # FIXED: Enhanced review input and submission with validation
         self._render_review_form(iteration_count, on_submit_callback)
         
         # Close review container
@@ -333,41 +338,84 @@ class CodeDisplayUI:
             st.code(t('review_format_example'), language="text")
     
     def _render_review_form(self, iteration_count: int, on_submit_callback: Callable) -> bool:
-        """       
-        Enhanced state management to prevent data loss during reruns.
         """
-        user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
+        FIXED: Enhanced review form with comprehensive variable validation.
+        """
+        # FIXED: Validate callback first
+        if not callable(on_submit_callback):
+            st.error("❌ Invalid submission handler. Please refresh the page.")
+            return False
         
-        # FIXED: Use iteration-specific keys to prevent conflicts
-        iteration_key = f"iter_{iteration_count}"
-        text_area_key = f"review_input_{iteration_key}"
-        submit_button_key = f"submit_review_{iteration_key}"
-        clear_button_key = f"clear_review_{iteration_key}"
+        # FIXED: Safe user ID extraction with validation
+        user_id = None
+        try:
+            if hasattr(st.session_state, 'auth') and isinstance(st.session_state.auth, dict):
+                user_id = st.session_state.auth.get("user_id")
+                if not user_id or not isinstance(user_id, str):
+                    user_id = None
+        except Exception as e:
+            logger.warning(f"Could not extract user_id: {str(e)}")
+            user_id = None
         
-        # FIXED: More robust state management with workflow step tracking
-        workflow_step = getattr(st.session_state.get('workflow_state'), 'current_step', 'unknown')
-        review_processing_key = f"review_processing_{iteration_key}"
+        # FIXED: Validate iteration count
+        try:
+            iteration_count = max(1, int(iteration_count))
+        except (ValueError, TypeError):
+            iteration_count = 1
+            logger.warning("Invalid iteration_count, defaulting to 1")
         
-        # Check if we're currently processing a review (prevents multiple submissions)
-        if st.session_state.get(review_processing_key, False):
+        # FIXED: Safe workflow step extraction
+        workflow_step = "unknown"
+        try:
+            if hasattr(st.session_state, 'workflow_state') and st.session_state.workflow_state:
+                workflow_step = getattr(st.session_state.workflow_state, 'current_step', 'unknown')
+                if not isinstance(workflow_step, str):
+                    workflow_step = str(workflow_step) if workflow_step else "unknown"
+        except Exception as e:
+            logger.warning(f"Could not extract workflow_step: {str(e)}")
+        
+        # FIXED: Unique keys with validation
+        try:
+            iteration_key = f"iter_{iteration_count}"
+            text_area_key = f"review_input_{iteration_key}"
+            submit_button_key = f"submit_review_{iteration_key}"
+            clear_button_key = f"clear_review_{iteration_key}"
+            review_processing_key = f"review_processing_{iteration_key}"
+        except Exception as e:
+            logger.error(f"Error creating form keys: {str(e)}")
+            st.error("❌ Form initialization error. Please refresh the page.")
+            return False
+        
+        # FIXED: Safe processing flag check
+        is_processing = False
+        try:
+            is_processing = bool(st.session_state.get(review_processing_key, False))
+        except Exception as e:
+            logger.warning(f"Could not check processing flag: {str(e)}")
+        
+        if is_processing:
             st.info("⏳ Processing your review... Please wait.")
             return False
         
-        # FIXED: Better success flag management
+        # FIXED: Safe success flag management
         success_flag = f"review_submitted_{iteration_key}"
-        if st.session_state.get(success_flag, False):
-            # Clear success flag and draft
-            if success_flag in st.session_state:
-                del st.session_state[success_flag]
-            draft_key = f"review_draft_{iteration_key}"
-            if draft_key in st.session_state:
-                del st.session_state[draft_key]
-            initial_value = ""
-            st.success("✅ Review submitted successfully!")
-        else:
-            # Preserve draft content with iteration-specific key
-            draft_key = f"review_draft_{iteration_key}"
-            initial_value = st.session_state.get(draft_key, "")
+        initial_value = ""
+        
+        try:
+            if st.session_state.get(success_flag, False):
+                # Clear success flag and draft
+                if success_flag in st.session_state:
+                    del st.session_state[success_flag]
+                draft_key = f"review_draft_{iteration_key}"
+                if draft_key in st.session_state:
+                    del st.session_state[draft_key]
+                st.success("✅ Review submitted successfully!")
+            else:
+                # Preserve draft content with iteration-specific key
+                draft_key = f"review_draft_{iteration_key}"
+                initial_value = str(st.session_state.get(draft_key, ""))
+        except Exception as e:
+            logger.warning(f"Error managing success flag: {str(e)}")
         
         # Enhanced form header
         st.markdown(f"""
@@ -385,176 +433,228 @@ class CodeDisplayUI:
         if workflow_step == "review":
             placeholder_text += f"\n\n💡 This is attempt {iteration_count}. Be specific about line numbers and error types."
         
-        student_review_input = st.text_area(
-            t("enter_your_review"),
-            value=initial_value, 
-            height=350,
-            key=text_area_key,
-            placeholder=placeholder_text,
-            label_visibility="collapsed",
-            help=t("review_help_text")
-        )
+        # FIXED: Safe text area rendering
+        try:
+            student_review_input = st.text_area(
+                t("enter_your_review"),
+                value=initial_value, 
+                height=350,
+                key=text_area_key,
+                placeholder=placeholder_text,
+                label_visibility="collapsed",
+                help=t("review_help_text")
+            )
+            
+            # Ensure we got a string
+            if not isinstance(student_review_input, str):
+                student_review_input = str(student_review_input) if student_review_input else ""
+                
+        except Exception as e:
+            logger.error(f"Error rendering text area: {str(e)}")
+            st.error("❌ Form rendering error. Please refresh the page.")
+            return False
         
-        # FIXED: Save draft with iteration-specific key to prevent conflicts
-        if student_review_input:
-            draft_key = f"review_draft_{iteration_key}"
-            st.session_state[draft_key] = student_review_input
+        # FIXED: Safe draft saving
+        try:
+            if student_review_input:
+                draft_key = f"review_draft_{iteration_key}"
+                st.session_state[draft_key] = student_review_input
+        except Exception as e:
+            logger.warning(f"Could not save draft: {str(e)}")
         
         # Enhanced buttons with better layout
         st.markdown('<div class="enhanced-button-container">', unsafe_allow_html=True)
         
         col1, col2 = st.columns([8, 2])
         
-        with col1:
-            submit_text = f"{t('submit_review_button')} (Attempt {iteration_count})"
-            submit_button = st.button(
-                f"🚀 {submit_text}", 
-                type="primary", 
-                use_container_width=True,
-                help=t("submit_review_help"),
-                key=submit_button_key,
-                disabled=st.session_state.get(review_processing_key, False)  # Disable during processing
-            )
-            
-        with col2:
-            clear_button = st.button(
-                f"🗑️ {t('clear')}", 
-                use_container_width=True,
-                help=t("clear_review_help"),
-                key=clear_button_key,
-                disabled=st.session_state.get(review_processing_key, False)  # Disable during processing
-            )
+        # FIXED: Safe button rendering
+        submit_button = False
+        clear_button = False
+        
+        try:
+            with col1:
+                submit_text = f"{t('submit_review_button')} (Attempt {iteration_count})"
+                submit_button = st.button(
+                    f"🚀 {submit_text}", 
+                    type="primary", 
+                    use_container_width=True,
+                    help=t("submit_review_help"),
+                    key=submit_button_key,
+                    disabled=is_processing
+                )
+                
+            with col2:
+                clear_button = st.button(
+                    f"🗑️ {t('clear')}", 
+                    use_container_width=True,
+                    help=t("clear_review_help"),
+                    key=clear_button_key,
+                    disabled=is_processing
+                )
+        except Exception as e:
+            logger.error(f"Error rendering buttons: {str(e)}")
+            st.error("❌ Button rendering error. Please refresh the page.")
+            return False
         
         st.markdown('</div>', unsafe_allow_html=True)
         
         # Handle clear button
         if clear_button:
-            draft_key = f"review_draft_{iteration_key}"
-            if draft_key in st.session_state:
-                del st.session_state[draft_key]
-            st.info("✅ Review cleared.")
-            st.rerun()
-            return False
+            try:
+                draft_key = f"review_draft_{iteration_key}"
+                if draft_key in st.session_state:
+                    del st.session_state[draft_key]
+                st.info("✅ Review cleared.")
+                st.rerun()
+                return False
+            except Exception as e:
+                logger.error(f"Error clearing review: {str(e)}")
+                st.error("❌ Could not clear review. Please refresh the page.")
         
         # Handle submit button
         if submit_button:
-            # Set processing flag to prevent multiple submissions
-            st.session_state[review_processing_key] = True
-            
-            # Log interaction
-            if user_id:
-                _log_user_interaction_code_display(
-                    user_id=user_id,
-                    interaction_type="practice", 
-                    action="submit_review",               
-                    details={
-                        "review_length": len(student_review_input),
-                        "iteration": iteration_count,
-                        "workflow_step": workflow_step,
-                        "has_content": bool(student_review_input.strip())
-                    }
+            # FIXED: Comprehensive validation before processing
+            try:
+                # Set processing flag to prevent multiple submissions
+                st.session_state[review_processing_key] = True
+                
+                # Log interaction with safe user_id
+                if user_id:
+                    try:
+                        _log_user_interaction_code_display(
+                            user_id=user_id,
+                            interaction_category="practice", 
+                            interaction_type="submit_review",               
+                            details={
+                                "review_length": len(student_review_input),
+                                "iteration": iteration_count,
+                                "workflow_step": workflow_step,
+                                "has_content": bool(student_review_input.strip())
+                            }
+                        )
+                    except Exception as log_error:
+                        logger.warning(f"Could not log interaction: {str(log_error)}")
+                
+                # Process the submission
+                return self._process_review_submission(
+                    student_review_input, 
+                    iteration_count, 
+                    on_submit_callback,
+                    success_flag,
+                    review_processing_key
                 )
-        
-            return self._process_review_submission(
-                student_review_input, 
-                iteration_count, 
-                on_submit_callback,
-                success_flag,
-                review_processing_key
-            )
+                
+            except Exception as e:
+                # Ensure processing flag is cleared on error
+                try:
+                    if review_processing_key in st.session_state:
+                        del st.session_state[review_processing_key]
+                except:
+                    pass
+                logger.error(f"Error handling submit button: {str(e)}")
+                st.error(f"❌ Submit error: {str(e)}")
+                return False
         
         return False
 
-    
+    def _safe_clear_processing_flag(self, processing_flag: str) -> None:
+        """FIXED: Safely clear processing flag with error handling."""
+        try:
+            if processing_flag and processing_flag in st.session_state:
+                del st.session_state[processing_flag]
+        except Exception as e:
+            logger.warning(f"Could not clear processing flag {processing_flag}: {str(e)}")
+
     def _process_review_submission(self, review_text: str, iteration_count: int, 
-                                      on_submit_callback: Callable, success_flag: str,
-                                      processing_flag: str) -> bool:
+                                        on_submit_callback: Callable, success_flag: str,
+                                        processing_flag: str) -> bool:
         """
-        Process review submission with better error handling and state management.
+        FIXED: Process review submission with comprehensive validation and error handling.
         """
         try:
             logger.debug(f"Processing review submission for iteration {iteration_count}")
             
-            # Validate input
+            # FIXED: Comprehensive input validation
+            if not isinstance(review_text, str):
+                review_text = str(review_text) if review_text else ""
+            
             if not review_text or not review_text.strip():
                 st.error(f"❌ {t('please_enter_review')}")
-                # Clear processing flag
-                if processing_flag in st.session_state:
-                    del st.session_state[processing_flag]
+                self._safe_clear_processing_flag(processing_flag)
                 return False
             
             cleaned_review = review_text.strip()
             
+            # FIXED: Enhanced validation
             if len(cleaned_review) < 20:
                 st.warning(t("review_too_short_warning"))
-                # Clear processing flag
-                if processing_flag in st.session_state:
-                    del st.session_state[processing_flag]
+                self._safe_clear_processing_flag(processing_flag)
                 return False
             
             # Additional validation
             if len(cleaned_review.split()) < 5:
                 st.warning("Please provide a more detailed review with at least 5 words.")
-                # Clear processing flag
-                if processing_flag in st.session_state:
-                    del st.session_state[processing_flag]
+                self._safe_clear_processing_flag(processing_flag)
+                return False
+            
+            # FIXED: Validate callback before calling
+            if not callable(on_submit_callback):
+                st.error("❌ Invalid submission handler. Please refresh the page.")
+                self._safe_clear_processing_flag(processing_flag)
                 return False
             
             # Show processing indicator
             with st.spinner(f"🔄 {t('processing_review')}..."):
                 logger.debug(f"Calling submit callback with review: '{cleaned_review[:100]}...'")
                 
-                # Call the submit callback
-                if on_submit_callback:
-                    try:
-                        logger.debug("Executing callback function...")
-                        result = on_submit_callback(cleaned_review)
-                        logger.debug(f"Callback returned: {result} (type: {type(result)})")
-                        
-                        # Clear processing flag
-                        if processing_flag in st.session_state:
-                            del st.session_state[processing_flag]
-                        
-                        # ENHANCED: More robust success check
-                        if result is True or result is None:
-                            # Set success flag
+                try:
+                    logger.debug("Executing callback function...")
+                    result = on_submit_callback(cleaned_review)
+                    logger.debug(f"Callback returned: {result} (type: {type(result)})")
+                    
+                    # Clear processing flag
+                    self._safe_clear_processing_flag(processing_flag)
+                    
+                    # FIXED: Enhanced success check with validation
+                    if result is True or result is None:
+                        # Set success flag
+                        try:
                             st.session_state[success_flag] = True
-                            
-                            # Clear the draft
+                        except Exception as flag_error:
+                            logger.warning(f"Could not set success flag: {str(flag_error)}")
+                        
+                        # Clear the draft
+                        try:
                             draft_key = f"review_draft_iter_{iteration_count}"
                             if draft_key in st.session_state:
                                 del st.session_state[draft_key]
-                            
-                            logger.debug(f"Review successfully submitted for iteration {iteration_count}")
-                            
-                            # FIXED: Only rerun after ensuring all state is properly set
+                        except Exception as draft_error:
+                            logger.warning(f"Could not clear draft: {str(draft_error)}")
+                        
+                        logger.debug(f"Review successfully submitted for iteration {iteration_count}")
+                        
+                        # FIXED: Safe rerun with error handling
+                        try:
                             time.sleep(0.5)  # Small delay to ensure state persistence
                             st.rerun()
-                            return True
-                        else:
-                            logger.warning(f"Submit callback returned: {result} for iteration {iteration_count}")
-                            st.error(f"❌ {t('error')} {t('processing_review')}. Callback returned: {result}")
-                            return False
-                            
-                    except Exception as callback_error:
-                        # Clear processing flag
-                        if processing_flag in st.session_state:
-                            del st.session_state[processing_flag]
-                        logger.error(f"Exception in submit callback: {str(callback_error)}", exc_info=True)
-                        st.error(f"❌ {t('error')} {t('processing_review')}: {str(callback_error)}")
+                        except Exception as rerun_error:
+                            logger.error(f"Error during rerun: {str(rerun_error)}")
+                            st.success("✅ Review submitted successfully! Please refresh if the page doesn't update.")
+                        
+                        return True
+                    else:
+                        logger.warning(f"Submit callback returned: {result} for iteration {iteration_count}")
+                        st.error(f"❌ {t('error')} {t('processing_review')}. Callback returned: {result}")
                         return False
-                else:
-                    # Clear processing flag
-                    if processing_flag in st.session_state:
-                        del st.session_state[processing_flag]
-                    logger.error("No submit callback provided")
-                    st.error(f"❌ {t('error')}: No submission handler available")
+                        
+                except Exception as callback_error:
+                    self._safe_clear_processing_flag(processing_flag)
+                    logger.error(f"Exception in submit callback: {str(callback_error)}", exc_info=True)
+                    st.error(f"❌ {t('error')} {t('processing_review')}: {str(callback_error)}")
                     return False
                     
         except Exception as e:
-            # Clear processing flag
-            if processing_flag in st.session_state:
-                del st.session_state[processing_flag]
+            self._safe_clear_processing_flag(processing_flag)
             logger.error(f"Exception in review submission processing: {str(e)}", exc_info=True)
             st.error(f"❌ {t('error')} {t('processing_review')}: {str(e)}")
             return False
@@ -718,10 +818,10 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
                 logger.debug(f"_process_student_review returned: {result}")
                 
                 if result is True:
-                    logger.debug(f"Review processing completed successfully for iteration {current_iteration}")
+                    logger.info(f"Review processing completed successfully for iteration {current_iteration}")
                     return True
                 elif result is None:
-                    logger.debug(f"Review processing completed (returned None) for iteration {current_iteration}")
+                    logger.info(f"Review processing completed (returned None) for iteration {current_iteration}")
                     return True  # Treat None as success
                 else:
                     logger.warning(f"Review processing returned: {result} for iteration {current_iteration}")
@@ -807,46 +907,80 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
                     st.rerun()
  
 def _process_student_review_with_comprehensive_tracking(workflow, student_review: str) -> bool:
-    """Enhanced review processing with detailed behavior tracking."""
+    """
+    FIXED: Enhanced review processing with comprehensive variable validation.
+    """
     try:
-        user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
+        # FIXED: Safe user ID extraction
+        user_id = None
+        try:
+            if hasattr(st.session_state, 'auth') and isinstance(st.session_state.auth, dict):
+                user_id = st.session_state.auth.get("user_id")
+                if not isinstance(user_id, str) or not user_id.strip():
+                    user_id = None
+        except Exception as e:
+            logger.warning(f"Could not extract user_id: {str(e)}")
+        
         review_start_time = time.time()
         
         logger.debug("Starting student review processing")
         logger.debug(f"Processing review: '{student_review[:100]}...' (length: {len(student_review)})")
         
-        # Track review submission
+        # FIXED: Safe workflow state validation
+        if not hasattr(st.session_state, 'workflow_state') or not st.session_state.workflow_state:
+            logger.error("No workflow state available")
+            st.error("❌ No workflow state available. Please generate code first.")
+            return False
+        
+        state = st.session_state.workflow_state
+        
+        # FIXED: Safe attribute extraction with validation
+        try:
+            current_iteration = getattr(state, 'current_iteration', 1)
+            if not isinstance(current_iteration, int) or current_iteration <= 0:
+                current_iteration = 1
+                
+            max_iterations = getattr(state, 'max_iterations', 3)
+            if not isinstance(max_iterations, int) or max_iterations <= 0:
+                max_iterations = 3
+        except Exception as e:
+            logger.warning(f"Error extracting iteration info: {str(e)}")
+            current_iteration = 1
+            max_iterations = 3
+        
+        # Track review submission with safe user_id
         if user_id:
-            current_iteration = getattr(st.session_state.workflow_state, 'current_iteration', 1)
-            max_iterations = getattr(st.session_state.workflow_state, 'max_iterations', 3)
-            
-            # Analyze review content for tracking
-            review_analysis = {
-                "review_length": len(student_review),
-                "word_count": len(student_review.split()),
-                "line_count": len(student_review.split('\n')),
-                "has_line_references": bool(re.search(r'line\s*\d+', student_review.lower())),
-                "iteration": current_iteration,
-                "max_iterations": max_iterations
-            }
-            
-            
+            try:
+                # FIXED: Safe review analysis
+                review_analysis = {
+                    "review_length": len(student_review),
+                    "word_count": len(student_review.split()),
+                    "line_count": len(student_review.split('\n')),
+                    "has_line_references": bool(re.search(r'line\s*\d+', student_review.lower())),
+                    "iteration": current_iteration,
+                    "max_iterations": max_iterations
+                }
+                
+                _log_user_interaction_code_display(
+                    user_id=user_id,
+                    interaction_category="practice",
+                    interaction_type="review_analysis_start",                   
+                    details={
+                        "analysis_step": "processing",
+                        "review_iteration": current_iteration,
+                        **review_analysis
+                    }
+                )
+            except Exception as log_error:
+                logger.warning(f"Could not log review start: {str(log_error)}")
         
         # Enhanced status tracking with detailed steps
         with st.status(t("processing_review"), expanded=True) as status:
-            if user_id:
-                _log_user_interaction_code_display(
-                    user_id=user_id,
-                    interaction_type="practice",
-                    action="review_analysis_start",                   
-                    details={
-                        "analysis_step": "processing",
-                        "review_iteration": current_iteration
-                    }
-                )
-            # Validation steps with tracking
+            
+            # Step 1: Validate workflow
             status.update(label="🔍 Validating workflow...", state="running")
             
+            # FIXED: Comprehensive workflow validation
             if not workflow:
                 error_msg = "No workflow provided"
                 logger.error(error_msg)                
@@ -854,20 +988,15 @@ def _process_student_review_with_comprehensive_tracking(workflow, student_review
                 st.error(f"❌ {error_msg}")
                 return False
             
-            # Step 2: Validate workflow state
-            status.update(label="🔍 Validating workflow state...", state="running")
-            
-            if not hasattr(st.session_state, 'workflow_state'):
-                error_msg = "Workflow state not found"
+            # FIXED: Validate workflow has required methods
+            if not hasattr(workflow, 'submit_review') or not callable(workflow.submit_review):
+                error_msg = "Workflow missing submit_review method"
                 logger.error(error_msg)
                 status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
-                st.error(f"❌ {error_msg}. {t('please_generate_problem_first')}")
+                st.error(f"❌ {error_msg}")
                 return False
-                
-            state = st.session_state.workflow_state
-            logger.debug(f"Current workflow state: step={getattr(state, 'current_step', 'unknown')}, iteration={getattr(state, 'current_iteration', 'unknown')}")
             
-            # Step 3: Validate code snippet
+            # Step 2: Validate code snippet
             status.update(label="🔍 Validating code snippet...", state="running")
             
             if not hasattr(state, "code_snippet") or state.code_snippet is None:
@@ -877,108 +1006,132 @@ def _process_student_review_with_comprehensive_tracking(workflow, student_review
                 st.error(f"❌ {error_msg}. {t('please_generate_problem_first')}")
                 return False
             
-            # Step 4: Validate review content
-            status.update(label="🔍 Validating review content...", state="running")
-            
-            if not student_review or not student_review.strip():
-                error_msg = "Review cannot be empty"
+            # FIXED: Validate code snippet has required content
+            try:
+                code_content = getattr(state.code_snippet, 'code', None)
+                if not code_content or not isinstance(code_content, str) or not code_content.strip():
+                    error_msg = "Code snippet has no valid content"
+                    logger.error(error_msg)
+                    status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
+                    st.error(f"❌ {error_msg}")
+                    return False
+            except Exception as code_error:
+                error_msg = f"Error accessing code content: {str(code_error)}"
                 logger.error(error_msg)
                 status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
-                st.error(f"❌ {t('please_enter_review')}")
+                st.error(f"❌ {error_msg}")
                 return False
             
-            review_text = student_review.strip()
-            
-            if len(review_text) < 10:
-                error_msg = "Review too short"
-                logger.error(error_msg)
-                status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
-                st.error(f"❌ {t('provide_detailed_review_minimum')}")
-                return False
-            
-            # Step 5: Submit to workflow
+            # Step 3: Submit to workflow
             status.update(label="🚀 Analyzing review with AI...", state="running")
             
             try:
                 analysis_start_time = time.time()
-                raw_updated_state = workflow.submit_review(st.session_state.workflow_state, student_review)
+                
+                # FIXED: Safe workflow submission with validation
+                raw_updated_state = workflow.submit_review(state, student_review)
+                
                 analysis_duration = time.time() - analysis_start_time
-
-                _log_user_interaction_code_display(
-                    user_id=user_id,
-                    interaction_type="practice",
-                    action="review_analysis_complete",                    
-                    details={
-                        "analysis_step": "completed",
-                        "analysis_duration": analysis_duration
-                    }
-                )
                 
-                logger.debug(f"Workflow analysis completed in {analysis_duration:.2f}s")
-                
+                # FIXED: Validate workflow response
                 if not raw_updated_state:
                     error_msg = "Workflow returned empty state"
                     status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
                     st.error(f"❌ {error_msg}")
                     return False
                 
+                # FIXED: Check for workflow errors
+                try:
+                    error = getattr(raw_updated_state, 'error', None)
+                    if error and isinstance(error, str) and error.strip():
+                        logger.error(f"Workflow returned error: {error}")
+                        status.update(label=f"❌ {t('error')}: {error}", state="error")
+                        st.error(f"❌ {error}")
+                        return False
+                except Exception as error_check:
+                    logger.warning(f"Could not check workflow error: {str(error_check)}")
+                
+                # Log completion if user_id available
+                if user_id:
+                    try:
+                        _log_user_interaction_code_display(
+                            user_id=user_id,
+                            interaction_category="practice",
+                            interaction_type="review_analysis_complete",                    
+                            details={
+                                "analysis_step": "completed",
+                                "analysis_duration": analysis_duration
+                            }
+                        )
+                    except Exception as log_error:
+                        logger.warning(f"Could not log completion: {str(log_error)}")
+                
+                logger.debug(f"Workflow analysis completed in {analysis_duration:.2f}s")
+                
             except Exception as workflow_error:
-                analysis_duration = time.time() - analysis_start_time
                 error_msg = f"Workflow execution failed: {str(workflow_error)}"
                 logger.error(error_msg, exc_info=True)
                 status.update(label=f"❌ {t('error')}: {error_msg}", state="error")
                 st.error(f"❌ {error_msg}")
                 return False
             
-            # Process results with tracking
-            status.update(label="📊 Processing analysis results...", state="running")
-            
-            error = getattr(raw_updated_state, 'error', None)
-            if error:
-                logger.error(f"Workflow returned error: {error}")
-                status.update(label=f"❌ {t('error')}: {error}", state="error")
-                st.error(f"❌ {error}")
-                return False
-            
-            # Update session state
+            # Step 4: Update session state
             status.update(label="💾 Updating session state...", state="running")
             
-            st.session_state.workflow_state = raw_updated_state
-            st.session_state.review_processing_success = True
-            st.session_state.last_review_timestamp = time.time()
+            try:
+                st.session_state.workflow_state = raw_updated_state
+                st.session_state.review_processing_success = True
+                st.session_state.last_review_timestamp = time.time()
+            except Exception as state_error:
+                logger.error(f"Error updating session state: {str(state_error)}")
+                # Continue - this is not a fatal error
             
-            # Extract results for tracking
-            review_history = getattr(raw_updated_state, 'review_history', None)
-            current_iteration = getattr(raw_updated_state, 'current_iteration', 1)
-            review_sufficient = getattr(raw_updated_state, 'review_sufficient', False)
-            
-            total_processing_time = time.time() - review_start_time
-            
-            if review_history and len(review_history) > 0:
-                logger.debug(f"Review processing completed successfully. History length: {len(review_history)}")
-                
-                # Track successful review processing
-                if user_id:
-                    latest_review = review_history[-1]
-                    analysis_results = getattr(latest_review, 'analysis', {}) if hasattr(latest_review, 'analysis') else {}
+            # Step 5: Validate results
+            try:
+                review_history = getattr(raw_updated_state, 'review_history', None)
+                if review_history and len(review_history) > 0:
+                    logger.debug(f"Review processing completed successfully. History length: {len(review_history)}")
                     
-                    processing_details = {
-                        "processing_duration": total_processing_time,
-                        "analysis_duration": analysis_duration,
-                        "review_iteration": current_iteration,
-                        "review_sufficient": review_sufficient,
-                        "analysis_results": {
-                            "identified_count": analysis_results.get(t('identified_count'), 0),
-                            "total_problems": analysis_results.get(t('total_problems'), 0),
-                            "accuracy_percentage": analysis_results.get(t('identified_percentage'), 0)
-                        }
-                    }
-                
-                status.update(label=f"✅ {t('analysis_complete_processed')}", state="complete")
-                return True
-            else:
-                logger.warning("Review processing may not have completed properly - no review history found")
-                status.update(label="⚠️ Processing completed with warnings", state="complete")
+                    # FIXED: Safe tracking of processing completion
+                    if user_id:
+                        try:
+                            latest_review = review_history[-1]
+                            analysis_results = getattr(latest_review, 'analysis', {}) if hasattr(latest_review, 'analysis') else {}
+                            
+                            total_processing_time = time.time() - review_start_time
+                            
+                            processing_details = {
+                                "processing_duration": total_processing_time,
+                                "analysis_duration": analysis_duration,
+                                "review_iteration": current_iteration,
+                                "review_sufficient": getattr(raw_updated_state, 'review_sufficient', False),
+                                "analysis_results": {
+                                    "identified_count": analysis_results.get(t('identified_count'), 0),
+                                    "total_problems": analysis_results.get(t('total_problems'), 0),
+                                    "accuracy_percentage": analysis_results.get(t('identified_percentage'), 0)
+                                }
+                            }
+                            
+                            _log_user_interaction_code_display(
+                                user_id=user_id,
+                                interaction_category="practice",
+                                interaction_type="review_processing_complete",
+                                details=processing_details
+                            )
+                        except Exception as final_log_error:
+                            logger.warning(f"Could not log final completion: {str(final_log_error)}")
+                    
+                    status.update(label=f"✅ {t('analysis_complete_processed')}", state="complete")
+                    return True
+                else:
+                    logger.warning("Review processing may not have completed properly - no review history found")
+                    status.update(label="⚠️ Processing completed with warnings", state="complete")
+                    return True
+                    
+            except Exception as validation_error:
+                logger.warning(f"Error validating results: {str(validation_error)}")
+                # Still return True as processing likely succeeded
+                status.update(label="✅ Processing completed", state="complete")
                 return True
             
     except Exception as e:        

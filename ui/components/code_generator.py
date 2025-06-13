@@ -258,11 +258,11 @@ class CodeGeneratorUI:
         
         user_id = st.session_state.auth.get("user_id") if "auth" in st.session_state else None
         if user_id:
-            action = "select_category" if category_name not in st.session_state.get("selected_categories", []) else "deselect_category"
+            interaction_type = "select_category" if category_name not in st.session_state.get("selected_categories", []) else "deselect_category"
             _log_user_interaction_code_generator(
                 user_id=user_id,
-                interaction_type="practice",
-                action=action,               
+                interaction_category="practice",
+                interaction_type=interaction_type,               
                 details={"category": category_name}
             )
             
@@ -588,8 +588,8 @@ class CodeGeneratorUI:
                 if user_id:
                     _log_user_interaction_code_generator(
                         user_id=user_id,
-                        interaction_type="practice",
-                        action="start_generate",                        
+                        interaction_category="practice",
+                        interaction_type="start_generate",                        
                         details={
                             "selected_categories": st.session_state.get("selected_categories", []),
                             "categories_count": len(st.session_state.get("selected_categories", [])),
@@ -605,8 +605,8 @@ class CodeGeneratorUI:
                     generation_time = int(time.time() - generation_start_time)
                     _log_user_interaction_code_generator(
                         user_id=user_id,
-                        interaction_type="pratice",
-                        action="generate_completed",                       
+                        interaction_category="pratice",
+                        interaction_type="generate_completed",                       
                         success=True,
                         time_spent_seconds=generation_time,
                         details={                            
@@ -622,8 +622,8 @@ class CodeGeneratorUI:
                 # Log code ready for review
                 _log_user_interaction_code_generator(
                     user_id=user_id,
-                    interaction_type="practice",
-                    action="code_ready_for_review",                    
+                    interaction_category="practice",
+                    interaction_type="code_ready_for_review",                    
                     details={
                         "has_code_snippet": bool(code_snippet),
                         "ready_for_review": True,

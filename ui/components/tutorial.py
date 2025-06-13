@@ -121,8 +121,8 @@ class TutorialUI:
                 
                 _log_user_interaction_tutorial(
                     user_id=user_id,
-                    interaction_type="tutorial",
-                    action="submit_review",
+                    interaction_category="tutorial",
+                    interaction_type="submit_review",
                     success=True,                    
                     details= {
                         "review_length": len(student_review),
@@ -157,8 +157,8 @@ class TutorialUI:
                         practice_error = st.session_state.get("practice_error_data", {})                        
                         _log_user_interaction_tutorial(
                             user_id=user_id,
-                            interaction_type="tutorial",
-                            action="review_analysis_complete",                            
+                            interaction_category="tutorial",
+                            interaction_type="review_analysis_complete",                            
                             success=True,                           
                             details={
                                 "accuracy": accuracy,
@@ -195,8 +195,8 @@ class TutorialUI:
             # Complete practice session as abandoned
             _log_user_interaction_tutorial(
                 user_id=user_id,
-                interaction_type="tutorial",
-                action="complete_tutorial_abandoned",                
+                interaction_category="tutorial",
+                interaction_type="complete_tutorial_abandoned",                
                 success=True,                
                 details= {
                     "abandoned": True,
@@ -222,8 +222,8 @@ class TutorialUI:
         if user_id:
             _log_user_interaction_tutorial(
                     user_id=user_id,
-                    interaction_type="tutorial",
-                    action="restart_tutorial_session",                  
+                    interaction_category="tutorial",
+                    interaction_type="restart_tutorial_session",                  
                     success=True,                   
                     details=None,
                     time_spent_seconds=0
@@ -248,8 +248,8 @@ class TutorialUI:
         if user_id:
             _log_user_interaction_tutorial(
                 user_id=user_id,
-                interaction_type="tutorial",
-                action="regenerate_tutorial_code",               
+                interaction_category="tutorial",
+                interaction_type="regenerate_tutorial_code",               
                 success=True,                
                 details=None,
                 time_spent_seconds=0
@@ -329,8 +329,8 @@ class TutorialUI:
                 if user_id:                    
                     _log_user_interaction_tutorial(
                         user_id=user_id,
-                        interaction_type="tutorial",
-                        action="regenerate_tutorial_code",                        
+                        interaction_category="tutorial",
+                        interaction_type="regenerate_tutorial_code",                        
                         success=True,                        
                         details={"search_term": search_term},
                         time_spent_seconds=0
@@ -353,8 +353,8 @@ class TutorialUI:
 
                     _log_user_interaction_tutorial(
                         user_id=user_id,
-                        interaction_type="tutorial",
-                        action="filter_by_category",                        
+                        interaction_category="tutorial",
+                        interaction_type="filter_by_category",                        
                         success=True,                       
                         details={"selected_category": selected_category},
                         time_spent_seconds=0
@@ -376,8 +376,8 @@ class TutorialUI:
                 if user_id:                   
                     _log_user_interaction_tutorial(
                         user_id=user_id,
-                        interaction_type="tutorial",
-                        action="filter_by_difficulty",                       
+                        interaction_category="tutorial",
+                        interaction_type="filter_by_difficulty",                       
                         success=True,                        
                         details={"selected_difficulty": selected_difficulty},
                         time_spent_seconds=0
@@ -642,8 +642,8 @@ class TutorialUI:
                 if user_id:
                     _log_user_interaction_tutorial(
                         user_id=user_id,
-                        interaction_type="tutorial",
-                        action="start_tutorial_code_generation",                        
+                        interaction_category="tutorial",
+                        interaction_type="start_tutorial_code_generation",                        
                         success=True,                       
                         details={
                             "error_code": error_code,
@@ -939,8 +939,8 @@ class TutorialUI:
 
                     _log_user_interaction_tutorial(
                         user_id=user_id,
-                        interaction_type="tutorial",
-                        action="code_generate_complete",                       
+                        interaction_category="tutorial",
+                        interaction_type="code_generate_complete",                       
                         success=True,                       
                         details= {
                             "generation_successful": True,
@@ -963,8 +963,8 @@ class TutorialUI:
 
                 _log_user_interaction_tutorial(
                     user_id=user_id,
-                    interaction_type="tutorial",
-                    action="code_ready_for_review",                    
+                    interaction_category="tutorial",
+                    interaction_type="code_ready_for_review",                    
                     success=True,                   
                     details= {
                         "code_ready": True,
