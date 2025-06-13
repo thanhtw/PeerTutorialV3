@@ -110,8 +110,8 @@ class JavaCodeReviewGraph:
             Updated workflow state with analysis
         """
         try:
-            logger.debug(f"Submitting review for iteration {state.current_iteration}")
-            logger.debug(f"Review text length: {len(student_review)} characters")
+            logger.info(f"Submitting review for iteration {state.current_iteration}")
+            logger.info(f"Review text length: {len(student_review)} characters")
             
             # Validate input
             if not student_review or not student_review.strip():

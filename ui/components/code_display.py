@@ -908,7 +908,7 @@ def _handle_review_submission(workflow, code_display_ui, auth_ui=None):
  
 def _process_student_review_with_comprehensive_tracking(workflow, student_review: str) -> bool:
     """
-    FIXED: Enhanced review processing with comprehensive variable validation.
+   Enhanced review processing with comprehensive variable validation.
     """
     try:
         # FIXED: Safe user ID extraction
@@ -1030,7 +1030,10 @@ def _process_student_review_with_comprehensive_tracking(workflow, student_review
                 
                 # FIXED: Safe workflow submission with validation
                 raw_updated_state = workflow.submit_review(state, student_review)
-                
+
+                #print(f"Raw updated state: {raw_updated_state}")
+
+
                 analysis_duration = time.time() - analysis_start_time
                 
                 # FIXED: Validate workflow response
