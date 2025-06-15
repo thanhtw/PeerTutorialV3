@@ -8,10 +8,11 @@ registration, and profile management using local JSON files.
 import streamlit as st
 import logging
 import time
-from typing import Dict, Any, Optional, Callable, Tuple
+from typing import Dict, Any, Optional, Callable, Tuple, List
 import os
 from pathlib import Path
 import base64
+import datetime
 
 from auth.mysql_auth import MySQLAuthManager
 from utils.language_utils import t, get_current_language, set_language, get_available_languages
@@ -487,57 +488,127 @@ class AuthUI:
         # Force UI refresh
         st.rerun()
 
-    def update_review_stats(self, accuracy: float, score: int = 0):
+    def update_review_stats(self, accuracy: float, score: int = 0) -> Dict[str, Any]:
         """
-        Update a user's review statistics after completing a review.
+        Enhanced review statistics update that integrates with the badge system.
         
         Args:
             accuracy: The accuracy of the review (0-100 percentage)
             score: Number of errors detected in the review
+            
+        Returns:
+            Dictionary containing update results and any awarded badges
         """
         # Check if user is authenticated
         if not st.session_state.auth.get("is_authenticated", False):
             return {"success": False, "error": "User not authenticated"}
                 
-        # Update stats in the database
         user_id = st.session_state.auth.get("user_id")
         
-        # Ensure score is an integer
-        score = int(score) if score else 0
+        if not user_id or user_id == 'demo_user':
+            return {"success": False, "error": "Invalid user or demo mode"}
         
-        # Add debug logging
-        logger.debug(f"AuthUI: Updating stats for user {user_id}: accuracy={accuracy:.1f}%, score={score}")
-        
-        # IMPORTANT: Pass both accuracy AND score parameters to the auth manager
-        result = self.auth_manager.update_review_stats(user_id, accuracy, score)
-
-        if result and result.get("success", False):
-            logger.debug(f"Updated user statistics: reviews={result.get('reviews_completed')}, " +
-                    f"score={result.get('score')}")
+        try:
+            # Ensure score is an integer
+            score = int(score) if score else 0
             
-            # UPDATE SESSION STATE WITH NEW VALUES
-            if st.session_state.auth.get("user_info"):
-                # Update reviews_completed and score in session state
-                st.session_state.auth["user_info"]["reviews_completed"] = result.get("reviews_completed", 0)
-                st.session_state.auth["user_info"]["score"] = result.get("score", 0)
-                logger.debug(f"Updated session state: reviews={result.get('reviews_completed')}, score={result.get('score')}")
+            logger.debug(f"AuthUI: Updating stats for user {user_id}: accuracy={accuracy:.1f}%, score={score}")
+            
+            # Update basic stats through auth manager
+            result = self.auth_manager.update_review_stats(user_id, accuracy, score)
+            
+            if result and result.get("success", False):
+                logger.debug(f"Updated user statistics: reviews={result.get('reviews_completed')}, " +
+                        f"score={result.get('score')}")
+                
+                # UPDATE SESSION STATE WITH NEW VALUES
+                if st.session_state.auth.get("user_info"):
+                    st.session_state.auth["user_info"]["reviews_completed"] = result.get("reviews_completed", 0)
+                    st.session_state.auth["user_info"]["score"] = result.get("score", 0)
+                    logger.debug(f"Updated session state: reviews={result.get('reviews_completed')}, score={result.get('score')}")
 
-            # Update session state if level changed
-            if result.get("level_changed", False):
-                new_level = result.get("new_level")
-                if new_level and st.session_state.auth.get("user_info"):
-                    st.session_state.auth["user_info"]["level"] = new_level
-                    # Also update the level name fields for consistency
-                    current_language = get_current_language()
-                    st.session_state.auth["user_info"][f"level_name_{current_language}"] = new_level
-                    logger.debug(f"Updated user level in session to: {new_level}")
+                # Handle level changes
+                if result.get("level_changed", False):
+                    new_level = result.get("new_level")
+                    if new_level and st.session_state.auth.get("user_info"):
+                        st.session_state.auth["user_info"]["level"] = new_level
+                        current_language = get_current_language()
+                        st.session_state.auth["user_info"][f"level_name_{current_language}"] = new_level
+                        logger.debug(f"Updated user level in session to: {new_level}")
+                
+                # === NEW: ENHANCED BADGE PROCESSING ===
+                try:
+                    from analytics.badge_manager import BadgeManager
                     
-        else:
-            err_msg = result.get('error', 'Unknown error') if result else "No result returned"
-            logger.error(f"Failed to update review stats: {err_msg}")
-        
-        return result
+                    badge_manager = BadgeManager()
+                    
+                    # Prepare review data for badge processing
+                    review_data = {
+                        'accuracy_percentage': float(accuracy),
+                        'identified_count': int(score),
+                        'total_problems': int(score) if accuracy >= 100.0 else max(int(score), 1),
+                        'time_spent_seconds': 0,  # Will be calculated by badge manager
+                        'session_type': 'regular',
+                        'code_difficulty': 'medium',  # Default, could be enhanced later
+                        'review_iterations': 1,  # Default, could be enhanced later
+                        'categories_encountered': []  # Could be enhanced later
+                    }
+                    
+                    # Process badge awards
+                    badge_result = badge_manager.process_review_completion(user_id, review_data)
+                    
+                    if badge_result.get('success'):
+                        # Add badge information to result
+                        result['badge_awards'] = badge_result.get('awarded_badges', [])
+                        result['points_awarded'] = badge_result.get('points_awarded', 0)
+                        result['total_badges_awarded'] = badge_result.get('total_badges_awarded', 0)
+                        
+                        logger.info(f"Badge processing completed: {badge_result.get('total_badges_awarded', 0)} badges awarded")
+                        
+                        # Show badge notification in UI if badges were awarded
+                        if badge_result.get('awarded_badges'):
+                            self._show_badge_notification(badge_result.get('awarded_badges'))
+                    else:
+                        logger.warning(f"Badge processing failed: {badge_result.get('error', 'Unknown error')}")
+                        
+                except Exception as badge_error:
+                    logger.error(f"Error in enhanced badge processing: {str(badge_error)}")
+                    # Don't fail the main update if badge processing fails
+                    pass
+                # === END ENHANCED BADGE PROCESSING ===
+                        
+            else:
+                err_msg = result.get('error', 'Unknown error') if result else "No result returned"
+                logger.error(f"Failed to update review stats: {err_msg}")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in update_review_stats: {str(e)}")
+            return {"success": False, "error": str(e)}
     
+    def _show_badge_notification(self, awarded_badges: List[Dict[str, Any]]) -> None:
+        """Show notification for newly awarded badges."""
+        try:
+            if not awarded_badges:
+                return
+            
+            # Create a success message with badge information
+            badge_names = [badge.get('name', 'Unknown Badge') for badge in awarded_badges]
+            
+            if len(badge_names) == 1:
+                message = f"🎉 Congratulations! You earned the '{badge_names[0]}' badge!"
+            else:
+                message = f"🎉 Congratulations! You earned {len(badge_names)} new badges: {', '.join(badge_names)}"
+            
+            st.success(message)
+            
+            # Show balloons for celebration
+            st.balloons()
+            
+        except Exception as e:
+            logger.error(f"Error showing badge notification: {str(e)}")
+
     def is_authenticated(self) -> bool:
         """
         Check if user is authenticated.
@@ -576,9 +647,7 @@ class AuthUI:
             logger.error(f"Error getting user level from database: {str(e)}")
             # Fallback to session state
             return st.session_state.auth.get("user_info", {}).get("level", "basic")
-    
-    
-        
+      
     def render_combined_profile_leaderboard(self):
         """Render enhanced combined profile and leaderboard in sidebar with better error handling."""
         if not st.session_state.auth.get("is_authenticated", False):
@@ -629,5 +698,202 @@ class AuthUI:
         if st.button(f"🚪 {t('logout')}", key="enhanced_logout", use_container_width=True):
             self.logout()
 
+    def render_profile_with_badges(self) -> None:
+        """Enhanced profile rendering that shows recent badge awards."""
+        if not st.session_state.auth.get("is_authenticated", False):
+            return
+        
+        user_info = st.session_state.auth.get("user_info", {})
+        user_id = st.session_state.auth.get("user_id")
+        
+        with st.sidebar:
+            try:
+                # Basic profile info
+                current_language = get_current_language()
+                display_name = user_info.get(f"display_name_{current_language}", 
+                                        user_info.get("display_name_en", "User"))
+                level = user_info.get(f"level_name_{current_language}", 
+                                    user_info.get("level", "Basic"))
+                
+                st.markdown(f"""
+                <div class="enhanced-profile-container">
+                    <div class="profile-header">
+                        <div class="profile-avatar">👤</div>
+                        <div class="profile-info">
+                            <h3>{display_name}</h3>
+                            <p class="profile-level">{level}</p>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Enhanced stats display
+                reviews = user_info.get("reviews_completed", 0)
+                score = user_info.get("score", 0)
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric(t("reviews_completed"), reviews)
+                with col2:
+                    st.metric(t("total_score"), score)
+                
+                # Recent badges section
+                if user_id and user_id != 'demo_user':
+                    self._render_recent_badges_preview(user_id)
+                
+                # Progress section
+                st.markdown("---")
+                st.markdown(f"### 📊 {t('quick_stats')}")
+                
+                # Get enhanced stats from database
+                try:
+                    from analytics.badge_manager import BadgeManager
+                    badge_manager = BadgeManager()
+                    
+                    # Get user statistics
+                    stats_query = """
+                        SELECT 
+                            COUNT(*) as total_sessions,
+                            AVG(accuracy_percentage) as avg_accuracy,
+                            COUNT(CASE WHEN accuracy_percentage = 100.0 THEN 1 END) as perfect_sessions
+                        FROM review_sessions 
+                        WHERE user_id = %s
+                    """
+                    
+                    stats_result = badge_manager.db.execute_query(stats_query, (user_id,), fetch_one=True)
+                    
+                    if stats_result:
+                        st.write(f"🎯 **{t('average_accuracy')}:** {stats_result.get('avg_accuracy', 0):.1f}%")
+                        st.write(f"💯 **{t('perfect_sessions')}:** {stats_result.get('perfect_sessions', 0)}")
+                        
+                        # Show streak information
+                        streak_query = """
+                            SELECT streak_type, current_streak, longest_streak
+                            FROM user_streaks 
+                            WHERE user_id = %s
+                        """
+                        
+                        streaks = badge_manager.db.execute_query(streak_query, (user_id,))
+                        
+                        for streak in streaks or []:
+                            streak_type = streak['streak_type']
+                            current = streak['current_streak']
+                            longest = streak['longest_streak']
+                            
+                            if streak_type == 'daily_practice':
+                                st.write(f"🔥 **{t('current_streak')}:** {current} {t('days')}")
+                            elif streak_type == 'perfect_reviews':
+                                st.write(f"✨ **{t('perfect_streak')}:** {current} {t('reviews')}")
+                                
+                except Exception as stats_error:
+                    logger.error(f"Error getting enhanced stats: {str(stats_error)}")
+                    # Fall back to basic display
+                    pass
+                
+            except Exception as e:
+                logger.error(f"Error in enhanced profile rendering: {str(e)}")
 
+    def _render_recent_badges_preview(self, user_id: str) -> None:
+        """Render a preview of recent badges in the sidebar."""
+        try:
+            from analytics.badge_manager import BadgeManager
+            badge_manager = BadgeManager()
+            
+            # Get recent badges (last 3)
+            current_language = get_current_language()
+            name_field = f"name_{current_language}" if current_language in ["en", "zh"] else "name_en"
+            
+            recent_badges_query = f"""
+                SELECT b.{name_field} as name, b.icon, ub.awarded_at
+                FROM user_badges ub
+                JOIN badges b ON ub.badge_id = b.badge_id
+                WHERE ub.user_id = %s
+                ORDER BY ub.awarded_at DESC
+                LIMIT 3
+            """
+            
+            recent_badges = badge_manager.db.execute_query(recent_badges_query, (user_id,))
+            
+            if recent_badges:
+                st.markdown(f"### 🏆 {t('recent_badges')}")
+                
+                for badge in recent_badges:
+                    awarded_date = badge['awarded_at']
+                    if isinstance(awarded_date, datetime.datetime):
+                        date_str = awarded_date.strftime("%m/%d")
+                    else:
+                        date_str = str(awarded_date)[:10] if awarded_date else ""
+                    
+                    st.markdown(f"""
+                    <div class="sidebar-badge-item">
+                        <span class="badge-icon">{badge.get('icon', '🏅')}</span>
+                        <span class="badge-info">
+                            <strong>{badge.get('name', 'Badge')}</strong><br>
+                            <small>{date_str}</small>
+                        </span>
+                    </div>
+                    """, unsafe_allow_html=True)
+            
+        except Exception as e:
+            logger.error(f"Error rendering recent badges preview: {str(e)}")
+
+    # Add CSS for enhanced profile display
+    ENHANCED_PROFILE_CSS = """
+    <style>
+    .enhanced-profile-container {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+    }
+
+    .profile-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .profile-avatar {
+        font-size: 2rem;
+        background: rgba(255,255,255,0.2);
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .profile-info h3 {
+        margin: 0;
+        font-size: 1.2rem;
+    }
+
+    .profile-level {
+        margin: 0;
+        opacity: 0.8;
+        font-size: 0.9rem;
+    }
+
+    .sidebar-badge-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        background: #f8f9fa;
+        border-radius: 6px;
+        margin-bottom: 0.5rem;
+    }
+
+    .badge-icon {
+        font-size: 1.2rem;
+    }
+
+    .badge-info {
+        font-size: 0.85rem;
+        line-height: 1.2;
+    }
+    </style>
+    """
 

@@ -818,3 +818,203 @@ class BadgeManager:
         except Exception as e:
             logger.error(f"Error awarding badge: {str(e)}")
             return {"success": False, "error": str(e)}
+
+    def _check_point_badges(self, user_id: str, total_points: int) -> None:
+        """
+        Check if a user qualifies for any point-based badges.
+        
+        Args:
+            user_id: The user's ID
+            total_points: The user's total points
+        """
+        # Rising Star badge - 500 points in first week
+        if total_points >= 500:
+            # Check when the user joined
+            query = "SELECT created_at FROM users WHERE uid = %s"
+            result = self.db.execute_query(query, (user_id,), fetch_one=True)
+            
+            if result:
+                created_at = result.get("created_at")
+                now = datetime.datetime.now()
+                
+                if created_at and (now - created_at).days <= 7:
+                    self.award_badge(user_id, "rising-star")
+
+    def _check_category_mastery(self, user_id: str, category: str, stats: Dict[str, Any]) -> None:
+        """
+        Check if a user qualifies for category mastery badges.
+        
+        Args:
+            user_id: The user's ID
+            category: The error category
+            stats: Category statistics
+        """
+        # Required mastery level and minimum encounters to earn the badge
+        MASTERY_THRESHOLD = 0.85
+        MIN_ENCOUNTERS = 10
+        
+        if stats and stats.get("mastery_level", 0) >= MASTERY_THRESHOLD and stats.get("encountered", 0) >= MIN_ENCOUNTERS:
+            # Update current language before mapping categories
+            self.current_language = get_current_language()
+            
+            # Map categories to badge IDs - support both English and Chinese categories
+            # Categories are not translated with t() because they need to match exactly what's in the database
+            category_badges = {
+                t("logical"): "logic-guru",
+                "Logical": "logic-guru",
+                "邏輯錯誤": "logic-guru",  # Chinese equivalent
+                t("syntax"): "syntax-specialist",
+                "Syntax": "syntax-specialist",
+                "語法錯誤": "syntax-specialist",  # Chinese equivalent
+                t("code_quality"): "quality-inspector",
+                "Code Quality": "quality-inspector",
+                "程式碼品質": "quality-inspector",  # Chinese equivalent
+                t("standard_violation"): "standards-expert",
+                "Standard Violation": "standards-expert",
+                "標準違規": "standards-expert",  # Chinese equivalent
+                t("java_specific"): "java-maven",
+                "Java Specific": "java-maven",
+                "Java 特定錯誤": "java-maven"  # Chinese equivalent
+            }
+            
+            # Award the appropriate badge if available
+            badge_id = category_badges.get(category)
+            if badge_id:
+                self.award_badge(user_id, badge_id)
+            
+        # Check for "Full Spectrum" badge - at least one error in each category
+        query = """
+            SELECT COUNT(DISTINCT category) AS category_count
+            FROM error_category_stats
+            WHERE user_id = %s AND identified > 0
+        """
+        
+        result = self.db.execute_query(query, (user_id,), fetch_one=True)
+        
+        if result and result.get("category_count", 0) >= 5:  # Assuming 5 main categories
+            self.award_badge(user_id, "full-spectrum")
+    
+    def check_review_completion_badges(self, user_id: str, reviews_completed: int, 
+                                    all_errors_found: bool) -> None:
+        """
+        Check if a user qualifies for review completion badges.
+        
+        Args:
+            user_id: The user's ID
+            reviews_completed: Number of reviews completed
+            all_errors_found: Whether all errors were found in the review
+        """
+        # Review progression badges
+        if reviews_completed >= 5:
+            self.award_badge(user_id, "reviewer-novice")
+        
+        if reviews_completed >= 25:
+            self.award_badge(user_id, "reviewer-adept")
+        
+        if reviews_completed >= 50:
+            self.award_badge(user_id, "reviewer-master")
+        
+        # Bug Hunter badge - find all errors in at least 5 reviews
+        if all_errors_found:
+            # Count how many perfect reviews the user has
+            query = """
+                SELECT COUNT(*) AS perfect_count
+                FROM activity_log
+                WHERE user_id = %s AND activity_type = 'perfect_review'
+            """
+            
+            result = self.db.execute_query(query, (user_id,), fetch_one=True)
+            
+            if result and result.get("perfect_count", 0) >= 5:
+                self.award_badge(user_id, "bug-hunter")            
+          
+                self.db.execute_query(
+                    "INSERT INTO activity_log (user_id, activity_type, points, details_en, details_zh) VALUES (%s, %s, %s, %s, %s)",
+                    (user_id, "perfect_review", 0, t("completed_perfect_review"), t("completed_perfect_review"))
+                )
+          
+            
+            # Perfectionist badge - 3 consecutive perfect reviews
+            query = """
+                SELECT activity_type
+                FROM activity_log
+                WHERE user_id = %s
+                ORDER BY created_at DESC
+                LIMIT 3
+            """
+            
+            result = self.db.execute_query(query, (user_id,))
+            
+            if result and len(result) >= 3:
+                all_perfect = all(r.get("activity_type") == "perfect_review" for r in result)
+                if all_perfect:
+                    self.award_badge(user_id, "perfectionist")
+
+    def update_consecutive_days(self, user_id: str) -> Dict[str, Any]:
+        """
+        Update a user's consecutive days of activity.
+        
+        Args:
+            user_id: The user's ID
+            
+        Returns:
+            Dict containing success status and updated statistics
+        """
+        if not user_id:
+            return {"success": False, "error": t("invalid_user_id")}
+        
+        try:
+            # Get current last_activity and consecutive_days
+            query = """
+                SELECT last_activity, consecutive_days 
+                FROM users 
+                WHERE uid = %s
+            """
+            
+            result = self.db.execute_query(query, (user_id,), fetch_one=True)
+            
+            if not result:
+                return {"success": False, "error": t("user_not_found")}
+            
+            today = datetime.date.today()
+            last_activity = result.get("last_activity")
+            consecutive_days = result.get("consecutive_days", 0)
+            
+            # Calculate new consecutive days
+            new_consecutive_days = consecutive_days
+            
+            if not last_activity:
+                # First activity
+                new_consecutive_days = 1
+            elif last_activity == today:
+                # Already logged today, no change
+                pass
+            elif last_activity == today - datetime.timedelta(days=1):
+                # Activity on consecutive day
+                new_consecutive_days += 1
+            else:
+                # Break in streak
+                new_consecutive_days = 1
+            
+            # Update user record
+            update_query = """
+                UPDATE users 
+                SET last_activity = %s,
+                    consecutive_days = %s
+                WHERE uid = %s
+            """
+            
+            self.db.execute_query(update_query, (today, new_consecutive_days, user_id))
+            
+            # Check for consistency badges
+            if new_consecutive_days >= 5:
+                self.award_badge(user_id, "consistency-champ")
+            
+            return {
+                "success": True, 
+                "consecutive_days": new_consecutive_days
+            }
+                
+        except Exception as e:
+            logger.error(f"{t('error_updating_consecutive_days')}: {str(e)}")
+            return {"success": False, "error": str(e)}
