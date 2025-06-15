@@ -220,7 +220,12 @@ INSERT INTO badges (badge_id, name_en, name_zh, description_en, description_zh, 
 ('efficiency-expert', 'Efficiency Expert', '效率專家', 'Maintain 90%+ accuracy with average review time under 5 minutes', '保持90%以上準確率且平均評審時間少於5分鐘', '⚡', 'skill', 'hard', 120, 'rare',
  '{"type": "efficiency", "accuracy": 90, "avg_time": 300, "min_reviews": 10, "description": "Speed and accuracy combined"}');
 
+-- Insert initial streak types
+INSERT IGNORE INTO user_streaks (user_id, streak_type) 
+SELECT uid, 'daily_practice' FROM users;
 
+INSERT IGNORE INTO user_streaks (user_id, streak_type) 
+SELECT uid, 'perfect_reviews' FROM users;
 
 -- =====================================================
 -- Badge Prerequisites and Advanced Criteria

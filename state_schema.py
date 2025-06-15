@@ -83,6 +83,7 @@ class WorkflowState(BaseModel):
     last_update_timestamp: float = Field(default_factory=time.time, description="Last time state was updated")
     session_id: Optional[str] = Field(None, description="Session identifier for debugging")
     debug_info: Dict[str, Any] = Field(default_factory=dict, description="Debug information")
+    badge_awards: Optional[Dict[str, Any]] = Field(None, description="Newly awarded badges and points")
     
     class Config:
         """Pydantic configuration"""

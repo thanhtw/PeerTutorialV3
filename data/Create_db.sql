@@ -15,6 +15,10 @@ DROP TABLE IF EXISTS badges;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS user_sessions;
 DROP TABLE IF EXISTS user_interactions;
+DROP TABLE IF EXISTS error_category_stats;
+DROP TABLE IF EXISTS review_sessions;
+DROP TABLE IF EXISTS badge_progress;
+DROP TABLE IF EXISTS user_streaks;  
 SET FOREIGN_KEY_CHECKS = 1;
 
 
@@ -34,7 +38,10 @@ CREATE TABLE IF NOT EXISTS users (
     last_activity DATE DEFAULT NULL,
     total_session_time INT DEFAULT 0,
     preferred_language ENUM('en', 'zh') DEFAULT 'en',
-    timezone VARCHAR(50) DEFAULT 'UTC',
+    perfect_reviews_count INT DEFAULT 0,
+    average_accuracy DECIMAL(5,2) DEFAULT 0.00,
+    last_badge_check TIMESTAMP NULL,
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
@@ -42,7 +49,9 @@ CREATE TABLE IF NOT EXISTS users (
     INDEX idx_level (level_name_en),
     INDEX idx_points (total_points DESC),
     INDEX idx_activity (last_activity DESC),
-    INDEX idx_performance (reviews_completed, score)
+    INDEX idx_performance (reviews_completed, score),
+    INDEX idx_users_performance (average_accuracy DESC, perfect_reviews_count DESC),
+    INDEX idx_users_badge_check (last_badge_check ASC)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- Badges table
@@ -70,6 +79,78 @@ CREATE TABLE IF NOT EXISTS badges (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- User Sessions - Track overall user sessions
+-- Add error_category_stats table (referenced in code but missing from schema)
+CREATE TABLE IF NOT EXISTS error_category_stats (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    category_name VARCHAR(100) NOT NULL,
+    encountered INT DEFAULT 0,
+    identified INT DEFAULT 0,
+    mastery_level DECIMAL(5,2) DEFAULT 0.00,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE,
+    UNIQUE KEY unique_user_category (user_id, category_name),
+    INDEX idx_user_mastery (user_id, mastery_level DESC),
+    INDEX idx_category_performance (category_name, mastery_level DESC)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- Add review_sessions table for detailed session tracking
+CREATE TABLE IF NOT EXISTS review_sessions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(500) NOT NULL,
+    session_id VARCHAR(500) NOT NULL,
+    code_difficulty VARCHAR(20) DEFAULT 'medium',
+    total_errors INT DEFAULT 0,
+    identified_errors INT DEFAULT 0,
+    accuracy_percentage DECIMAL(5,2) DEFAULT 0.00,
+    review_iterations INT DEFAULT 1,
+    time_spent_seconds INT DEFAULT 0,
+    session_type ENUM('practice', 'regular', 'tutorial') DEFAULT 'regular',
+    practice_error_code VARCHAR(100) NULL,
+    completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE,
+    INDEX idx_user_performance (user_id, accuracy_percentage DESC, completed_at DESC),
+    INDEX idx_session_stats (session_type, accuracy_percentage DESC),
+    INDEX idx_practice_tracking (user_id, practice_error_code, completed_at DESC)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- Add badge_progress table to track incremental progress toward badges
+CREATE TABLE IF NOT EXISTS badge_progress (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    badge_id VARCHAR(50) NOT NULL,
+    current_progress INT DEFAULT 0,
+    target_progress INT DEFAULT 0,
+    progress_data JSON,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE,
+    FOREIGN KEY (badge_id) REFERENCES badges(badge_id) ON DELETE CASCADE,
+    UNIQUE KEY unique_user_badge_progress (user_id, badge_id),
+    INDEX idx_progress_tracking (user_id, current_progress, target_progress)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- Add user_streaks table for consistency tracking
+CREATE TABLE IF NOT EXISTS user_streaks (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    streak_type VARCHAR(50) NOT NULL,
+    current_streak INT DEFAULT 0,
+    longest_streak INT DEFAULT 0,
+    last_activity_date DATE,
+    streak_data JSON,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE,
+    UNIQUE KEY unique_user_streak_type (user_id, streak_type),
+    INDEX idx_streak_tracking (user_id, streak_type, current_streak DESC)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- Error categories table
 CREATE TABLE error_categories (
@@ -169,5 +250,5 @@ SELECT 'Database tables created successfully!' as Status;
 SELECT COUNT(table_name) as Tables_Created 
 FROM information_schema.tables 
 WHERE table_schema = DATABASE() 
-AND table_name IN ('users', 'error_categories', 'java_errors', 'badges', 'user_badges', 'activity_log','user_interactions');   
+AND table_name IN ('users', 'error_categories', 'java_errors', 'badges', 'user_badges', 'activity_log','user_interactions','error_category_stats', 'review_sessions', 'badge_progress', 'user_streaks');   
 

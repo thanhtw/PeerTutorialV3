@@ -485,11 +485,9 @@ class WorkflowNodes:
     # =================================================================
 
     def generate_comparison_report_node(self, state: WorkflowState) -> WorkflowState:
-        """
-        PHASE 3: Generate comparison report node.
-        """
+        """Enhanced comparison report node with badge processing."""
         try:
-            logger.debug("PHASE 3: Generating comparison report")
+            logger.debug("PHASE 3: Generating comparison report with badge processing")
             
             # Check if we have review history
             if not hasattr(state, 'review_history') or not state.review_history:
@@ -504,10 +502,8 @@ class WorkflowNodes:
             # Generate comparison report if not already generated
             if not hasattr(state, 'comparison_report') or not state.comparison_report:
                 if hasattr(state, 'evaluation_result') and state.evaluation_result:
-                    # Extract error information from evaluation results
                     found_errors = state.evaluation_result.get(t('found_errors'), [])
                     
-                    # Convert review history to format expected by generate_comparison_report
                     converted_history = []
                     for review in state.review_history:
                         converted_history.append({
@@ -528,37 +524,34 @@ class WorkflowNodes:
                         except Exception as report_error:
                             logger.error(f"Failed to generate comparison report: {str(report_error)}")
                             state.comparison_report = None
-                    else:
-                        # Fallback comparison report
-                        state.comparison_report = None
-                else:
-                    # No evaluation result available
-                    state.comparison_report = None
+            
+            # === NEW: BADGE PROCESSING ===
+            try:
+                import streamlit as st
+                if hasattr(st, 'session_state') and 'auth' in st.session_state:
+                    user_id = st.session_state.auth.get('user_id')
+                    
+                    if user_id and user_id != 'demo_user':
+                        from workflow.badge_integration import WorkflowBadgeIntegrator
+                        
+                        badge_integrator = WorkflowBadgeIntegrator()
+                        badge_result = badge_integrator.process_review_completion_with_badges(
+                            state, user_id
+                        )
+                        
+                        if badge_result.get('success'):
+                            state.badge_awards = {
+                                'awarded_badges': badge_result.get('awarded_badges', []),
+                                'points_awarded': badge_result.get('points_awarded', 0),
+                                'total_badges_awarded': badge_result.get('total_badges_awarded', 0)
+                            }
+                            logger.info(f"Badge processing completed: {badge_result.get('total_badges_awarded', 0)} badges awarded")
+            except Exception as badge_error:
+                logger.error(f"Error in badge processing: {str(badge_error)}")
+            # === END BADGE PROCESSING ===
             
             # Update state to complete
             state.current_step = "complete"
-            
-            # Generate final summary
-            if not hasattr(state, 'final_summary') or not state.final_summary:
-                if hasattr(state, 'review_history') and state.review_history:
-                    latest_review = state.review_history[-1]
-                    if hasattr(latest_review, 'analysis') and latest_review.analysis:
-                        analysis = latest_review.analysis
-                        identified_count = analysis.get(t('identified_count'), 0)
-                        original_error_count = getattr(state, 'original_error_count', 0)
-                        is_sufficient = getattr(state, 'review_sufficient', False)
-                        
-                        if original_error_count > 0:
-                            percentage = (identified_count / original_error_count) * 100
-                            suffix = " (Sufficient)" if is_sufficient else " (Needs Improvement)"
-                            state.final_summary = f"Review completed: {identified_count}/{original_error_count} errors identified ({percentage:.1f}%){suffix}"
-                        else:
-                            suffix = " (Sufficient)" if is_sufficient else " (Needs Improvement)"
-                            state.final_summary = f"Review completed: {identified_count} errors identified{suffix}"
-                    else:
-                        state.final_summary = "Review workflow completed"
-                else:
-                    state.final_summary = "Workflow completed successfully"
             
             logger.debug("PHASE 3: Comparison report generation completed")
             return state

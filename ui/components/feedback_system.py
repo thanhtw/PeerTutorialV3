@@ -51,7 +51,7 @@ class FeedbackSystem:
         self.comparison_renderer = ComparisonReportRenderer()
 
     def render_feedback_tab(self):
-        """Render the feedback tab with review analysis from LangGraph workflow results."""
+        """Render the feedback tab with review analysis and badge awards."""
         state = st.session_state.workflow_state
         
         # Check if review process is completed
@@ -84,6 +84,7 @@ class FeedbackSystem:
         st.markdown('</div>', unsafe_allow_html=True)
         
         with feedback_tabs[0]:
+            self.render_newly_awarded_badges(state)
             # Display the feedback results from workflow
             self.render_results(
                 comparison_report=comparison_report,
@@ -238,7 +239,6 @@ class FeedbackSystem:
         if hasattr(state, 'review_history') and state.review_history and len(state.review_history) > 0:
             latest_review = state.review_history[-1]
             analysis = latest_review.analysis if hasattr(latest_review, 'analysis') else {}
-            print(f"Latest review analysis: {analysis}")
             identified_count = analysis[t('identified_count')]
             total_problems = analysis[t('total_problems')]
             
@@ -423,7 +423,6 @@ class FeedbackSystem:
                 user_id=user_id,
                 interaction_category="practice",
                 interaction_type="view_badge_showcase",
-                component="badge_showcase",
                 details={"badges_count": len(badges)}
             )
 
@@ -433,6 +432,84 @@ class FeedbackSystem:
             <div class="badge-summary-stats">{total_badges} total badges earned across {total_categories} categories</div>
         </div>
         ''', unsafe_allow_html=True)
+
+    def render_newly_awarded_badges(self, state):
+        """Render newly awarded badges section."""
+        try:
+            if not hasattr(state, 'badge_awards') or not state.badge_awards:
+                return
+            
+            badge_awards = state.badge_awards
+            awarded_badges = badge_awards.get('awarded_badges', [])
+            points_awarded = badge_awards.get('points_awarded', 0)
+            
+            if not awarded_badges and points_awarded == 0:
+                return
+            
+            # Add CSS for badge celebration
+            st.markdown("""
+            <style>
+            .badge-celebration-container {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 2rem;
+                border-radius: 12px;
+                margin: 2rem 0;
+                text-align: center;
+            }
+            .new-badge-card {
+                background: linear-gradient(145deg, #f0f0f0, #ffffff);
+                border-radius: 12px;
+                padding: 1.5rem;
+                text-align: center;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                margin: 1rem 0;
+                border: 2px solid #ffd700;
+            }
+            .badge-icon-large { font-size: 3rem; margin-bottom: 0.5rem; }
+            .badge-name-large { font-weight: bold; font-size: 1.2rem; color: #333; }
+            .points-award-summary {
+                background: #28a745;
+                color: white;
+                padding: 1rem;
+                border-radius: 8px;
+                text-align: center;
+                margin: 1rem 0;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
+            if awarded_badges:
+                st.markdown(f"""
+                <div class="badge-celebration-container">
+                    <h3>🎉 {t('new_badges_earned')}!</h3>
+                    <p>Congratulations on earning {len(awarded_badges)} new badges!</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Display new badges
+                cols = st.columns(min(len(awarded_badges), 3))
+                for i, badge in enumerate(awarded_badges):
+                    with cols[i % 3]:
+                        st.markdown(f"""
+                        <div class="new-badge-card">
+                            <div class="badge-icon-large">{badge.get('icon', '🏅')}</div>
+                            <div class="badge-name-large">{badge.get('name', 'New Badge')}</div>
+                            <div class="badge-description-small">{badge.get('description', '')}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                
+                st.balloons()  # Celebration effect
+            
+            if points_awarded > 0:
+                st.markdown(f"""
+                <div class="points-award-summary">
+                    <span>⭐ Points Earned: <strong>{points_awarded}</strong></span>
+                </div>
+                """, unsafe_allow_html=True)
+                
+        except Exception as e:
+            logger.error(f"Error rendering newly awarded badges: {str(e)}")
 
 def render_feedback_tab(workflow, auth_ui=None):
         """
