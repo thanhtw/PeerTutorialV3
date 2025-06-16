@@ -51,13 +51,15 @@ class ProfileLeaderboardSidebar:
                                 user_info.get("display_name", "User"))
         level = user_info.get(f"level_name_{current_lang}", 
                             user_info.get("level", "basic")).capitalize()
-        # Use get() with default values to handle missing fields
+        
+        # FIXED: Use total_points instead of score
         reviews_completed = user_info.get("reviews_completed", 0)
-        score = user_info.get("score", 0)
-        return display_name, level, reviews_completed, score
-    
-    def _render_profile_section(self, display_name: str, level: str, 
-                                    reviews_completed: int, score: int, 
+        total_points = user_info.get("total_points", 0)  
+       
+        return display_name, level, reviews_completed, total_points
+
+    def _render_profile_section(self, display_name: str, level: str,
+                                    reviews_completed: int, total_points: int,
                                     user_badges: List[Dict], user_rank_info: Dict) -> None:
         """Render profile section with fixed HTML structure."""
         
@@ -94,16 +96,14 @@ class ProfileLeaderboardSidebar:
                             <div class="stat-label-enhanced">{t("review_times")}</div>
                         </div>
                         <div class="stat-item-enhanced">
-                            <div class="stat-value-enhanced">{score:,}</div>
-                            <div class="stat-label-enhanced">{t("score")}</div>
+                            <div class="stat-value-enhanced">{total_points:,}</div>
+                            <div class="stat-label-enhanced">{t("total_points")}</div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
         '''
-        
-        # Render profile with error handling
         try:
             st.markdown(profile_html, unsafe_allow_html=True)
         except Exception as e:
@@ -114,10 +114,7 @@ class ProfileLeaderboardSidebar:
             with col1:
                 st.metric("Reviews", reviews_completed)
             with col2:
-                st.metric("Score", f"{score:,}")
-        
-        # Render rank section separately
-        #self._render_rank_section(user_rank_info)
+                st.metric("Total Points", f"{total_points:,}")
     
     def _render_rank_section(self, user_rank_info: Dict) -> None:
         """Render rank section with fallback."""

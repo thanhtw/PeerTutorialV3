@@ -13,6 +13,7 @@ from data.database_error_repository import DatabaseErrorRepository
 from utils.language_utils import get_current_language, t
 from state_schema import WorkflowState
 from utils.code_utils import _get_category_icon, _log_user_interaction_code_generator
+from utils.workflow_state_manager import WorkflowStateManager
 
 # Configure logging 
 logging.basicConfig(level=logging.INFO) 
@@ -46,7 +47,250 @@ class CodeGeneratorUI:
         Args:
             user_level: User's experience level (basic, medium, senior)
         """
+        # Get workflow context
+        context = WorkflowStateManager.get_workflow_context()
+        status = context["status"]
+
+        # Always show workflow progress
+        from ui.components.workflow_progress import WorkflowProgressIndicator
+        WorkflowProgressIndicator.render_progress_bar()
         
+        # Render based on workflow state
+        if status == "not_started":
+            self._render_initial_generation(user_level)
+        elif status in ["code_generated", "review_in_progress"]:
+            self._render_review_guidance_mode()
+        elif status == "review_completed":
+            self._render_completion_mode()
+        else:
+            # Fallback to normal generation
+            self._render_initial_generation(user_level)
+
+    def _render_initial_generation(self, user_level: str):
+        """Render the initial code generation interface."""
+        # This is your existing render logic
+        self._render_header()
+        self._initialize_session_state()
+        self._render_configuration_section(user_level)
+        self._render_code_display_section()
+    
+    def _render_review_guidance_mode(self):
+        """Render guidance when code is ready for review."""
+        context = WorkflowStateManager.get_workflow_context()
+        
+        # Guidance header
+        st.markdown(f"""
+        <div class="smart-guidance-container">
+            <div class="guidance-card current-step">
+                <div class="guidance-header">
+                    <span class="guidance-icon">✅</span>
+                    <div class="guidance-content">
+                        <h3>{t('code_generated_successfully')}</h3>
+                        <p>{t('your_code_challenge_is_ready_for_review')}</p>
+                    </div>
+                </div>
+                <div class="guidance-actions">
+                    <div class="primary-action">
+                        <p class="action-text">👉 {t('next_recommended_step')}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Action buttons
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            if st.button(
+                f"📋 {t('start_code_review')}",
+                type="primary",
+                use_container_width=True,
+                key="go_to_review_smart"
+            ):
+                st.session_state.active_tab = 2  # Switch to review tab
+                st.rerun()
+        
+        with col2:
+            if st.button(
+                f"👀 {t('preview_code')}",
+                type="secondary",
+                use_container_width=True,
+                key="preview_code_smart"
+            ):
+                st.session_state.show_code_preview = True
+        
+        # Show code preview if requested
+        if st.session_state.get("show_code_preview", False):
+            self._render_code_preview()
+        
+        # Advanced options
+        self._render_advanced_options()
+    
+    def _render_code_preview(self):
+        """Render a preview of the generated code."""
+        if hasattr(st.session_state.workflow_state, 'code_snippet'):
+            st.markdown(f"### 👀 {t('code_preview')}")
+            
+            # Show code snippet
+            code_snippet = st.session_state.workflow_state.code_snippet
+            if hasattr(code_snippet, 'clean_code') and code_snippet.clean_code:
+                # Show first 10 lines as preview
+                lines = code_snippet.clean_code.split('\n')[:10]
+                preview_code = '\n'.join(lines)
+                if len(code_snippet.clean_code.split('\n')) > 10:
+                    preview_code += '\n// ... (truncated for preview)'
+                
+                st.code(preview_code, language="java")
+                st.info(f"💡 {t('full_code_available_in_review_tab')}")
+            
+            # Hide preview button
+            if st.button(f"🔼 {t('hide_preview')}", key="hide_preview"):
+                st.session_state.show_code_preview = False
+                st.rerun()
+    
+    def _render_advanced_options(self):
+        """Render advanced options like regeneration."""
+        with st.expander(f"⚙️ {t('advanced_options')}", expanded=False):
+            st.markdown(f"""
+            <div class="advanced-options-info">
+                <h5>🔄 {t('regenerate_code')}</h5>
+                <p>{t('regeneration_explanation')}</p>
+                <div class="warning-box">
+                    ⚠️ {t('regeneration_will_reset_progress')}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Show current progress info
+            context = WorkflowStateManager.get_workflow_context()
+            if context["review_count"] > 0:
+                st.warning(f"⚠️ {t('you_have_review_progress')} ({context['review_count']} {t('attempts')})")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button(
+                    f"🔄 {t('yes_regenerate_new')}",
+                    key="confirm_regenerate",
+                    help=t('this_will_reset_all_progress')
+                ):
+                    self._handle_regeneration()
+            
+            with col2:
+                if st.button(
+                    f"📋 {t('no_continue_review')}",
+                    key="continue_to_review",
+                    type="primary",
+                    help=t('go_to_review_tab')
+                ):
+                    st.session_state.active_tab = 2
+                    st.rerun()
+    
+    def _render_completion_mode(self):
+        """Render interface when review is completed."""
+        context = WorkflowStateManager.get_workflow_context()
+        
+        st.markdown(f"""
+        <div class="completion-container">
+            <div class="completion-header">
+                <span class="completion-icon">🎉</span>
+                <div class="completion-content">
+                    <h3>{t('review_session_completed')}</h3>
+                    <p>{t('great_job_completing_review')}</p>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Action options
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button(
+                f"📊 {t('view_detailed_feedback')}",
+                type="primary",
+                use_container_width=True,
+                key="view_feedback_completion"
+            ):
+                st.session_state.active_tab = 3  # Go to feedback tab
+                st.rerun()
+        
+        with col2:
+            if st.button(
+                f"🔄 {t('try_new_challenge')}",
+                type="secondary",
+                use_container_width=True,
+                key="new_challenge_completion"
+            ):
+                self._start_new_session()
+        
+        with col3:
+            if st.button(
+                f"🏠 {t('start_over')}",
+                type="secondary",
+                use_container_width=True,
+                key="start_over_completion"
+            ):
+                st.session_state.full_reset = True
+                st.rerun()
+    
+    def _handle_regeneration(self):
+        """Handle code regeneration with progress reset."""
+        try:
+            # Clear existing workflow state
+            if hasattr(st.session_state, 'workflow_state'):
+                # Preserve configuration but reset execution state
+                old_state = st.session_state.workflow_state
+                new_state = WorkflowState()
+                
+                # Copy configuration
+                if hasattr(old_state, 'selected_error_categories'):
+                    new_state.selected_error_categories = old_state.selected_error_categories
+                if hasattr(old_state, 'code_length'):
+                    new_state.code_length = old_state.code_length
+                if hasattr(old_state, 'difficulty_level'):
+                    new_state.difficulty_level = old_state.difficulty_level
+                
+                st.session_state.workflow_state = new_state
+            
+            # Clear UI state
+            ui_keys_to_clear = [
+                'show_code_preview',
+                'generation_completed',
+                'show_regenerate_confirmation'
+            ]
+            
+            for key in ui_keys_to_clear:
+                if key in st.session_state:
+                    del st.session_state[key]
+            
+            st.success(f"✅ {t('regeneration_initiated')}")
+            st.rerun()
+            
+        except Exception as e:
+            logger.error(f"Error during regeneration: {str(e)}")
+            st.error(f"❌ {t('regeneration_failed')}: {str(e)}")
+    
+    def _start_new_session(self):
+        """Start a completely new session."""
+        # Clear all session state except auth
+        keys_to_preserve = ['auth', 'language', 'provider_selection']
+        preserved_values = {k: st.session_state.get(k) for k in keys_to_preserve if k in st.session_state}
+        
+        # Clear everything
+        for key in list(st.session_state.keys()):
+            if key not in keys_to_preserve:
+                del st.session_state[key]
+        
+        # Restore preserved values
+        for key, value in preserved_values.items():
+            st.session_state[key] = value
+        
+        # Reset to first tab
+        st.session_state.active_tab = 0
+        st.success(f"🆕 {t('new_session_started')}")
+        st.rerun()
+
         # Check for tab switching flag and handle it
         if st.session_state.get("switch_to_review_tab", False):
             # Clear the flag

@@ -43,6 +43,20 @@ class AuthUI:
                 "user_info": {}
             }
     
+    def _extract_user_data(self, user_info: Dict[str, Any]) -> tuple:
+        """Extract user data with total_points instead of score."""
+        current_lang = get_current_language()
+        display_name = user_info.get(f"display_name_{current_lang}", 
+                                user_info.get("display_name", "User"))
+        level = user_info.get(f"level_name_{current_lang}", 
+                            user_info.get("level", "basic")).capitalize()
+        
+        # FIXED: Use total_points instead of score
+        reviews_completed = user_info.get("reviews_completed", 0)
+        total_points = user_info.get("total_points", 0)  # Changed from score
+        
+        return display_name, level, reviews_completed, total_points
+
     def render_auth_page(self) -> bool:
         """
         Render a professional authentication page with enhanced styling and proper i18n.
@@ -837,8 +851,169 @@ class AuthUI:
         except Exception as e:
             logger.error(f"Error rendering recent badges preview: {str(e)}")
 
+    def render_combined_profile_leaderboard(self):
+        """Render enhanced combined profile and leaderboard with separated badges."""
+        if not st.session_state.auth.get("is_authenticated", False):
+            return
+        
+        user_info = st.session_state.auth.get("user_info", {})
+        user_id = st.session_state.auth.get("user_id")
+        
+        with st.sidebar:
+            try:
+                from ui.components.profile_leaderboard import ProfileLeaderboardSidebar
+                from ui.components.badge_sidebar import BadgeSidebar  # NEW IMPORT
+                
+                # Create sidebar instances
+                sidebar_component = ProfileLeaderboardSidebar()
+                badge_component = BadgeSidebar()  # NEW COMPONENT
+                
+                # Render profile (without badges now)
+                sidebar_component.render_combined_sidebar(user_info, user_id)
+                
+                # Render separated badges section
+                st.markdown("---")
+                badge_component.render_badge_section(user_info, user_id)
+                
+            except ImportError as ie:
+                logger.error(f"Failed to import sidebar components: {str(ie)}")
+            except Exception as e:
+                logger.error(f"Enhanced sidebar error: {str(e)}")
+            
+            # App info and logout section
+            self._render_sidebar_footer()
+
+# CSS for badge sidebar - Add to your CSS files
+BADGE_SIDEBAR_CSS = """
+<style>
+.sidebar-badges-container {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.badges-header h4 {
+    margin: 0;
+    color: #495057;
+    font-size: 1rem;
+}
+
+.no-badges-container {
+    text-align: center;
+    padding: 1rem;
+    color: #6c757d;
+}
+
+.no-badges-icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.badges-hint {
+    margin-top: 0.5rem;
+}
+
+.sidebar-badge-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: white;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    border: 1px solid #e9ecef;
+}
+
+.badge-icon-sidebar {
+    font-size: 1.2rem;
+    min-width: 24px;
+}
+
+.badge-info-sidebar {
+    flex: 1;
+    min-width: 0;
+}
+
+.badge-name-sidebar {
+    font-weight: 600;
+    font-size: 0.8rem;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.badge-date-sidebar {
+    font-size: 0.7rem;
+    color: #6c757d;
+}
+
+.badge-stats-container {
+    margin-top: 1rem;
+    padding: 0.5rem;
+    background: white;
+    border-radius: 6px;
+}
+
+.badge-progress-bar {
+    text-align: center;
+}
+
+.progress-label {
+    font-size: 0.8rem;
+    color: #495057;
+    margin-bottom: 0.25rem;
+}
+
+.progress-bar-bg {
+    background: #e9ecef;
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 0.25rem;
+}
+
+.progress-bar-fill {
+    background: linear-gradient(90deg, #28a745, #20c997);
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    font-size: 0.7rem;
+    color: #6c757d;
+}
+
+.modal-badge-card {
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 0.5rem;
+    text-align: center;
+    margin-bottom: 0.5rem;
+    border: 1px solid #e9ecef;
+}
+
+.modal-badge-card .badge-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.modal-badge-card .badge-name {
+    font-weight: 600;
+    font-size: 0.8rem;
+    margin-bottom: 0.25rem;
+}
+
+.modal-badge-card .badge-date {
+    font-size: 0.7rem;
+    color: #6c757d;
+}
+</style>
+"""           
     # Add CSS for enhanced profile display
-    ENHANCED_PROFILE_CSS = """
+
+ENHANCED_PROFILE_CSS = """
     <style>
     .enhanced-profile-container {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);

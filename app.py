@@ -1,13 +1,6 @@
-# app.py - Updated with comprehensive fixes for rerun issues
-
+# app.py - FIXED VERSION
 """
-Java Peer Code Review Training System - LangGraph Version
-
-UPDATED: Enhanced with comprehensive fixes for rerun issues:
-1. Fixed review form state management during reruns
-2. Prevented unnecessary code regeneration on reruns  
-3. Added robust session state management
-4. Enhanced workflow conditions with safeguards
+Fixed version of app.py with proper error handling for tab creation
 """
 
 import streamlit as st
@@ -21,7 +14,7 @@ from static.css_utils import load_css
 # Import language utilities with i18n support
 from utils.language_utils import init_language, render_language_selector, t
 
-# ADDED: Import enhanced session state manager
+# ENHANCED: Import session state manager
 from utils.session_state_manager import session_state_manager
 
 # Configure logging
@@ -69,10 +62,210 @@ try:
 except Exception as e:
     logger.warning(f"CSS loading failed: {str(e)}")
 
-def main():
-    """Enhanced main application function with comprehensive rerun fixes."""
+# FIXED: Safe tab creation with proper error handling
+def create_smart_tabs_safe(tab_labels):
+    """
+    Create tabs with smart workflow indicators and comprehensive error handling.
+    
+    Args:
+        tab_labels: List of tab label strings
+        
+    Returns:
+        Streamlit tabs object (never None)
+    """
+    try:
+        # Try to import WorkflowStateManager safely
+        try:
+            from utils.workflow_state_manager import WorkflowStateManager
+            use_smart_features = True
+        except ImportError as e:
+            logger.warning(f"WorkflowStateManager not available: {str(e)}. Using basic tabs.")
+            use_smart_features = False
+        except Exception as e:
+            logger.warning(f"Error importing WorkflowStateManager: {str(e)}. Using basic tabs.")
+            use_smart_features = False
+        
+        if use_smart_features:
+            try:
+                # Get workflow context safely
+                context = WorkflowStateManager.get_workflow_context()
+                status = context.get("status", "not_started")
+                
+                # Add smart indicators to tab labels
+                enhanced_labels = []
+                for i, label in enumerate(tab_labels):
+                    if i == 0:  # Tutorial - always accessible
+                        enhanced_labels.append(label)
+                    elif i == 1:  # Generate
+                        if status == "not_started":
+                            enhanced_labels.append(f"👉 {label}")
+                        else:
+                            enhanced_labels.append(f"✅ {label}")
+                    elif i == 2:  # Review
+                        if status == "code_generated":
+                            enhanced_labels.append(f"👉 {label}")
+                        elif status in ["review_in_progress", "review_completed"]:
+                            enhanced_labels.append(f"✅ {label}")
+                        else:
+                            enhanced_labels.append(label)
+                    elif i == 3:  # Feedback
+                        if status == "review_completed":
+                            enhanced_labels.append(f"🎉 {label}")
+                        else:
+                            enhanced_labels.append(label)
+                    else:
+                        enhanced_labels.append(label)
+                
+                # Create tabs with enhanced labels
+                tabs = st.tabs(enhanced_labels)
+                logger.debug("Created smart tabs successfully")
+                return tabs
+                
+            except Exception as e:
+                logger.error(f"Error in smart tab creation: {str(e)}. Falling back to basic tabs.")
+                # Fall back to basic tabs
+                pass
+        
+        # Fallback: Create basic tabs
+        tabs = st.tabs(tab_labels)
+        logger.debug("Created basic tabs successfully")
+        return tabs
+        
+    except Exception as e:
+        logger.error(f"Critical error in tab creation: {str(e)}. Creating minimal tabs.")
+        # Ultimate fallback: Create minimal tabs with basic labels
+        try:
+            minimal_labels = ["Tutorial", "Generate", "Review", "Feedback"]
+            return st.tabs(minimal_labels)
+        except Exception as critical_error:
+            logger.critical(f"Could not create any tabs: {str(critical_error)}")
+            # If even this fails, return a mock object that won't break the interface
+            return [st.container() for _ in range(4)]
 
-    # ADDED: Clean up expired locks at start of each run
+def render_workflow_progress_safe():
+    """
+    FIXED: Safely render workflow progress indicator with fallback.
+    This version ensures HTML is never displayed as raw text.
+    """
+    try:
+        # Option 1: Try the full workflow progress indicator
+        from ui.components.workflow_progress import WorkflowProgressIndicator
+        WorkflowProgressIndicator.render_progress_bar()
+        
+    except ImportError:
+        logger.debug("WorkflowProgressIndicator not available, using simple fallback")
+        render_simple_progress_fallback()
+        
+    except Exception as e:
+        logger.warning(f"Error rendering workflow progress: {str(e)}, using simple fallback")
+        render_simple_progress_fallback()
+
+def render_simple_progress_fallback():
+    """
+    IMMEDIATE FIX: Simple progress indicator that always works.
+    This replaces the broken HTML version with a working Streamlit-native version.
+    """
+    try:
+        # Get status safely
+        try:
+            from utils.workflow_state_manager import WorkflowStateManager
+            status = WorkflowStateManager.get_workflow_status()
+        except:
+            # Default status if WorkflowStateManager not available
+            status = "not_started"
+            if hasattr(st.session_state, 'workflow_state') and st.session_state.workflow_state:
+                if hasattr(st.session_state.workflow_state, 'code_snippet') and st.session_state.workflow_state.code_snippet:
+                    review_history = getattr(st.session_state.workflow_state, 'review_history', [])
+                    if review_history:
+                        current_iteration = getattr(st.session_state.workflow_state, 'current_iteration', 1)
+                        max_iterations = getattr(st.session_state.workflow_state, 'max_iterations', 3)
+                        review_sufficient = getattr(st.session_state.workflow_state, 'review_sufficient', False)
+                        if review_sufficient or current_iteration > max_iterations:
+                            status = "review_completed"
+                        else:
+                            status = "review_in_progress"
+                    else:
+                        status = "code_generated"
+        
+        # Create a clean, working progress indicator using Streamlit components
+        st.markdown("### 🎯 Your Learning Journey")
+        
+        # Define steps with status mapping
+        steps = [
+            ("🔧", "Generate Code", ["not_started"]),
+            ("📋", "Review Code", ["code_generated", "review_in_progress"]),
+            ("📊", "Get Feedback", ["review_completed"])
+        ]
+        
+        # Create columns for horizontal layout
+        cols = st.columns(len(steps))
+        
+        for i, (icon, label, active_statuses) in enumerate(steps):
+            with cols[i]:
+                if status in active_statuses:
+                    # Current/Active step - Green highlight
+                    st.markdown(f"""
+                    <div style="text-align: center; padding: 1rem; background: linear-gradient(145deg, #d4edda, #c3e6cb); border-radius: 10px; border: 2px solid #28a745; margin-bottom: 0.5rem;">
+                        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">{icon}</div>
+                        <div style="font-weight: bold; color: #155724; font-size: 1rem;">{label}</div>
+                        <div style="font-size: 0.8rem; color: #28a745; font-weight: 500;">👉 Current Step</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                elif any(step_status in ["code_generated", "review_in_progress", "review_completed"] for step_status in active_statuses) and status in ["code_generated", "review_in_progress", "review_completed"]:
+                    # Check if this step should be marked as completed
+                    step_order = ["not_started", "code_generated", "review_in_progress", "review_completed"]
+                    current_order = step_order.index(status) if status in step_order else 0
+                    step_max_order = max([step_order.index(s) for s in active_statuses if s in step_order])
+                    
+                    if current_order > step_max_order:
+                        # Completed step - Checked green
+                        st.markdown(f"""
+                        <div style="text-align: center; padding: 1rem; background: linear-gradient(145deg, #f8f9fa, #e9ecef); border-radius: 10px; border: 1px solid #28a745; margin-bottom: 0.5rem;">
+                            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">✅</div>
+                            <div style="font-weight: bold; color: #155724; font-size: 1rem;">{label}</div>
+                            <div style="font-size: 0.8rem; color: #28a745;">Completed</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        # Pending step - Gray
+                        st.markdown(f"""
+                        <div style="text-align: center; padding: 1rem; background: linear-gradient(145deg, #f8f9fa, #e9ecef); border-radius: 10px; border: 1px solid #dee2e6; margin-bottom: 0.5rem;">
+                            <div style="font-size: 2.5rem; margin-bottom: 0.5rem; opacity: 0.5;">{icon}</div>
+                            <div style="color: #6c757d; font-size: 1rem;">{label}</div>
+                            <div style="font-size: 0.8rem; color: #6c757d;">Pending</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                else:
+                    # Pending step - Gray
+                    st.markdown(f"""
+                    <div style="text-align: center; padding: 1rem; background: linear-gradient(145deg, #f8f9fa, #e9ecef); border-radius: 10px; border: 1px solid #dee2e6; margin-bottom: 0.5rem;">
+                        <div style="font-size: 2.5rem; margin-bottom: 0.5rem; opacity: 0.5;">{icon}</div>
+                        <div style="color: #6c757d; font-size: 1rem;">{label}</div>
+                        <div style="font-size: 0.8rem; color: #6c757d;">Pending</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+        
+        # Add contextual guidance message
+        if status == "not_started":
+            st.info("👉 **Next Step:** Start by generating a Java code challenge")
+        elif status == "code_generated":
+            st.info("👉 **Next Step:** Your code is ready! Go to the Review tab to analyze it")
+        elif status == "review_in_progress":
+            st.info("🔄 **In Progress:** Continue your code review analysis")
+        elif status == "review_completed":
+            st.success("🎉 **Completed:** Check your results in the Feedback tab")
+        
+    except Exception as e:
+        logger.error(f"Error in simple progress fallback: {str(e)}")
+        # Ultimate fallback - just text
+        st.markdown("### 🎯 Your Learning Journey")
+        st.info("**Progress:** Generate Code → Review Code → Get Feedback")
+
+
+def main():
+    """Enhanced main application function with comprehensive error handling."""
+
+    # Clean up expired locks at start of each run
     session_state_manager.cleanup_expired_locks()
 
     # Initialize language selection and i18n system
@@ -92,7 +285,7 @@ def main():
     user_level = auth_ui.get_user_level()   
     st.session_state.user_level = user_level
     
-    # ENHANCED: Handle full reset with better state management
+    # Handle full reset with better state management
     if st.session_state.get("full_reset", False):
         del st.session_state["full_reset"]
         preserved = {
@@ -165,7 +358,7 @@ def main():
     if st.session_state.get("practice_mode_active", False):
         render_practice_mode_interface(error_explorer_ui, workflow)
     else:
-        render_normal_interface_enhanced(
+        render_normal_interface_enhanced_fixed(
             code_generator_ui, 
             workflow, 
             code_display_ui, 
@@ -188,7 +381,7 @@ def init_session_state_enhanced():
         'workflow_steps': [],
         'sidebar_tab': "Status",
         'user_level': None,
-        # ADDED: State management flags
+        # State management flags
         'generation_in_progress': False,
         'review_submission_in_progress': False,
         'last_rerun_timestamp': 0
@@ -219,7 +412,7 @@ class CodeGeneratorUIEnhanced:
     def render(self, user_level: str = "medium"):
         """Enhanced render with rerun protection."""
         
-        # ADDED: Check if code generation should be prevented
+        # Check if code generation should be prevented
         if session_state_manager.prevent_code_regeneration_on_rerun():
             logger.debug("Code regeneration prevented due to recent activity")
             # Just show the existing code
@@ -266,9 +459,9 @@ def render_practice_mode_interface(error_explorer_ui, workflow):
     # Render the error explorer in practice mode with workflow
     error_explorer_ui.render(workflow)
 
-def render_normal_interface_enhanced(code_generator_ui, workflow, code_display_ui, auth_ui, 
-                                   error_explorer_ui, user_level):
-    """Enhanced normal interface with rerun protection."""
+def render_normal_interface_enhanced_fixed(code_generator_ui, workflow, code_display_ui, auth_ui, 
+                                          error_explorer_ui, user_level):
+    """FIXED: Enhanced normal interface with working progress indicator."""
     
     # Header with improved styling
     st.markdown(f"""
@@ -278,19 +471,8 @@ def render_normal_interface_enhanced(code_generator_ui, workflow, code_display_u
     </div>
     """, unsafe_allow_html=True)
     
-    # ADDED: Show debug info if requested
-    if st.session_state.get("show_debug_info", False):
-        with st.expander("🔧 Debug Information", expanded=False):
-            debug_info = session_state_manager.debug_session_state()
-            st.json(debug_info)
-            
-            if st.button("Hide Debug Info"):
-                st.session_state.show_debug_info = False
-                st.rerun()
-    else:
-        if st.button("🔧 Show Debug Info", help="Show session state debug information"):
-            st.session_state.show_debug_info = True
-            st.rerun()
+    # FIXED: Use the working progress indicator
+    render_workflow_progress_safe()
     
     # Display error message if there's an error
     if st.session_state.error:
@@ -299,7 +481,7 @@ def render_normal_interface_enhanced(code_generator_ui, workflow, code_display_u
             st.session_state.error = None
             st.rerun()
     
-    # Create enhanced tabs for different steps of the workflow
+    # FIXED: Safe tab creation
     tab_labels = [
         t("tab_tutorial"),
         t("tab_generate"),
@@ -307,44 +489,61 @@ def render_normal_interface_enhanced(code_generator_ui, workflow, code_display_u
         t("tab_feedback")      
     ]
     
-    # Use the enhanced tabs function
-    tabs = create_enhanced_tabs(tab_labels)
+    # Create tabs with safe error handling
+    try:
+        tabs = st.tabs(tab_labels)
+    except Exception as e:
+        logger.error(f"Tab creation failed: {str(e)}")
+        st.error("❌ Interface error occurred. Please refresh the page.")
+        return
+    
+    # Ensure tabs is valid
+    if tabs is None or len(tabs) < 4:
+        logger.error("Invalid tabs object created")
+        st.error("❌ Interface initialization error. Please refresh the page.")
+        return
 
     # Tab content with enhanced error handling
-    with tabs[0]: # Tutorial Tab
-        try:
-            error_explorer_ui.render(workflow) 
-        except Exception as e:
-            logger.error(f"Error in tutorial tab: {str(e)}")
-            st.error("Error loading tutorial. Please refresh the page.")
+    try:
+        with tabs[0]: # Tutorial Tab
+            try:
+                error_explorer_ui.render(workflow) 
+            except Exception as e:
+                logger.error(f"Error in tutorial tab: {str(e)}")
+                st.error("Error loading tutorial. Please refresh the page.")
 
-    with tabs[1]: # Generate Tab
-        try:
-            # Check for special practice session completion flow
-            if st.session_state.get("practice_session_active", False):
-                error_name = st.session_state.get("practice_error_name", "")
-                st.info(f"🎯 **Practice Session Active** - Practicing with error: **{error_name}**")
-                st.info("💡 A code snippet has been generated for this error. Go to the **Review** tab to start analyzing!")
-            
-            code_generator_ui.render(user_level)
-        except Exception as e:
-            logger.error(f"Error in generate tab: {str(e)}")
-            st.error("Error in code generation. Please refresh the page.")
-    
-    with tabs[2]: # Review Tab
-        try:
-            render_enhanced_review_tab_protected(workflow, code_display_ui, auth_ui)
-        except Exception as e:
-            logger.error(f"Error in review tab: {str(e)}")
-            st.error("Error in review section. Please refresh the page.")
-    
-    with tabs[3]: # Feedback Tab
-        try:
-            render_feedback_tab(workflow, auth_ui)
-        except Exception as e:
-            logger.error(f"Error in feedback tab: {str(e)}")
-            st.error("Error loading feedback. Please refresh the page.")
+        with tabs[1]: # Generate Tab
+            try:
+                # Check for special practice session completion flow
+                if st.session_state.get("practice_session_active", False):
+                    error_name = st.session_state.get("practice_error_name", "")
+                    st.info(f"🎯 **Practice Session Active** - Practicing with error: **{error_name}**")
+                    st.info("💡 A code snippet has been generated for this error. Go to the **Review** tab to start analyzing!")
+                
+                code_generator_ui.render(user_level)
+            except Exception as e:
+                logger.error(f"Error in generate tab: {str(e)}")
+                st.error("Error in code generation. Please refresh the page.")
+        
+        with tabs[2]: # Review Tab
+            try:
+                render_enhanced_review_tab_protected(workflow, code_display_ui, auth_ui)
+            except Exception as e:
+                logger.error(f"Error in review tab: {str(e)}")
+                st.error("Error in review section. Please refresh the page.")
+        
+        with tabs[3]: # Feedback Tab
+            try:
+                render_feedback_tab(workflow, auth_ui)
+            except Exception as e:
+                logger.error(f"Error in feedback tab: {str(e)}")
+                st.error("Error loading feedback. Please refresh the page.")
+                
+    except Exception as e:
+        logger.error(f"Critical error in tab rendering: {str(e)}")
+        st.error("❌ Critical interface error. Please refresh the page.")
 
+# FIXED: Create fallback functions for missing components
 def render_enhanced_review_tab_protected(workflow, code_display_ui, auth_ui=None):
     """
     Enhanced review tab with comprehensive rerun protection.
@@ -376,7 +575,7 @@ def render_enhanced_review_tab_protected(workflow, code_display_ui, auth_ui=None
                 st.session_state.active_tab = 0
                 st.rerun()
     
-    # ENHANCED: Use the enhanced review tab rendering
+    # Use the enhanced review tab rendering
     render_review_tab_with_state_protection(workflow, code_display_ui, auth_ui)
 
 def render_review_tab_with_state_protection(workflow, code_display_ui, auth_ui=None):
@@ -490,7 +689,7 @@ def handle_review_submission_protected(workflow, code_display_ui, auth_ui=None):
     
     if current_iteration <= max_iterations and not review_sufficient and not all_errors_found:
         def on_submit_review_protected(review_text):
-            """ENHANCED: Protected submit callback with duplicate prevention."""
+            """Protected submit callback with duplicate prevention."""
             
             # Use session state manager for safe submission
             success, result = session_state_manager.safe_review_submission(
