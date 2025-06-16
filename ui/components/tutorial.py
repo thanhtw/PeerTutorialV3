@@ -450,7 +450,7 @@ class TutorialUI:
                         t("description"): '',  # Will be fetched from repository
                         'difficulty_level': error['difficulty_level'],
                         'category': error['category_name_en'],
-                        'practice_stats': error
+                        'practice_stats': error  # This includes the practice stats
                     })
                 return self._apply_standard_filters(formatted_errors)
                 
@@ -466,13 +466,13 @@ class TutorialUI:
                         t("implementation_guide"): error['implementation_guide_en'],
                         'difficulty_level': error['difficulty_level'],
                         'category': error['category_name_en'],
-                        'practice_stats': None
+                        'practice_stats': None  # No practice stats for unpracticed
                     })
                 return self._apply_standard_filters(formatted_errors)
                 
             elif selected_practice == t('completed_errors'):
                 errors = [e for e in practice_data.get('practiced_errors', []) 
-                         if e['completion_status'] in ['completed', 'mastered']]
+                        if e['completion_status'] in ['completed', 'mastered']]
                 # Convert and filter
                 formatted_errors = []
                 for error in errors:
@@ -482,13 +482,13 @@ class TutorialUI:
                         t("description"): '',
                         'difficulty_level': error['difficulty_level'],
                         'category': error['category_name_en'],
-                        'practice_stats': error
+                        'practice_stats': error  # This includes the practice stats
                     })
                 return self._apply_standard_filters(formatted_errors)
                 
             elif selected_practice == t('mastered_errors'):
                 errors = [e for e in practice_data.get('practiced_errors', []) 
-                         if e['completion_status'] == 'mastered']
+                        if e['completion_status'] == 'mastered']
                 # Convert and filter
                 formatted_errors = []
                 for error in errors:
@@ -498,16 +498,153 @@ class TutorialUI:
                         t("description"): '',
                         'difficulty_level': error['difficulty_level'],
                         'category': error['category_name_en'],
-                        'practice_stats': error
+                        'practice_stats': error  # This includes the practice stats
                     })
                 return self._apply_standard_filters(formatted_errors)
             
-            else:  # All errors
-                return self._get_all_filtered_errors()
+            else:  # All errors - Get all errors with practice data merged
+                return self._get_all_errors_with_practice_data(practice_data)
                 
         except Exception as e:
-            logger.error(f"Error getting enhanced filtered errors: {str(e)}")
+            logger.error(f"Error getting filtered errors: {str(e)}")
             return []
+
+    def _get_all_errors_with_practice_data(self, practice_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Get all errors with practice data merged, grouped by category and ordered by difficulty."""
+        try:
+            selected_category = st.session_state.get('selected_category', t('all_categories'))
+            
+            # Get categories to process
+            if selected_category == t('all_categories'):
+                categories = self._get_categories()
+            else:
+                categories = [selected_category]
+            
+            # Create a lookup dictionary for practiced errors by error_code and name
+            practiced_errors_lookup = {}
+            for practiced_error in practice_data.get('practiced_errors', []):
+                error_code = practiced_error.get('error_code')
+                error_name_en = practiced_error.get('error_name_en')
+                error_name_zh = practiced_error.get('error_name_zh')
+                
+                if error_code:
+                    practiced_errors_lookup[error_code] = practiced_error
+                if error_name_en:
+                    practiced_errors_lookup[error_name_en] = practiced_error
+                if error_name_zh:
+                    practiced_errors_lookup[error_name_zh] = practiced_error
+            
+            # Get all errors organized by category
+            all_errors = []
+            for category in categories:
+                category_errors = self.repository.get_category_errors(category)
+                
+                # Process each error in the category
+                category_errors_with_practice = []
+                for error in category_errors:
+                    # Get error identifiers
+                    error_name = error.get(t("error_name_variable"), "")
+                    error_code = error.get('error_code', '')
+                    
+                    # Find practice stats
+                    practice_stats = None
+                    if error_code and error_code in practiced_errors_lookup:
+                        practice_stats = practiced_errors_lookup[error_code]
+                    elif error_name and error_name in practiced_errors_lookup:
+                        practice_stats = practiced_errors_lookup[error_name]
+                    
+                    # Create enhanced error with all necessary data
+                    enhanced_error = {
+                        'error_code': error_code or f"gen_{hash(error_name) % 10000}",
+                        t("error_name_variable"): error_name,
+                        t("description"): error.get(t("description"), ""),
+                        t("implementation_guide"): error.get(t("implementation_guide"), ""),
+                        'difficulty_level': error.get('difficulty_level', 'medium'),
+                        'category': category,
+                        'practice_stats': practice_stats
+                    }
+                    
+                    category_errors_with_practice.append(enhanced_error)
+                
+                # Sort errors within category by difficulty (easy -> medium -> hard)
+                category_errors_sorted = self._sort_errors_by_difficulty(category_errors_with_practice)
+                all_errors.extend(category_errors_sorted)
+            
+            # Apply search and difficulty filters
+            return self._apply_standard_filters(all_errors)
+            
+        except Exception as e:
+            logger.error(f"Error getting all errors with practice data: {str(e)}")
+            return []
+
+    def _render_error_content(self, user_id: str):
+        """Render the main error content with professional cards grouped by category."""
+        
+        practice_data = {}
+        if user_id:
+            practice_data = self.practice_tracker.get_user_practice_data(user_id)
+        
+        filtered_errors = self._get_filtered_errors(practice_data)
+        
+        if not filtered_errors:
+            self._render_no_results()
+            return
+        
+        # Group errors by category and render by sections
+        self._render_error_sections_grouped(filtered_errors, practice_data)
+
+
+    def _render_error_sections_grouped(self, filtered_errors: List[Dict[str, Any]], 
+                                  practice_data: Dict[str, Any]):
+        """Render errors grouped by category with enhanced section headers."""
+        errors_by_category = self._group_errors_by_category(filtered_errors)
+        
+        # Get the original category order from repository
+        all_categories = self._get_categories()
+        
+        # Process categories in their original order
+        for category_name in all_categories:
+            if category_name not in errors_by_category:
+                continue
+                
+            errors = errors_by_category[category_name]
+            if not errors:
+                continue
+            
+            # Errors are already sorted by difficulty within category
+            
+            # Enhanced category header with practice stats
+            practiced_count = len([e for e in errors if e.get('practice_stats')])
+            mastered_count = len([e for e in errors if e.get('practice_stats') and 
+                                e['practice_stats'].get('completion_status') == 'mastered'])
+            completed_count = len([e for e in errors if e.get('practice_stats') and 
+                                e['practice_stats'].get('completion_status') in ['completed', 'mastered']])
+            total_count = len(errors)
+            
+            # Calculate category completion percentage
+            completion_percentage = (completed_count / total_count * 100) if total_count > 0 else 0
+            
+            st.markdown(f"""
+            <div class="enhanced-category-section">
+                <h3 class="enhanced-category-title">
+                    <span class="category-icon">{_get_category_icon(category_name.lower())}</span>
+                    {category_name}
+                    <div class="category-stats">
+                        <span class="total-count">{total_count} {t('errors')}</span>
+                        {practiced_count if practiced_count > 0 else 0} {t("practiced")}
+                        {f'{completion_percentage:.0f}% {t("completed")}' if completion_percentage > 0 else f'0% {t("completed")}'}
+                    </div>
+                </h3>
+                <div class="category-progress-bar">
+                    <div class="progress-fill" style="width: {completion_percentage}%"></div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Render errors in this category
+            for error in errors:
+                self._render_error_card(error)
+
 
     def _get_categories(self) -> List[str]:
         """Get all available categories."""
@@ -558,16 +695,11 @@ class TutorialUI:
             filtered = [
                 error for error in filtered
                 if search_term in error.get(t("error_name_variable"), "").lower() or
-                   search_term in error.get(t("description"), "").lower()
+                search_term in error.get(t("description"), "").lower() or
+                search_term in error.get(t("implementation_guide"), "").lower()
             ]
         
-        # Category filter
-        selected_category = st.session_state.get('selected_category', t('all_categories'))
-        if selected_category != t('all_categories'):
-            filtered = [
-                error for error in filtered
-                if error.get('category', '') == selected_category
-            ]
+        # Category filter is already handled in _get_all_errors_with_practice_data
         
         # Difficulty filter
         selected_difficulty = st.session_state.get('selected_difficulty', t('all_levels'))
@@ -820,7 +952,7 @@ class TutorialUI:
                     {category_name}
                     <div class="category-stats">
                         <span class="total-count">{total_count}</span>
-                        {f'<span class="practiced-count">({practiced_count} {t("practiced")})</span>' if practiced_count > 0 else ''}
+                        {practiced_count if practiced_count > 0 else 0} {t("practiced")}
                     </div>
                 </h3>
             </div>

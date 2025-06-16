@@ -845,6 +845,45 @@
     "choose_your_next_action": "選擇您的下一個行動以繼續學習",
     "try_another_challenge": "嘗試另一個挑戰",
     "back_to_explorer": "返回探索器",
-    "analyzing_your_review":"分析您的評論"
+    "analyzing_your_review":"分析您的評論",
+  
+    "practice_status": "練習狀態",
+    "practiced_errors": "已練習錯誤",
+    "unpracticed_errors": "未練習錯誤",
+    "completed_errors": "已完成錯誤", 
+    "mastered_errors": "已掌握錯誤",
+    "all_errors": "所有錯誤",
+    "not_practiced": "未練習",    
+    "in_progress": "進行中",
+
+    "your_practice_progress": "您的練習進度",
+    "completion_rate": "完成率",
+    "mastery_rate": "掌握率",
+    "avg_accuracy": "平均準確率",
+    "practice_progress": "練習進度",
+    "best": "最佳",
+    "sessions": "次會話",  
+    "previous_attempts": "先前嘗試",
+    
+ 
+    
+    "continue_practice": "繼續練習",
+    "practice_again_mastered": "再次練習（已掌握）",
+    "practice_again_completed": "再次練習（已完成）",
+    "starting_first_practice_with": "開始第一次練習",
+    "continuing_practice_with": "繼續練習",    
+    "total_practiced": "總練習數",
+    "how_to_find": "如何找到",
+    
+    
+   
+    "badge_progress": "徽章進度",
+    "current_progress": "當前進度",
+    "target_progress": "目標進度",
+    "progress_percentage": "進度百分比",
+    "badge_completed": "徽章已完成",
+    "badge_in_progress": "徽章進行中",
+    "badge_not_started": "徽章未開始",
+    "go_to_results": "查看結果"
   }
 }
