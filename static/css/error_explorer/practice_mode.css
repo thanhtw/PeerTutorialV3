@@ -1122,3 +1122,640 @@
         padding: 1rem;
     }
 }
+
+/* Enhanced Tutorial UI Styles with Practice Tracking */
+
+/* Enhanced Header Styles */
+.enhanced-error-explorer-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 2rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.header-content-enhanced {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+    color: white;
+}
+
+.title-section-enhanced h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 0 0 0.5rem 0;
+    color: white;
+}
+
+.subtitle-enhanced {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin: 0;
+}
+
+.stats-section-enhanced {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.stat-card-enhanced {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 1.25rem;
+    text-align: center;
+    min-width: 100px;
+    transition: transform 0.3s ease, background 0.3s ease;
+}
+
+.stat-card-enhanced:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.stat-card-enhanced.success {
+    background: rgba(40, 167, 69, 0.2);
+    border-color: rgba(40, 167, 69, 0.3);
+}
+
+.stat-card-enhanced.primary {
+    background: rgba(0, 123, 255, 0.2);
+    border-color: rgba(0, 123, 255, 0.3);
+}
+
+.stat-number-enhanced {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label-enhanced {
+    font-size: 0.9rem;
+    opacity: 0.9;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Practice Dashboard Styles */
+.practice-dashboard {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+}
+
+.dashboard-header {
+    margin-bottom: 1.5rem;
+}
+
+.dashboard-header h3 {
+    color: #495057;
+    margin: 0;
+    font-weight: 600;
+}
+
+.dashboard-icon {
+    margin-right: 0.5rem;
+    font-size: 1.2em;
+}
+
+.progress-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+}
+
+.progress-card {
+    text-align: center;
+}
+
+.progress-circle {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: conic-gradient(
+        #28a745 0deg, 
+        #28a745 calc(var(--progress) * 3.6deg), 
+        #e9ecef calc(var(--progress) * 3.6deg), 
+        #e9ecef 360deg
+    );
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+    position: relative;
+}
+
+.progress-circle.mastery {
+    background: conic-gradient(
+        #6f42c1 0deg, 
+        #6f42c1 calc(var(--progress) * 3.6deg), 
+        #e9ecef calc(var(--progress) * 3.6deg), 
+        #e9ecef 360deg
+    );
+}
+
+.progress-circle::before {
+    content: '';
+    width: 90px;
+    height: 90px;
+    background: white;
+    border-radius: 50%;
+    position: absolute;
+}
+
+.progress-text {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #495057;
+    z-index: 1;
+    position: relative;
+}
+
+.accuracy-display {
+    width: 120px;
+    height: 120px;
+    background: linear-gradient(135deg, #17a2b8, #138496);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+    color: white;
+}
+
+.accuracy-number {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.progress-label {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #495057;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Enhanced Search Filter Styles */
+.enhanced-search-filter-container {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* Enhanced Category Section Styles */
+.enhanced-category-section {
+    margin-bottom: 1.5rem;
+}
+
+.enhanced-category-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 12px;
+    margin-bottom: 1rem;
+    border: 1px solid #dee2e6;
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #495057;
+}
+
+.category-stats {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.total-count {
+    background: #6c757d;
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-weight: 600;
+}
+
+.practiced-count {
+    background: #28a745;
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-weight: 600;
+}
+
+/* Practice Progress Styles */
+.practice-progress-container {
+    margin: 1rem 0;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #28a745;
+}
+
+.progress-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.progress-label {
+    font-weight: 600;
+    color: #495057;
+}
+
+.progress-stats {
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+
+.progress-bar-container {
+    position: relative;
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    background: var(--progress-color, #28a745);
+    width: var(--progress-width, 0%);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.progress-fill {
+    height: 100%;
+    width: 100%;
+    background: inherit;
+    border-radius: inherit;
+}
+
+/* Enhanced Error Card Styles */
+.st-expander > div:first-child {
+    border-radius: 8px !important;
+    border: 1px solid #dee2e6 !important;
+    margin-bottom: 1rem !important;
+}
+
+.st-expander[data-testid="stExpander"][aria-expanded="true"] > div:first-child {
+    border-bottom: none !important;
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+}
+
+.st-expander > div:last-child {
+    border: 1px solid #dee2e6 !important;
+    border-top: none !important;
+    border-radius: 0 0 8px 8px !important;
+    padding: 1.5rem !important;
+}
+
+/* Practice Status Indicators */
+.practice-status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-left: 0.5rem;
+}
+
+.practice-status-indicator.mastered {
+    background: #ffd700;
+    color: #856404;
+}
+
+.practice-status-indicator.completed {
+    background: #d4edda;
+    color: #155724;
+}
+
+.practice-status-indicator.in-progress {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.practice-status-indicator.practiced {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.practice-status-indicator.unpracticed {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* Enhanced Practice Mode Styles */
+.professional-practice-header {
+    background: linear-gradient(135deg, #6f42c1 0%, #5a3a9a 100%);
+    padding: 2rem;
+    border-radius: 16px;
+    margin-bottom: 2rem;
+    color: white;
+    box-shadow: 0 8px 32px rgba(111, 66, 193, 0.3);
+}
+
+.practice-header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.practice-mode-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.5rem 1rem;
+    border-radius: 25px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.practice-error-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 0 0 1rem 0;
+    color: white;
+}
+
+.practice-meta-info {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.practice-category,
+.practice-difficulty {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.practice-category {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.practice-difficulty {
+    border: 1px solid;
+}
+
+/* Progress Steps */
+.practice-progress-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.progress-step {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+}
+
+.progress-step.active {
+    background: white;
+    color: #6f42c1;
+    border-color: white;
+}
+
+.progress-connector {
+    width: 30px;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Enhanced Action Panel */
+.enhanced-action-panel {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-top: 2rem;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+}
+
+.action-panel-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.action-panel-header h3 {
+    color: #495057;
+    margin: 0 0 0.5rem 0;
+    font-weight: 600;
+}
+
+.action-panel-header p {
+    color: #6c757d;
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.action-icon {
+    margin-right: 0.5rem;
+    font-size: 1.2em;
+}
+
+/* Enhanced Results Dashboard */
+.enhanced-results-dashboard {
+    background: white;
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+}
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.metric-card {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    border: 1px solid #dee2e6;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.metric-card.primary {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: white;
+    border-color: #007bff;
+}
+
+.metric-card.success {
+    background: linear-gradient(135deg, #28a745, #1e7e34);
+    color: white;
+    border-color: #28a745;
+}
+
+.metric-card.info {
+    background: linear-gradient(135deg, #17a2b8, #117a8b);
+    color: white;
+    border-color: #17a2b8;
+}
+
+.metric-icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.8;
+}
+
+.metric-content {
+    flex: 1;
+}
+
+.metric-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+}
+
+.metric-label {
+    font-size: 1rem;
+    opacity: 0.9;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .header-content-enhanced {
+        flex-direction: column;
+        text-align: center;
+        gap: 1.5rem;
+    }
+    
+    .stats-section-enhanced {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .practice-header-content {
+        flex-direction: column;
+        text-align: center;
+        gap: 1.5rem;
+    }
+    
+    .progress-metrics {
+        grid-template-columns: 1fr;
+    }
+    
+    .metrics-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .practice-error-title {
+        font-size: 2rem;
+    }
+    
+    .stat-number-enhanced {
+        font-size: 1.5rem;
+    }
+}
+
+/* Animation Classes */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in-up {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+.pulse {
+    animation: pulse 2s infinite;
+}
+
+/* Enhanced Button Styles */
+.stButton > button[kind="primary"] {
+    /* background: #84eb88 !important; */
+    /* border: none !important; */
+    color: white !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    padding: 0.75rem 1.5rem !important;
+    transition: all 0.3s ease !important;
+}
+
+.stButton > button[kind="primary"]:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 24px #65d067 !important;
+}
+
+.stButton > button[kind="secondary"] {
+    /* background: #986ddf !important; */
+    /* border: none !important; */
+    color: white !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    padding: 0.75rem 1.5rem !important;
+    transition: all 0.3s ease !important;
+}
+
+.stButton > button[kind="secondary"]:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 24px #764abc !important;
+}

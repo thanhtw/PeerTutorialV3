@@ -233,10 +233,13 @@ class BadgeManager:
             # 5. Award points for the review
             points_awarded = self._calculate_and_award_points(user_id, review_data)
             
-            # 6. Check and award badges
+            # 6. Update badge progress for all relevant badges
+            self._update_all_badge_progress(user_id, review_data)
+
+            # 7. Check and award badges
             awarded_badges = self._check_and_award_all_badges(user_id, review_data)
             
-            # 7. Update badge check timestamp
+            # 8. Update badge check timestamp
             self._update_badge_check_timestamp(user_id)
             
             result = {
@@ -293,6 +296,262 @@ class BadgeManager:
             logger.error(f"Error storing review session: {str(e)}")
             return ""
     
+    def _update_all_badge_progress(self, user_id: str, review_data: Dict[str, Any]) -> None:
+        """Update badge progress for all applicable badges based on review completion."""
+        try:
+            # Get all badges that could potentially be progressed
+            badges_query = """
+            SELECT badge_id, criteria, name_en, name_zh
+            FROM badges 
+            WHERE is_active = TRUE
+            """
+            
+            badges = self.db.execute_query(badges_query) or []
+            
+            for badge in badges:
+                self._update_badge_progress(user_id, badge['badge_id'], badge['criteria'], review_data)
+                
+        except Exception as e:
+            logger.error(f"Error updating all badge progress: {str(e)}")
+
+    def _update_badge_progress(self, user_id: str, badge_id: str, criteria_json: str, review_data: Dict[str, Any]) -> None:
+        """Update progress for a specific badge based on review completion."""
+        try:
+            # Parse badge criteria
+            criteria = json.loads(criteria_json) if isinstance(criteria_json, str) else criteria_json
+            
+            if not criteria:
+                return
+            
+            # Calculate progress based on badge type
+            progress_update = self._calculate_badge_progress_update(criteria, review_data, user_id)
+            
+            if progress_update['increment'] > 0:
+                # Update or create badge progress record
+                upsert_query = """
+                INSERT INTO badge_progress 
+                (user_id, badge_id, current_progress, target_progress, progress_data)
+                VALUES (%s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    current_progress = LEAST(target_progress, current_progress + VALUES(current_progress)),
+                    progress_data = VALUES(progress_data),
+                    last_updated = CURRENT_TIMESTAMP
+                """
+                
+                progress_data = json.dumps({
+                    'last_review_date': datetime.datetime.now().isoformat(),
+                    'last_increment': progress_update['increment'],
+                    'review_type': review_data.get('session_type', 'regular'),
+                    'accuracy': review_data.get('accuracy_percentage', 0)
+                })
+                
+                params = (
+                    user_id,
+                    badge_id,
+                    progress_update['increment'],
+                    progress_update['target'],
+                    progress_data
+                )
+                
+                self.db.execute_query(upsert_query, params)
+                
+                logger.debug(f"Updated badge progress for {badge_id}: +{progress_update['increment']} (target: {progress_update['target']})")
+                
+        except Exception as e:
+            logger.error(f"Error updating badge progress for {badge_id}: {str(e)}")
+
+    def _calculate_badge_progress_update(self, criteria: Dict[str, Any], review_data: Dict[str, Any], user_id: str) -> Dict[str, int]:
+        """Calculate how much progress should be added for a badge based on review completion."""
+        try:
+            badge_type = criteria.get('type', '')
+            increment = 0
+            target = criteria.get('threshold', 1)
+            
+            # Review count based badges
+            if badge_type == 'review_count':
+                increment = 1  # Each review adds 1 to progress
+                target = criteria.get('threshold', 1)
+                
+            # Perfect review badges
+            elif badge_type == 'perfect_reviews':
+                identified = review_data.get('identified_count', 0)
+                total = review_data.get('total_problems', 1)
+                if identified == total and total > 0:
+                    increment = 1
+                target = criteria.get('threshold', 5)
+                
+            # Consecutive perfect reviews
+            elif badge_type == 'consecutive_perfect':
+                identified = review_data.get('identified_count', 0)
+                total = review_data.get('total_problems', 1)
+                if identified == total and total > 0:
+                    # Check if this continues a streak
+                    current_streak = self._get_consecutive_perfect_count(user_id)
+                    increment = 1 if current_streak > 0 else 1  # Always increment, streak logic handled elsewhere
+                target = criteria.get('threshold', 3)
+                
+            # Speed and accuracy badges
+            elif badge_type == 'speed_accuracy':
+                time_spent = review_data.get('time_spent_seconds', 999)
+                accuracy = review_data.get('accuracy_percentage', 0)
+                time_limit = criteria.get('time_limit', 120)
+                accuracy_threshold = criteria.get('accuracy_threshold', 80)
+                
+                if time_spent <= time_limit and accuracy >= accuracy_threshold:
+                    increment = 1
+                target = 1  # Usually one-time achievement
+                
+            # Category mastery badges
+            elif badge_type == 'category_mastery':
+                category = criteria.get('category', '')
+                required_accuracy = criteria.get('accuracy', 85)
+                min_encounters = criteria.get('min_encounters', 10)
+                
+                # Check current category performance
+                category_stats = self._get_category_statistics(user_id)
+                category_data = category_stats.get(category, {})
+                
+                if category_data:
+                    mastery_level = category_data.get('mastery_level', 0)
+                    encounters = category_data.get('encountered', 0)
+                    
+                    if encounters >= min_encounters and mastery_level >= required_accuracy:
+                        increment = 1
+                        target = 1
+                
+            # Points-based badges
+            elif badge_type == 'total_points':
+                points_threshold = criteria.get('threshold', 1000)
+                # Get current total points
+                current_points = self._get_user_total_points(user_id)
+                points_awarded = review_data.get('points_awarded', 0)
+                
+                if current_points >= points_threshold:
+                    increment = 1
+                    target = 1
+                
+            # Time-based point achievements (rising star)
+            elif badge_type == 'points_timeframe':
+                points_required = criteria.get('points', 500)
+                timeframe_days = criteria.get('days', 7)
+                
+                # Check if user is within timeframe and has enough points
+                user_stats = self._get_user_stats(user_id)
+                if user_stats:
+                    created_at = user_stats.get('created_at')
+                    total_points = user_stats.get('total_points', 0)
+                    
+                    if created_at:
+                        days_since_creation = (datetime.datetime.now() - created_at).days
+                        if days_since_creation <= timeframe_days and total_points >= points_required:
+                            increment = 1
+                            target = 1
+                
+            # Daily practice streaks
+            elif badge_type == 'consecutive_days':
+                target = criteria.get('threshold', 5)
+                current_streak = self._get_streak_count(user_id, 'daily_practice')
+                if current_streak >= target:
+                    increment = 1
+                    target = 1
+                
+            # Practice session badges
+            elif badge_type == 'practice_sessions':
+                if review_data.get('session_type') == 'practice':
+                    increment = 1
+                target = criteria.get('threshold', 10)
+                
+            # Feature usage badges
+            elif badge_type == 'feature_usage':
+                feature = criteria.get('feature', '')
+                if feature == 'error_explorer' and review_data.get('session_type') == 'practice':
+                    increment = 1
+                target = criteria.get('threshold', 10)
+            
+            return {'increment': increment, 'target': target}
+            
+        except Exception as e:
+            logger.error(f"Error calculating badge progress: {str(e)}")
+            return {'increment': 0, 'target': 1}
+
+    def get_user_badge_progress(self, user_id: str) -> List[Dict[str, Any]]:
+        """Get all badge progress for a user."""
+        if not user_id:
+            return []
+        
+        try:
+            self.current_language = get_current_language()
+            name_field = f"name_{self.current_language}" if self.current_language in ["en", "zh"] else "name_en"
+            desc_field = f"description_{self.current_language}" if self.current_language in ["en", "zh"] else "description_en"
+            
+            query = f"""
+            SELECT 
+                bp.badge_id,
+                bp.current_progress,
+                bp.target_progress,
+                bp.progress_data,
+                bp.last_updated,
+                b.{name_field} as name,
+                b.{desc_field} as description,
+                b.icon,
+                b.category,
+                b.difficulty,
+                b.points,
+                CASE 
+                    WHEN bp.current_progress >= bp.target_progress THEN 'completed'
+                    WHEN bp.current_progress > 0 THEN 'in_progress'
+                    ELSE 'not_started'
+                END as progress_status,
+                CASE 
+                    WHEN bp.target_progress > 0 THEN (bp.current_progress * 100.0 / bp.target_progress)
+                    ELSE 0
+                END as progress_percentage
+            FROM badge_progress bp
+            JOIN badges b ON bp.badge_id = b.badge_id
+            WHERE bp.user_id = %s AND b.is_active = TRUE
+            ORDER BY progress_percentage DESC, bp.last_updated DESC
+            """
+            
+            progress_records = self.db.execute_query(query, (user_id,)) or []
+            
+            return progress_records
+            
+        except Exception as e:
+            logger.error(f"Error getting user badge progress: {str(e)}")
+            return []
+
+    def get_badge_progress_summary(self, user_id: str) -> Dict[str, Any]:
+        """Get summary of user's badge progress."""
+        if not user_id:
+            return {}
+        
+        try:
+            progress_records = self.get_user_badge_progress(user_id)
+            
+            total_badges = len(progress_records)
+            in_progress = len([p for p in progress_records if p['progress_status'] == 'in_progress'])
+            completed = len([p for p in progress_records if p['progress_status'] == 'completed'])
+            not_started = total_badges - in_progress - completed
+            
+            # Calculate average progress
+            avg_progress = 0
+            if progress_records:
+                total_progress = sum(p['progress_percentage'] for p in progress_records)
+                avg_progress = total_progress / len(progress_records)
+            
+            return {
+                'total_badges': total_badges,
+                'in_progress': in_progress,
+                'completed': completed,
+                'not_started': not_started,
+                'average_progress': avg_progress,
+                'completion_rate': (completed / total_badges * 100) if total_badges > 0 else 0
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting badge progress summary: {str(e)}")
+            return {}
+
     def _update_user_statistics(self, user_id: str, review_data: Dict[str, Any]) -> None:
         """Update user's overall statistics."""
         try:
@@ -642,19 +901,7 @@ class BadgeManager:
         
         return badges
     
-    def _get_user_stats(self, user_id: str) -> Optional[Dict[str, Any]]:
-        """Get comprehensive user statistics."""
-        try:
-            query = """
-                SELECT uid, reviews_completed, score, total_points, perfect_reviews_count,
-                       average_accuracy, total_session_time, created_at, last_activity
-                FROM users 
-                WHERE uid = %s
-            """
-            return self.db.execute_query(query, (user_id,), fetch_one=True)
-        except Exception as e:
-            logger.error(f"Error getting user stats: {str(e)}")
-            return None
+    
     
     def _get_perfect_review_count(self, user_id: str) -> int:
         """Get count of perfect reviews."""
@@ -670,57 +917,6 @@ class BadgeManager:
             logger.error(f"Error getting perfect review count: {str(e)}")
             return 0
     
-    def _get_consecutive_perfect_count(self, user_id: str) -> int:
-        """Get current consecutive perfect review count."""
-        try:
-            query = """
-                SELECT current_streak 
-                FROM user_streaks 
-                WHERE user_id = %s AND streak_type = 'perfect_reviews'
-            """
-            result = self.db.execute_query(query, (user_id,), fetch_one=True)
-            return result.get('current_streak', 0) if result else 0
-        except Exception as e:
-            logger.error(f"Error getting consecutive perfect count: {str(e)}")
-            return 0
-    
-    def _get_streak_count(self, user_id: str, streak_type: str) -> int:
-        """Get current streak count for a specific type."""
-        try:
-            query = """
-                SELECT current_streak 
-                FROM user_streaks 
-                WHERE user_id = %s AND streak_type = %s
-            """
-            result = self.db.execute_query(query, (user_id, streak_type), fetch_one=True)
-            return result.get('current_streak', 0) if result else 0
-        except Exception as e:
-            logger.error(f"Error getting streak count: {str(e)}")
-            return 0
-    
-    def _get_category_statistics(self, user_id: str) -> Dict[str, Dict[str, Any]]:
-        """Get category-specific statistics."""
-        try:
-            query = """
-                SELECT category_name, encountered, identified, mastery_level
-                FROM error_category_stats 
-                WHERE user_id = %s
-            """
-            results = self.db.execute_query(query, (user_id,))
-            
-            stats = {}
-            for result in results or []:
-                stats[result['category_name']] = {
-                    'encountered': result['encountered'],
-                    'identified': result['identified'],
-                    'mastery_level': float(result['mastery_level'])
-                }
-            
-            return stats
-        except Exception as e:
-            logger.error(f"Error getting category statistics: {str(e)}")
-            return {}
-    
     def _update_badge_check_timestamp(self, user_id: str) -> None:
         """Update the timestamp of last badge check."""
         try:
@@ -729,96 +925,7 @@ class BadgeManager:
         except Exception as e:
             logger.error(f"Error updating badge check timestamp: {str(e)}")
     
-    # Legacy methods for compatibility
-    def award_points(self, user_id: str, points: int, activity_type: str, details: str = None) -> Dict[str, Any]:
-        """Award points to a user and log the activity."""
-        if not user_id:
-            return {"success": False, "error": t("invalid_user_id")}
-        
-        try:
-            # Update the user's total points
-            update_query = """
-                UPDATE users 
-                SET total_points = total_points + %s 
-                WHERE uid = %s
-            """
-            self.db.execute_query(update_query, (points, user_id))
-           
-            # Log the activity
-            log_query = """
-                INSERT INTO activity_log 
-                (user_id, activity_type, points, details_en, details_zh) 
-                VALUES (%s, %s, %s, %s, %s)
-            """
-            self.db.execute_query(log_query, (user_id, activity_type, points, details, details))
-            
-            # Get the updated total points
-            points_query = "SELECT total_points FROM users WHERE uid = %s"
-            result = self.db.execute_query(points_query, (user_id,), fetch_one=True)
-            
-            if result:
-                total_points = result.get("total_points", 0)
-                return {"success": True, "total_points": total_points}
-            else:
-                return {"success": False, "error": t("user_not_found")}
-                
-        except Exception as e:
-            logger.error(f"Error awarding points: {str(e)}")
-            return {"success": False, "error": str(e)}
     
-    def award_badge(self, user_id: str, badge_id: str) -> Dict[str, Any]:
-        """Award a badge to a user."""
-        if not user_id or not badge_id:
-            return {"success": False, "error": t("invalid_user_id_or_badge_id")}
-        
-        try:
-            # Check if the badge exists
-            name_field = f"name_{self.current_language}" if self.current_language in ["en", "zh"] else "name_en"
-            desc_field = f"description_{self.current_language}" if self.current_language in ["en", "zh"] else "description_en"
-            
-            badge_query = f"SELECT badge_id, {name_field} as name, {desc_field} as description, points FROM badges WHERE badge_id = %s"
-            badge = self.db.execute_query(badge_query, (badge_id,), fetch_one=True)
-            
-            if not badge:
-                return {"success": False, "error": t("badge_not_found")}
-            
-            # Check if the user already has this badge
-            has_badge_query = """
-                SELECT * FROM user_badges 
-                WHERE user_id = %s AND badge_id = %s
-            """
-            existing = self.db.execute_query(has_badge_query, (user_id, badge_id), fetch_one=True)
-            
-            if existing:
-                return {"success": True, "badge": badge, "message": t("badge_already_awarded")}
-            
-            # Award the badge
-            award_query = """
-                INSERT INTO user_badges 
-                (user_id, badge_id) 
-                VALUES (%s, %s)
-            """
-            self.db.execute_query(award_query, (user_id, badge_id))
-            
-            # Award points for earning the badge
-            badge_points = badge.get("points", 10)
-            self.award_points(
-                user_id, 
-                badge_points,
-                "badge_earned",
-                f"Earned badge: {badge.get('name')}"
-            )
-            
-            return {
-                "success": True, 
-                "badge": badge,
-                "message": t("badge_awarded_successfully").format(badge_name=badge.get('name'))
-            }
-                
-        except Exception as e:
-            logger.error(f"Error awarding badge: {str(e)}")
-            return {"success": False, "error": str(e)}
-
     def _check_point_badges(self, user_id: str, total_points: int) -> None:
         """
         Check if a user qualifies for any point-based badges.
@@ -1017,4 +1124,211 @@ class BadgeManager:
                 
         except Exception as e:
             logger.error(f"{t('error_updating_consecutive_days')}: {str(e)}")
+            return {"success": False, "error": str(e)}
+        
+    def _get_user_total_points(self, user_id: str) -> int:
+        """Get user's total points."""
+        try:
+            query = "SELECT total_points FROM users WHERE uid = %s"
+            result = self.db.execute_query(query, (user_id,), fetch_one=True)
+            return result.get('total_points', 0) if result else 0
+        except Exception as e:
+            logger.error(f"Error getting user total points: {str(e)}")
+            return 0
+    
+    def _get_consecutive_perfect_count(self, user_id: str) -> int:
+        """Get current consecutive perfect review count."""
+        try:
+            query = """
+                SELECT current_streak 
+                FROM user_streaks 
+                WHERE user_id = %s AND streak_type = 'perfect_reviews'
+            """
+            result = self.db.execute_query(query, (user_id,), fetch_one=True)
+            return result.get('current_streak', 0) if result else 0
+        except Exception as e:
+            logger.error(f"Error getting consecutive perfect count: {str(e)}")
+            return 0
+    
+    def _get_streak_count(self, user_id: str, streak_type: str) -> int:
+        """Get current streak count for a specific type."""
+        try:
+            query = """
+                SELECT current_streak 
+                FROM user_streaks 
+                WHERE user_id = %s AND streak_type = %s
+            """
+            result = self.db.execute_query(query, (user_id, streak_type), fetch_one=True)
+            return result.get('current_streak', 0) if result else 0
+        except Exception as e:
+            logger.error(f"Error getting streak count: {str(e)}")
+            return 0
+    
+    def _get_category_statistics(self, user_id: str) -> Dict[str, Dict[str, Any]]:
+        """Get category-specific statistics."""
+        try:
+            query = """
+                SELECT category_name, encountered, identified, mastery_level
+                FROM error_category_stats 
+                WHERE user_id = %s
+            """
+            results = self.db.execute_query(query, (user_id,))
+            
+            stats = {}
+            for result in results or []:
+                stats[result['category_name']] = {
+                    'encountered': result['encountered'],
+                    'identified': result['identified'],
+                    'mastery_level': float(result['mastery_level'])
+                }
+            
+            return stats
+        except Exception as e:
+            logger.error(f"Error getting category statistics: {str(e)}")
+            return {}
+    
+    def _get_user_stats(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get comprehensive user statistics."""
+        try:
+            query = """
+                SELECT uid, reviews_completed, score, total_points, perfect_reviews_count,
+                       average_accuracy, total_session_time, created_at, last_activity
+                FROM users 
+                WHERE uid = %s
+            """
+            return self.db.execute_query(query, (user_id,), fetch_one=True)
+        except Exception as e:
+            logger.error(f"Error getting user stats: {str(e)}")
+            return None
+    
+   
+    def get_user_badges(self, user_id: str) -> List[Dict[str, Any]]:
+        """Get all badges earned by a user."""
+        if not user_id:
+            return []
+        
+        self.current_language = get_current_language()
+        
+        try:
+            name_field = f"name_{self.current_language}" if self.current_language == "en" or self.current_language == "zh" else "name_en"
+            desc_field = f"description_{self.current_language}" if self.current_language == "en" or self.current_language == "zh" else "description_en"
+            
+            query = f"""
+                SELECT b.badge_id, b.{name_field} as name, b.{desc_field} as description, 
+                       b.icon, b.category, b.difficulty, b.points, ub.awarded_at
+                FROM badges b
+                JOIN user_badges ub ON b.badge_id = ub.badge_id
+                WHERE ub.user_id = %s
+                ORDER BY ub.awarded_at DESC
+            """
+            
+            badges = self.db.execute_query(query, (user_id,))
+            return badges or []
+                
+        except Exception as e:
+            logger.error(f"Error getting user badges: {str(e)}")
+            return []
+
+    def award_badge(self, user_id: str, badge_id: str) -> Dict[str, Any]:
+        """Award a badge to a user."""
+        if not user_id or not badge_id:
+            return {"success": False, "error": "Invalid user ID or badge ID"}
+        
+        try:
+            name_field = f"name_{self.current_language}" if self.current_language in ["en", "zh"] else "name_en"
+            desc_field = f"description_{self.current_language}" if self.current_language in ["en", "zh"] else "description_en"
+            
+            badge_query = f"SELECT badge_id, {name_field} as name, {desc_field} as description, points FROM badges WHERE badge_id = %s"
+            badge = self.db.execute_query(badge_query, (badge_id,), fetch_one=True)
+            
+            if not badge:
+                return {"success": False, "error": "Badge not found"}
+            
+            # Check if the user already has this badge
+            has_badge_query = """
+                SELECT * FROM user_badges 
+                WHERE user_id = %s AND badge_id = %s
+            """
+            existing = self.db.execute_query(has_badge_query, (user_id, badge_id), fetch_one=True)
+            
+            if existing:
+                return {"success": True, "badge": badge, "message": "Badge already awarded"}
+            
+            # Award the badge
+            award_query = """
+                INSERT INTO user_badges 
+                (user_id, badge_id) 
+                VALUES (%s, %s)
+            """
+            self.db.execute_query(award_query, (user_id, badge_id))
+            
+            # Award points for earning the badge
+            badge_points = badge.get("points", 10)
+            self.award_points(
+                user_id, 
+                badge_points,
+                "badge_earned",
+                f"Earned badge: {badge.get('name')}"
+            )
+            
+            # Mark badge as completed in progress table
+            self._mark_badge_progress_completed(user_id, badge_id)
+            
+            return {
+                "success": True, 
+                "badge": badge,
+                "message": f"Badge awarded successfully: {badge.get('name')}"
+            }
+                
+        except Exception as e:
+            logger.error(f"Error awarding badge: {str(e)}")
+            return {"success": False, "error": str(e)}
+    
+    def _mark_badge_progress_completed(self, user_id: str, badge_id: str) -> None:
+        """Mark a badge as completed in the progress table."""
+        try:
+            update_query = """
+            UPDATE badge_progress 
+            SET current_progress = target_progress,
+                last_updated = CURRENT_TIMESTAMP
+            WHERE user_id = %s AND badge_id = %s
+            """
+            self.db.execute_query(update_query, (user_id, badge_id))
+        except Exception as e:
+            logger.error(f"Error marking badge progress as completed: {str(e)}")
+
+    def award_points(self, user_id: str, points: int, activity_type: str, details: str = None) -> Dict[str, Any]:
+        """Award points to a user and log the activity."""
+        if not user_id:
+            return {"success": False, "error": "Invalid user ID"}
+        
+        try:
+            # Update the user's total points
+            update_query = """
+                UPDATE users 
+                SET total_points = total_points + %s 
+                WHERE uid = %s
+            """
+            self.db.execute_query(update_query, (points, user_id))
+           
+            # Log the activity
+            log_query = """
+                INSERT INTO activity_log 
+                (user_id, activity_type, points, details_en, details_zh) 
+                VALUES (%s, %s, %s, %s, %s)
+            """
+            self.db.execute_query(log_query, (user_id, activity_type, points, details, details))
+            
+            # Get the updated total points
+            points_query = "SELECT total_points FROM users WHERE uid = %s"
+            result = self.db.execute_query(points_query, (user_id,), fetch_one=True)
+            
+            if result:
+                total_points = result.get("total_points", 0)
+                return {"success": True, "total_points": total_points}
+            else:
+                return {"success": False, "error": "User not found"}
+                
+        except Exception as e:
+            logger.error(f"Error awarding points: {str(e)}")
             return {"success": False, "error": str(e)}

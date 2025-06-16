@@ -7,6 +7,8 @@ DROP VIEW IF EXISTS user_performance_summary;
 DROP VIEW IF EXISTS daily_activity_summary;
 DROP VIEW IF EXISTS badge_progress_summary; 
 
+DROP VIEW IF EXISTS user_practice_summary; 
+
 DROP TABLE IF EXISTS user_badges;
 DROP TABLE IF EXISTS activity_log;
 DROP TABLE IF EXISTS java_errors;
@@ -117,6 +119,35 @@ CREATE TABLE IF NOT EXISTS review_sessions (
     INDEX idx_session_stats (session_type, accuracy_percentage DESC),
     INDEX idx_practice_tracking (user_id, practice_error_code, completed_at DESC)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+
+CREATE TABLE IF NOT EXISTS user_error_practice (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    error_code VARCHAR(100) NOT NULL,
+    error_name_en VARCHAR(200) NOT NULL,
+    error_name_zh VARCHAR(200) NOT NULL,
+    category_name VARCHAR(100) NOT NULL,
+    practice_count INT DEFAULT 0,
+    total_attempts INT DEFAULT 0,
+    successful_completions INT DEFAULT 0,
+    best_accuracy DECIMAL(5,2) DEFAULT 0.00,
+    total_time_spent INT DEFAULT 0,
+    last_practiced TIMESTAMP NULL,
+    first_practiced TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completion_status ENUM('not_started', 'in_progress', 'completed', 'mastered') DEFAULT 'not_started',
+    mastery_level DECIMAL(5,2) DEFAULT 0.00,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES users(uid) ON DELETE CASCADE,
+    UNIQUE KEY unique_user_error (user_id, error_code),
+    INDEX idx_user_practice (user_id, completion_status),
+    INDEX idx_error_practice (error_code, completion_status),
+    INDEX idx_user_mastery (user_id, mastery_level DESC),
+    INDEX idx_practice_stats (user_id, last_practiced DESC)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 
 -- Add badge_progress table to track incremental progress toward badges
 CREATE TABLE IF NOT EXISTS badge_progress (
@@ -244,6 +275,21 @@ CREATE TABLE IF NOT EXISTS user_interactions (
     INDEX idx_interaction_type (interaction_type, timestamp DESC)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+
+CREATE VIEW user_practice_summary AS
+SELECT 
+    u.uid as user_id,
+    u.display_name_en,
+    u.display_name_zh,
+    COUNT(uep.id) as total_errors_practiced,
+    SUM(CASE WHEN uep.completion_status = 'completed' THEN 1 ELSE 0 END) as completed_errors,
+    SUM(CASE WHEN uep.completion_status = 'mastered' THEN 1 ELSE 0 END) as mastered_errors,
+    AVG(uep.best_accuracy) as average_accuracy,
+    SUM(uep.total_time_spent) as total_practice_time,
+    MAX(uep.last_practiced) as last_practice_session
+FROM users u
+LEFT JOIN user_error_practice uep ON u.uid = uep.user_id
+GROUP BY u.uid, u.display_name_en, u.display_name_zh;
 
 -- Verification and status
 SELECT 'Database tables created successfully!' as Status;
