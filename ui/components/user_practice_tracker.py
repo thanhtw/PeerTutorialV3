@@ -6,6 +6,7 @@ import json
 from typing import Dict, List, Any, Optional
 from data.database_error_repository import DatabaseErrorRepository
 from data.mysql_connection import MySQLConnection
+from utils.language_utils import t
 
 
 logger = logging.getLogger(__name__)

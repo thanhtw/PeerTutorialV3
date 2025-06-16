@@ -353,11 +353,7 @@ class TutorialUI:
                     <div class="stat-card-enhanced success">
                         <div class="stat-number-enhanced">{practice_stats.get('total_practiced', 0)}</div>
                         <div class="stat-label-enhanced">{t('practiced')}</div>
-                    </div>
-                    <div class="stat-card-enhanced primary">
-                        <div class="stat-number-enhanced">{practice_stats.get('completed_count', 0)}</div>
-                        <div class="stat-label-enhanced">{t('completed')}</div>
-                    </div>                  
+                    </div>                                     
                 </div>
             </div>
         </div>
@@ -763,8 +759,7 @@ class TutorialUI:
         """Render enhanced error card with practice status indicators."""
         error_name = error.get(t("error_name_variable"), t("unknown_error"))        
         difficulty = error.get('difficulty_level', 'medium')
-        practice_stats = error.get('practice_stats')
-        print(f"Rendering error card for: {error_name} (Code: {error})")
+        practice_stats = error.get('practice_stats')       
         # Get full error details if not provided
         if not error.get(t("description")):
             category = error.get('category', '')
